@@ -1,0 +1,373 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>D3188=10-0178. 
+Revision to N3113: Async Launch Policies (CH36)</title>
+  <style type="text/css">
+del, del * { background-color: #FF6666 ; color: #0000CC }
+ins, ins * { background-color: #99FFCC; color:  #0000CC }
+  </style>
+</head>
+
+<body>
+  <div class="Section1">
+    <table border="1" cellpadding="1">
+      <tr>
+        <td>
+          <p>Document Number:</p>
+        </td>
+
+        <td>
+          <p>D3188=10-0178 Revision to (N3113=10-0103)</p>
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          <p>Date:</p>
+        </td>
+
+        <td>
+          <p>2010-11-108</p>
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          <p>Project:</p>
+        </td>
+
+        <td>
+          <p>Programming Language C++</p>
+        </td>
+      </tr>
+    </table>
+
+    <p>Peter Sommerlad &lt;<a href=
+    "mailto:peter.sommerlad@hsr.ch">peter.sommerlad@hsr.ch</a>&gt;</p>
+
+    <h1>D3188 - Revision to N3113: Async Launch Policies (CH 36)</h1>
+
+    <h2>Introduction</h2>
+
+    <p>The limitation of async's launch strategies to only 2 different strategies (sync,
+    async) and a third strategy saying either one makes it hard for vendors to provide
+    better strategies in the future and for users writing portable code wrt to the
+    available strategies.</p>
+
+    <p>A bitmask type for the async launch strategy seems to be more suitable than a
+    3-way enum. However, adaptation of the bitmask requirements (GB53) couldn't be voted
+    in Rapperswil, but were close to and it is expected they will be voted in 
+    Batavia. Further discussion provided insight that an enum with corresponding 
+    overloaded bit-operators should be chosen.</p>
+
+    <h2>Problem</h2>
+
+    <p>Providing only three different possible values for the enum launch and saying that
+    launch::any means either launch::sync or launch::async is very restricting. This
+    hinders future implementors to provide clever infrastructures that can simply used
+    by a call to async(launch::any,...). Also there is no hook for an implementation to
+    provide additional alternatives to launch enumeration and no useful means to combine
+    those (i.e. interpret them like flags). We believe something like async(launch::sync
+    | launch::async, ...) should be allowed and can become especially useful if one could
+    say also something like async(launch::any &amp; ~launch::sync, ....) respectively.
+    This flexibility might limit the features usable in the function called through
+    async(), but it will allow a path to effortless profit from improved
+    hardware/software without complicating the programming model when just using
+    async(launch::any,...)</p>
+    
+    <p>The visual distinction of <code>launch::sync</code> and <code>launch::async</code> 
+    is hard to see. In addition <code>launch::sync</code> is not about synchronous execution,
+    but deferring the function execution until its result is really wanted, which may never.
+    Therefore this document suggests also renaming the launch policy
+    <code>launch::sync</code>  to become 
+    <code>launch::deferred</code> 
+    </p>
+
+    <h2>Discussion</h2>
+
+    <p>CH 36 provided the following proposal:</p>
+
+    <p>Change in 30.6.1 'enum class launch' to allow further implementation defined
+    values and provide the following bit-operators on the launch values (operator|,
+    operator&amp;, operator~ delivering a launch value). Note: a possible implementation
+    might use an unsigned value to represent the launch enums, but we shouldn't limit the
+    standard to just 32 or 64 available bits in that case and also should keep the launch
+    enums in their own enum namespace.</p>
+
+    <p>Change [future.async] p3 according to the changes to enum launch. change
+    --launch::any to "the implementation may choose any of the policies it provides."
+    Note: this can mean that an implementation may restrict the called function to take
+    all required information by copy in case it will be called in a different address
+    space, or even, on a different processor type. To ensure that a call is either
+    performed like launch::async or launch::sync describe one should call
+    async(launch::sync|launch::async,...)</p>
+
+    <p>Discussion in Rapperswil:</p>
+
+    <p>The discussion discovered that the launch enum served two aspects: On the one hand,
+    there is an implementation view, where an "enum bit" can denote a specific async launch
+    strategy, e.g., in a thread pool, or run it on a GPU. Such a specific launch
+    mechanism provides specific requirements for the underlying function to be run
+    asynchronously, such as copying all input values, or only referring to read-only data
+    to avoid races. On the other hand, there is a user's view where the enum should specify
+    the requirements the user
+    can guarantee for the asynchronously called function and the implementation should be
+    able to select an appropriate one, may be even dynamically for very clever
+    implementations (see below).</p>
+
+    <p>To allow this dual nature the enum should provide a hook for implementers to
+    extend it and for users to combine enum values in a useful way, e.g., with a meaning
+    "anything but sync", or "I don't care, because the function is a pure function and
+    would not give any data races or undefined behavior".</p>
+
+    <p>The discussion also covered if launch::any is a good name for
+    (launch::sync|launch::async) or for "everything implementers think is safe". However,
+    the name "default" is a keyword and thus unavailable. Nevertheless, the "default"
+    used by the async() function overload without a launch strategy should at least be
+    (launch::sync|launch::async).</p>
+
+    <p>&nbsp;</p>
+
+    <p>Minutes from Discussion in Rapperswil:</p>
+    <pre>
+existing launch enums: sync, async
+    
+vendor and future lunch enums: separate_process, other_endian, gpu
+
+possible launch enum sets:
+   nothing_outside_standard = async | sync
+   no_restrictions_beyond_the_standard = 
+   what_implementers_think_is_safe =
+   everything_implementers_have = 
+    
+launch::default &lt;= launch::no_restrictions_beyond_the_standard
+   
+launch::any = ?
+   
+std::async( task );
+   
+std::async( std::launch::async | std::launch::gpu, task );
+</pre>
+
+    <p>Proposed text: The value launch::default is at least sync|async. Any vendor
+    extensions shall place no additional restrictions on task interaction.</p>
+
+    <p>&nbsp;</p>
+
+<p>further discussion on the reflector and emails provided input and changes.</p>
+
+<p>Discussion in Batavia and on reflector while there</p>
+<em>
+<p>Daniel Kr&uuml;gler</p>
+<p>I would strongly appreciate, if this paper would follow the
+idea that was implemented in the bitmask-repair paper
+</p><p>
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2010/n3110.html
+</p><p>
+that is now in the staging area and to *remove* the declared
+operators for type launch, because they are implied by the
+bitmask definition enforced by this bimask paper. The disadvantage
+of the current paper state is that the non-mutable functions are
+unnecessarily non-constexpr, and second we have unnecessary
+wording duplication with chances of unwanted differences.
+</p><p>
+IMO the chances of a rejection of n3110 are minimal, because
+it was only rejected the last time to get more time to read it.
+</p>
+</em>
+<p>The previous version of this paper N3113 caused several minor conflicting edits
+with other papers or issues that were corrected here: </p>
+<ul><li>N3125 - change "happens-before" to "synchronizes-with" because happens-before doesn't 
+guarantee transitivity in 30.6.9p5</li>
+<li>N3129 - Lawrence paper on clarifying handling of liason state 
+(aka associated asynchronous state): add the paper's number</li>
+<li>N3170 - conflicting edits in 30.6.9 p5 wrt. to "as if joining a thread">
+make the proposed change to the corresponding sentence</li>
+<li>LWG 1518 - conflicting edits in 30.6.9 p3 wrt to semantics of when a deferred function 
+gets called (not in the case of timed waiting functions)</li>
+</ul>
+<p>Plus it got rid of the bitmask operators, because those are implied, 
+when the non-controversial paper N3110 is voted in.</p>
+
+    <h2>Acknowledgements</h2>
+
+    <p>Thanks to Detlef Vollmann, Lawrence Crowl, Pete Becker, Alberto Ganesh Barbati, 
+    Anthony Williams, Daniel Kr&uuml;gler, Hans Boehm, Michael Wang, Bjarne Stroustrup
+    and the Concurrency subgroup for their
+    comments and contributions to this paper.</p>
+
+    <h2>Resolved Issues</h2>
+
+    <p>This paper addresses and details the proposed resolution of FDIS NB comment CH 36. 
+    It uses terms of art to be introduced by a paper by Lawrence Crowl N3129</p>
+
+    <h2>Proposed Changes</h2>
+
+    <h3>Make launch a bitmask type according to N3110:</h3>
+
+
+    <p>In 30.6.1 p1 replace</p>
+<del>
+    <pre>
+enum class launch {
+ any,   
+ async,
+ sync
+};
+</pre>
+</del>
+    <p>with</p>
+<ins>
+    <pre>
+enum class launch : <em>unspecified</em> {
+  async = <em>unspecified</em>,
+  deferred = <em>unspecified</em>
+  <em>, implementation defined</em>
+};
+
+</pre>
+</ins>
+
+    <p>At the end of 30.6.1 add</p>
+<ins>
+    <p>The enum type launch is an implementation-defined bitmask type
+    (17.5.2.1.3) with launch::async and launch::deferred denoting individual bits. 
+    [ <em>Note</em>: 
+    Implementations can provide bitmasks to specify restrictions on task interaction
+    by functions launched by <code>async()</code> applicable to a corresponding subset 
+    of available launch policies.
+    Implementations that would like to extend the behavior of the first
+    overload of async are free to do so by adding their extensions to the launch
+    policy under the "as if" rule.
+    <em>end note</em> ]</p>
+</ins>
+
+	<p>Change 30.6.4 paragraph 2 as follows:</p>
+	
+	[<em>Note</em>: The result can be any kind of object including a function to
+	compute that result, as used by <code>async</code> when <code>policy</code> is 
+	<code>launch::<ins>deferred</ins><del>sync</del></code>. &mdash;
+	<em>end note</em> ]
+
+    <h3>Specify semantics in a clearer way using terminology from 1.10 and an updated
+    30.4 (according to the paper by Lawrence Crowl)</h3>
+
+    <p>Change 30.6.9 p3 as follows:</p>
+    <p>
+	<em>Effects:</em> The first function behaves the same as a call to the second
+	function with a <code>policy</code> argument of <code><del>launch::any</del>
+	<ins>(launch::async|launch::deferred)</ins></code>
+	and the same arguments
+	for <code>F</code> and <code>Args</code>. 
+	The second function creates an associated asynchronous
+	state that is associated with the returned <code>future</code> object. The further
+	behavior of the second function depends on the <code>policy</code> argument as
+	follows. 
+	<ins>If more than one bullet applies, the implementation may choose any applicable policy.</ins>
+	</p>
+	
+	<p>&mdash; <ins>If</ins> <code> launch::async</code> <ins>is set in <code>policy</code></ins>
+	&mdash; executes <code><em>INVOKE</em>(decay_copy(std::forward&lt;F&gt;(f)),
+	decay_copy(std::forward&lt;Args&gt;(args))...)</code> (20.8.2, 30.3.1.2) as if in
+	a new thread of execution represented by a <code>thread</code> object with the
+	calls to <code>decay_copy()</code> being evaluated in the thread that called
+	<code>async</code>. Any return value is stored as the result in the associated
+	asynchronous state. Any exception propagated from the execution of
+	<code><em>INVOKE</em>(decay_copy(std::forward&lt;F&gt;(f)),
+	decay_copy(std::forward&lt;Args&gt;(args))...)</code> is stored as the
+	exceptional result in the associated asynchronous state. The
+	<code>thread</code> object is stored in the associated asynchronous state and
+	affects the behavior of any <del><code>future</code></del><ins>asynchronous return</ins>
+	objects that reference that state.
+	</p>
+	
+	
+    <p>&mdash;<ins>If</ins> <code>launch::<del>sync</del><ins>deferred</ins></code>
+    <ins> is set in <code>policy</code></ins>
+     &mdash; Stores
+    <code>decay_copy(std::forward&lt;F&gt;(f))</code> and
+    <code>decay_copy(std::forward&lt;Arg&gt;(args))...</code> in the associated
+    asynchronous state. These copies of <code>f</code> and <code>args</code> constitute a
+    <em>deferred function</em>. Invocation of the deferred function evaluates
+    <code>INVOKE(g, xyz)</code> where <code>g</code> is the stored value of
+    <code>decay_copy(std::forward&lt;F&gt;(f))</code> and <code>xyz</code> is the stored
+    copy of <code>decay_copy(std::forward&lt;Args.(args))...</code>. The associated
+    asynchronous state is not <ins>made</ins> ready until the function has completed. 
+<!--Library issue 1518-->    
+The first call to a function
+<del>waiting</del><ins>requiring a non-timed wait on an asynchronous return
+    object referring to</ins> <del>for</del> the
+associated asynchronous state created by this  <code>async</code> call to become
+ready shall invoke the deferred function in the thread that called
+the waiting function; <ins>once evaluation of <tt><i>INVOKE</i>(g,
+xyz)</tt> begins, the function is no longer considered
+deferred</ins> <del>all other calls waiting for the same associated
+asynchronous state to become ready shall block until the deferred
+function has completed</del>.
+    <ins>[ <em>Note:</em> If this policy is specified together with other policies,
+    such as when using a <code>policy</code> value of <code>launch::async|launch::deferred</code>, 
+    implementations should defer invocation or the
+    selection of the policy when no more concurrency can be effectively exploited.
+    &mdash;<em>end note</em>]</ins></p>
+
+    <p><del>&mdash;<code>launc::any </code> &mdash; the implementation 
+    may choose either policy at
+    any call to <code>async</code>. 
+    [ <em>Note</em>: implementations should defer invocation 
+    when no more concurrency can be effectively exploited.     
+    &ndash;
+    <em>end note</em> ]</del></p>
+
+    <p>Change 30.6.9 p5 as follows:</p>
+
+    <p><em>Synchronization</em>: <ins>Regardless of provided <code>policy</code></ins></p>
+
+    <ul>
+      <li>the invocation of <code>async</code> 
+      <del>happens before</del><ins>synchronizes with</ins> (1.10) the invocation of
+      <code>f</code>. [ <em>Note</em>: this statement applies even when the corresponding
+      <code>future</code> object is moved to another thread. &mdash;<em>end note</em> ]</li>
+<ins>
+      <li>the completion of the function <code>f</code> synchronizes with
+      (1.10) the calling thread <em>making the associated asynchronous state ready</em> . [
+      <em>Note</em>: f might not be called at all, so its completion might never happen. &ndash;
+      <em>end note</em>]</li>
+
+      <li>the return from the invocation of <code>async</code>
+      synchronizes with (1.10) the return from last function that releases the associated
+      asynchronous state.</li>
+</ins>
+    </ul>
+
+    <p>If <ins><code>launch::async</code> is set in policy</ins> 
+    <del>the invocation is not deferred,</del></p>
+
+    <ul>
+      <li>a call to a waiting function on an asynchronous return object that shares the
+      associated asynchronous state created by this <code>async</code> call shall block
+      until the associated <code>thread</code> has completed
+      <ins>, as if joined ([thread.thread.member])</ins>.</li>
+
+      <li>the <code>join()</code>on the created <code>thread</code><ins> object</ins>
+      <ins>synchronizes with</ins>
+      <del>happens-before</del> (1.10) the first function that successfully detects the ready status
+      of the associated asynchronous state returns or <ins>synchronizes with (1.10)</ins>
+      <del>before</del> 
+      the <ins>return from the last</ins> function that <del>that gives up the last
+      reference to</del> <ins>releases</ins> the associated asynchronous state, whichever
+      happens first. <del>If the invocation is deferred, the completion of the invocation
+      of the deferred function happens-before the calls to the waiting functions
+      return.</del></li>
+    </ul>
+
+    <p>Change the note in 30.6.9 p 9 as follows:</p>
+
+    <p>[ <em>Note</em>: line #1 might not result in concurrency because the
+    <code>async</code> call uses the default <del><code>launch::any</code></del> policy, which may
+    use <code>launch::<ins>deferred</ins><del>sync</del></code>, in which case the lambda might
+    not be invoked until the <code>get()</code> call; in that case, <code>work1</code>
+    and <code>work2</code> are called on the same thread and there is no concurrency. &ndash;
+    <em>end note</em> ] &mdash;<em>end example</em> ]</p>
+  </div>
+</body>
+</html>

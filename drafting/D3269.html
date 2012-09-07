@@ -1,0 +1,92 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>D3269: shared_future(future&lt;R&gt;&amp;&amp;) should be allowed to throw</title>
+  <style type="text/css">
+del, del * { background-color: #FF6666 ; color: #0000CC }
+ins, ins * { background-color: #99FFCC; color:  #0000CC }
+  </style>
+</head>
+
+<body>
+  <div class="Section1">
+    <table border="1" cellpadding="1">
+      <tr>
+        <td>
+          <p>Document Number:</p>
+        </td>
+
+        <td>
+          <p>D3269=11-0039</p>
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          <p>Date:</p>
+        </td>
+
+        <td>
+          <p>2011-03-24</p>
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          <p>Project:</p>
+        </td>
+
+        <td>
+          <p>Programming Language C++</p>
+        </td>
+      </tr>
+    </table>
+
+    <p>Peter Sommerlad &lt;<a href=
+    "mailto:peter.sommerlad@hsr.ch">peter.sommerlad@hsr.ch</a>&gt;</p>
+
+    <h1>D3269: shared_future(future&lt;R&gt;&amp;&amp;) should be allowed to throw</h1>
+
+    <h2>Problem</h2>
+<p>Requiring the constructor <tt>shared_future(future&lt;R&gt;&amp;&amp;)</tt> 
+not to throw is a pessimisation of the case where a future is returned from a call to 
+<tt>async(function,launch::deferred)</tt> and possible other cases.
+</p><p>
+Such a future not dealing with multiple threads
+only needs to keep (a copy of) the function to be called it later. However, 
+creating a shared_future from that future will require more infrastructure,
+like space for the value of type R, an exception_ptr,
+and a synchronized reference counter for the shared_future's
+instances. 
+</p><p>
+Enforcing the constructor <tt>shared_future(future&lt;R&gt;&amp;&amp;)</tt>
+not to throw, implies that any implementation of future will need to pre-allocate
+space for <tt>shared_future</tt>'s infrastructure, that also requires an operating system
+resource for synchronization, regardless if is ever needed. 
+</p><p>
+In addtion the usual way to obtain a shared_future from a future is to call 
+<tt>future::share()</tt> that also does not give a non throwing guarantee anyway.
+</p>
+    <h2>Proposed Changes</h2>
+    
+<ol>
+<li>In 30.6.7 [futures.shared_future] after p.3 <tt>shared_future</tt> synopsis
+and after p.8:
+<p>
+if noexcept is not removed from </p>
+<blockquote>
+<tt>shared_future(future&lt;R&gt;&amp;&amp;) noexcept;</tt> 
+</blockquote>
+<p>remove <tt>noexcept</tt>.
+</li>
+<li>In 30.6.7 [futures.shared_future] after p.10:
+<p>if the following was added:
+<blockquote>
+?? <em>Throws</em>: Nothing.
+</blockquote>
+<p>was added, remove it.</p>
+</li>
+</ol>
+
+  </div>
+</body>
+</html>

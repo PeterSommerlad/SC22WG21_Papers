@@ -1,0 +1,50 @@
+1369. [FCD] rethrow_exception may introduce data races
+
+Section: 18.8.6 [propagation] Status: Review Submitter: BSI Opened: 2010-08-25 Last modified: 2010-11-11
+
+View other active issues in [propagation].
+
+View all other issues in [propagation].
+
+View all issues with Open status.
+
+Discussion:
+
+Addresses GB-74
+
+One idea for the exception_ptr type was that a reference-counted implementation 
+could simply 'reactivate' the same exception object in the context of a call to 
+rethrow_exception. Such an implementation would allow the same exception object to be 
+active in multiple threads (such as when multiple threads join on a shared_future) and 
+introduce potential data races in any exception handler that catches exceptions by reference 
+- notably existing library code written before this capability was added. rethrow_exception 
+should always make a copy of the target exception object.
+
+
+
+Batavia Meeting 2010-11-11:
+
+Howard consider the following proposed resolution to be ABI changing and NAD.
+
+
+Concurrency group is in favor of adding a note after 18.8.6p10
+
+Proposed resolution:
+
+[pre Batavia 2010-11-11]:
+
+Add the following to 18.8.5, [propogation]
+
+    Throws: a copy of the exception object to which p refers. 
+
+[Batavia 2010-11-11]
+
+Add the following note to 18.8.6p10, [propagation]
+
+[Note: This may cause the same exception to be thrown concurrently in multiple threads. 
+Modification of such an exception object might introduce data races.]
+
+Add the following note to 30.6.7p22, [futures.shared_future]
+
+[Note: This may cause the same exception to be thrown concurrently in multiple threads. 
+Modification of such an exception object might introduce data races.]

@@ -1,0 +1,27 @@
+1364. [FCD] It is not clear how exception_ptr is synchronized
+
+Section: 18.8.6 [propagation] Status: NAD Submitter: Switzerland Opened: 2010-08-25 Last modified: 2010-11-11
+
+View other active issues in [propagation].
+
+View all other issues in [propagation].
+
+View all issues with Open status.
+
+Discussion:
+
+Addresses CH-19
+
+It is not clear how exception_ptr is synchronized.
+
+[ Resolution proposed by ballot comment ]
+
+Make clear that accessing in different threads multiple exception_ptr objects that all refer to the same exception introduce a race.
+
+[ Batavia 2010-11-11]
+
+17.6.4.8 guarantees that the reference counter, if any, is synchronized.
+
+proposed resolution to 1369 resolves also this issue for rethrow.
+
+Proposed resolution:

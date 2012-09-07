@@ -1,0 +1,37 @@
+<hr>
+<h3><a name="1368"></a>1368. [FCD] Thread safety of <tt>std::uncaught_exception()</tt></h3>
+<p><b>Section:</b> 18.8.5 [uncaught] <b>Status:</b> <a href="lwg-active.html#Immediate">Immediate</a>
+ <b>Submitter:</b> BSI <b>Opened:</b> 2010-08-25 <b>Last modified:</b> 2010-10-27</p>
+
+<p><b>View all issues with</b> <a href="lwg-status.html#Open">Open</a> status.</p>
+<p><b>Discussion:</b></p>
+<p><b>Addresses GB-73</b></p>
+<p>
+The thread safety <tt>std::uncaught_exception()</tt> and the
+result of the function when multiple threads throw
+exceptions at the same time are unspecified. To make the
+function safe to use in the presence of exceptions in
+multiple threads the specification needs to be updated.
+</p>
+
+<p><i>[
+Resolution proposed by ballot comment
+]</i></p>
+
+<p>
+Update this clause to support safe calls from
+multiple threads without placing synchronization
+requirements on the user.
+</p>
+
+
+
+<p><b>Proposed resolution:</b></p>
+
+<p>change 18.8.5p1 [uncaught]  as follows:</p>
+<p>
+Returns: <tt>true</tt> after <ins> the current thread has initialized </ins><del>initializing</del>
+ an exception object (15.1) until a handler for the exception (including unexpected() or terminate()) 
+ is activated (15.3). [ Note: This includes stack unwinding (15.2). - end note ]
+</p>
+<hr>
