@@ -37,6 +37,7 @@ Discussion on the reflector in May 2012 showed demand for some or even many pre-
 \item \tcode{s} was proposed for \tcode{std::string} but is also ISO standard for seconds and could be convenient for \tcode{std::chrono::duration} values.
 \item an UDL for constructing \tcode{std::string} literals should not allocate memory, but use a \tcode{str_ref} type, once some like that is available in the standard.
 \item any proposal that is made for adding user-defined literal functions to the standard library will evoke some discussion.
+\item Alberto Ganesh Barbati <albertobarbati@gmail.com> suggested to provide the number parsing facility to be used by UDL template operators should be exported, so that authors of UDL suffixes could reuse it.
 \end{itemize}
 
 Based on this discussion this paper proposes to include UDL operators for the following library components.
@@ -47,7 +48,23 @@ Based on this discussion this paper proposes to include UDL operators for the fo
 \item \tcode{std::chrono::duration}, suffixes \tcode{h, min, s, ms, us, ns} in \\namespace \tcode{std::suffixes::chrono}
 \end{itemize}
 
+\section{Rationale}
+User-defined literal operators (UDL) are a new features of C++11. However, while the feature is there it is not yet used by the standard library of C++11. The papers introducing UDL already named a few examples where source code could benefit from pre-defined UDL operators in the library, such as binary number, imaginary number, or std::string literals.
+
+Fortunately the C++11 standard already reserved UDL names not starting with an underscore '_' for future standardization. 
+
+In addition to a facility for binary literals for integral values, several library classes representing scalar or numeric types can benefit from pre-defined UDL operators that ease their use: \tcode{std::complex} and \tcode{std::chrono::duration}. Also std::basic_string<CharT> instantiations are a viable candidate for a suffix \tcode{operator "" s(CharT const*, size_t)}.
+
+During the creation of this paper, it became apparent that a mechanism for parsing integral values from UDL operator template can be useful in its own, so that implementers of their own UDL operators can reuse it. A further observation from implementing binary literals was, that to mimic the mechanism of the compiler to automatically select a best fitting integral type, based on the literal's value can be reused as well in similar UDL operators. The last mechanism actually requires parsing integral values by UDL operator templates to retain the value as a compile-time constant. This would get lost if the UDL operator taking an \tcode{unsigned long long} would have been chosen.
+
 \section{Open Issues}
+\subsection{Suffixes Utilities}
+It has to be decided if the utilities for implementing UDL suffix operators with integers should be standardized.
+
+Especially the \tcode{constexpr unsigned long long pow(unsigned, size_t)} function might be put somewhere else, because it is actually unrelated and might not be standardized at all. I started out with the classic recursive template class with a static const value member, before I recognized that a compile-time \tcode{pow()} for small integer bases is actually what is needed.
+
+The template \tcode{select_int_type} might be a candidate for the clause [meta.type.synop], aka header \tcode{<type_traits>}.
+
 \subsection{Upper-case versions of suffixes}
 While it seems useful and symmetric to provide upper case variations of suffixes \tcode{u, l, ll, ull} as allowed for integral constants, it needs to be discussed if also \tcode{'b'} should vary in case accordingly and thus doubling the number of overloaded UDL operators.
 
@@ -60,10 +77,222 @@ It needs to be discussed if this set of suffixes (r, lr, fr, R, LR, FR) for comp
 
 %\section{}
 \section{Acknowledgements}
-Acknowledgements go to the original authors of the sequence of papers the lead to inclusion of UDL in the standard and to the participants of the discussion on UDL on the reflector. Special thanks to Daniel Kr\"ugler for feedback on early drafts and to Jonathan Wakely for guidelines on GCC command line options. Thanks to Alberto Ganesh Barbati for feedback on duration representation overflow.
+Acknowledgements go to the original authors of the sequence of papers the lead to inclusion of UDL in the standard and to the participants of the discussion on UDL on the reflector. Special thanks to Daniel Kr\"ugler for feedback on early drafts and to Jonathan Wakely for guidelines on GCC command line options. Thanks to Alberto Ganesh Barbati for feedback on duration representation overflow and suggestion for also providing the number parsing as a standardized library component. Thanks to Bjarne Stroustrup for suggesting to add more rationale to the proposal.
 
 \chapter{Possible Implementation}
 This section shows some possible implementations of the user-defined-literals proposed.
+\section{integer parsing}
+For its usage, seee the implementation of \tcode{std::chrono::duration} literals.
+\begin{codeblock}
+#ifndef SUFFIXESPARSENUMBERS_H_
+#define SUFFIXESPARSENUMBERS_H_
+#include <cstddef>
+namespace std {
+namespace suffixes {
+namespace parse_int {
+
+template <unsigned base, char... Digits>
+struct parse_int{
+    static_assert(base<=16u,"only support up to hexadecimal");
+    static_assert(! sizeof...(Digits), "invalid integral constant");
+    static constexpr unsigned long long value=0;
+};
+
+template <char... Digits>
+struct base_dispatch;
+
+template <char... Digits>
+struct base_dispatch<'0','x',Digits...>{
+    static constexpr unsigned long long value=parse_int<16u,Digits...>::value;
+};
+template <char... Digits>
+struct base_dispatch<'0','X',Digits...>{
+    static constexpr unsigned long long value=parse_int<16u,Digits...>::value;
+};
+template <char... Digits>
+struct base_dispatch<'0',Digits...>{
+    static constexpr unsigned long long value=parse_int<8u,Digits...>::value;
+};
+template <char... Digits>
+struct base_dispatch{
+    static constexpr unsigned long long value=parse_int<10u,Digits...>::value;
+};
+
+constexpr unsigned long long
+pow(unsigned base, size_t to) {
+    return to?base * pow(base,to-1):1;
+}
+
+template <unsigned base, char... Digits>
+struct parse_int<base,'0',Digits...>{
+    static constexpr unsigned long long value{ parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'1',Digits...>{
+    static constexpr unsigned long long value{ 1 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'2',Digits...>{
+    static_assert(base>2,"invalid digit");
+    static constexpr unsigned long long value{ 2 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'3',Digits...>{
+    static_assert(base>3,"invalid digit");
+    static constexpr unsigned long long value{ 3 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'4',Digits...>{
+    static_assert(base>4,"invalid digit");
+    static constexpr unsigned long long value{ 4 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'5',Digits...>{
+    static_assert(base>5,"invalid digit");
+    static constexpr unsigned long long value{ 5 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'6',Digits...>{
+    static_assert(base>6,"invalid digit");
+    static constexpr unsigned long long value{ 6 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'7',Digits...>{
+    static_assert(base>7,"invalid digit");
+    static constexpr unsigned long long value{ 7 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'8',Digits...>{
+    static_assert(base>8,"invalid digit");
+    static constexpr unsigned long long value{ 8 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'9',Digits...>{
+    static_assert(base>9,"invalid digit");
+    static constexpr unsigned long long value{ 9 *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'a',Digits...>{
+    static_assert(base>0xa,"invalid digit");
+
+    static constexpr unsigned long long value{ 0xa *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'b',Digits...>{
+    static_assert(base>0xb,"invalid digit");
+    static constexpr unsigned long long value{ 0xb *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'c',Digits...>{
+    static_assert(base>0xc,"invalid digit");
+    static constexpr unsigned long long value{ 0xc *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'d',Digits...>{
+    static_assert(base>0xd,"invalid digit");
+    static constexpr unsigned long long value{ 0xd *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'e',Digits...>{
+    static_assert(base>0xe,"invalid digit");
+    static constexpr unsigned long long value{ 0xe *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'f',Digits...>{
+    static_assert(base>0xf,"invalid digit");
+    static constexpr unsigned long long value{ 0xf *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'A',Digits...>{
+    static_assert(base>0xA,"invalid digit");
+    static constexpr unsigned long long value{ 0xa *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'B',Digits...>{
+    static_assert(base>0xB,"invalid digit");
+    static constexpr unsigned long long value{ 0xb *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'C',Digits...>{
+    static_assert(base>0xC,"invalid digit");
+    static constexpr unsigned long long value{ 0xc *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'D',Digits...>{
+    static_assert(base>0xD,"invalid digit");
+    static constexpr unsigned long long value{ 0xd *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'E',Digits...>{
+    static_assert(base>0xE,"invalid digit");
+    static constexpr unsigned long long value{ 0xe *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+template <unsigned base, char... Digits>
+struct parse_int<base,'F',Digits...>{
+    static_assert(base>0xF,"invalid digit");
+    static constexpr unsigned long long value{ 0xf *pow(base,sizeof...(Digits))
+                                               + parse_int<base,Digits...>::value};
+};
+}
+}
+}
+#endif /* SUFFIXESPARSENUMBERS_H_ */
+\end{codeblock}
+
+\section{integral type fitting}
+For its usage, see the implementation of binary literals.
+\begin{codeblock}
+#ifndef SELECT_INT_TYPE_H_
+#define SELECT_INT_TYPE_H_
+#include <type_traits>
+#include <limits>
+
+namespace std {
+namespace suffixes {
+namespace select_int_type {
+
+template <unsigned long long val, typename... INTS>
+struct select_int_type;
+
+template <unsigned long long val, typename INTTYPE, typename... INTS>
+struct select_int_type<val,INTTYPE,INTS...>:conditional<
+    val<=static_cast<unsigned long long>(std::numeric_limits<INTTYPE>::max())
+    ,INTTYPE
+    ,typename select_int_type<val,INTS...>::type >{
+    static typename select_int_type::type const
+        value{ static_cast<typename select_int_type::type>(val) };
+};
+
+template <unsigned long long val>
+struct select_int_type<val>{
+    typedef unsigned long long type;
+    static type const value{  val };
+};
+
+}}}
+#endif /* SELECT_INT_TYPE_H_ */
+\end{codeblock}
+
 
 \section{binary}
 \begin{codeblock}
@@ -71,152 +300,132 @@ This section shows some possible implementations of the user-defined-literals pr
 #define BINARY_H_
 #include <limits>
 #include <type_traits>
+#include "select_int_type.h"
 namespace std{
 namespace suffixes{
 namespace binary{
 namespace __impl{
-// serves also as base case of recursion
+
 template <char... Digits>
 struct bitsImpl{
-	static_assert(! sizeof...(Digits),
-			"binary literal digits must be 0 or 1");
-	static constexpr unsigned long long value=0;
+    static_assert(! sizeof...(Digits),
+            "binary literal digits must be 0 or 1");
+    static constexpr unsigned long long value=0;
 };
 
 template <char... Digits>
 struct bitsImpl<'0',Digits...>{
-	static constexpr unsigned long long value=bitsImpl<Digits...>::value;
+    static constexpr unsigned long long value=bitsImpl<Digits...>::value;
 };
 
 template <char... Digits>
 struct bitsImpl<'1',Digits...>{
-	static constexpr unsigned long long value=
-			bitsImpl<Digits...>::value|(1ULL<<sizeof...(Digits));
+    static constexpr unsigned long long value=
+            bitsImpl<Digits...>::value|(1ULL<<sizeof...(Digits));
 };
-
-template <unsigned long long val, typename... INTS>
-struct select_type;
-
-template <unsigned long long val, typename INTTYPE, typename... INTS>
-struct select_type<val,INTTYPE,INTS...>:conditional<
-	val<=static_cast<unsigned long long>(std::numeric_limits<INTTYPE>::max())
-	,INTTYPE
-	,typename select_type<val,INTS...>::type >{
-	static typename select_type::type const
-		value{ static_cast<typename select_type::type>(val) };
-};
-
-template <unsigned long long val>
-struct select_type<val>{
-	typedef unsigned long long type;
-	static type const value{  val };
-};
-
+using std::suffixes::select_int_type::select_int_type;
 }
 
 
 template <char... Digits>
 constexpr typename
-__impl::select_type<__impl::bitsImpl<Digits...>::value,
+__impl::select_int_type<__impl::bitsImpl<Digits...>::value,
       int, unsigned, long, unsigned long, long long>::type
 operator"" b(){
-	return	__impl::select_type<__impl::bitsImpl<Digits...>::value,
-			int, unsigned, long, unsigned long, long long>::value;
+    return    __impl::select_int_type<__impl::bitsImpl<Digits...>::value,
+            int, unsigned, long, unsigned long, long long>::value;
 }
 template <char... Digits>
 constexpr typename
-__impl::select_type<__impl::bitsImpl<Digits...>::value,
+__impl::select_int_type<__impl::bitsImpl<Digits...>::value,
       long, unsigned long, long long>::type
 operator"" bl(){
-	return	__impl::select_type<__impl::bitsImpl<Digits...>::value,
-			      long, unsigned long, long long>::value;
+    return    __impl::select_int_type<__impl::bitsImpl<Digits...>::value,
+                  long, unsigned long, long long>::value;
 }
 template <char... Digits>
 constexpr auto
 operator"" bL() -> decltype(operator "" bl<Digits...>()){
-	return 	operator "" bl<Digits...>();
+    return     operator "" bl<Digits...>();
 }
 
 template <char... Digits>
 constexpr typename
-__impl::select_type<__impl::bitsImpl<Digits...>::value,
+__impl::select_int_type<__impl::bitsImpl<Digits...>::value,
        long long>::type
 operator"" bll(){
-	return 	__impl::select_type<__impl::bitsImpl<Digits...>::value,
-			      long long>::value;
+    return     __impl::select_int_type<__impl::bitsImpl<Digits...>::value,
+                  long long>::value;
 }
 template <char... Digits>
 constexpr auto
 operator"" bLL() -> decltype(operator "" bll<Digits...>()){
-	return 	operator "" bll<Digits...>();
+    return     operator "" bll<Digits...>();
 }
 
 template <char... Digits>
 constexpr typename
-__impl::select_type<__impl::bitsImpl<Digits...>::value,
+__impl::select_int_type<__impl::bitsImpl<Digits...>::value,
       unsigned, unsigned long>::type
 operator"" bu(){
-	return 	__impl::select_type<__impl::bitsImpl<Digits...>::value,
-			      unsigned, unsigned long>::value;
+    return     __impl::select_int_type<__impl::bitsImpl<Digits...>::value,
+                  unsigned, unsigned long>::value;
 }
 
 template <char... Digits>
 constexpr auto
 operator"" bU() -> decltype(operator "" bu<Digits...>()){
-	return 	operator "" bu<Digits...>();
+    return     operator "" bu<Digits...>();
 }
 
 template <char... Digits>
 constexpr typename
-__impl::select_type<__impl::bitsImpl<Digits...>::value,
+__impl::select_int_type<__impl::bitsImpl<Digits...>::value,
        unsigned long>::type
 operator"" bul(){
-	return 	__impl::select_type<__impl::bitsImpl<Digits...>::value,
-			      unsigned long>::value;
+    return     __impl::select_int_type<__impl::bitsImpl<Digits...>::value,
+                  unsigned long>::value;
 }
 template <char... Digits>
 constexpr auto
 operator"" bUL() -> decltype(operator "" bul<Digits...>()){
-	return 	operator "" bul<Digits...>();
+    return     operator "" bul<Digits...>();
 }
 template <char... Digits>
 constexpr auto
 operator"" buL() -> decltype(operator "" bul<Digits...>()){
-	return 	operator "" bul<Digits...>();
+    return     operator "" bul<Digits...>();
 }
 template <char... Digits>
 constexpr auto
 operator"" bUl() -> decltype(operator "" bul<Digits...>()){
-	return 	operator "" bul<Digits...>();
+    return     operator "" bul<Digits...>();
 }
 template <char... Digits>
 constexpr unsigned long long
 operator"" bull(){
-	return __impl::bitsImpl<Digits...>::value;
+    return __impl::bitsImpl<Digits...>::value;
 }
 template <char... Digits>
 constexpr unsigned long long
 operator"" bULL(){
-	return __impl::bitsImpl<Digits...>::value;
+    return __impl::bitsImpl<Digits...>::value;
 }
 template <char... Digits>
 constexpr unsigned long long
 operator"" buLL(){
-	return __impl::bitsImpl<Digits...>::value;
+    return __impl::bitsImpl<Digits...>::value;
 }
 template <char... Digits>
 constexpr unsigned long long
 operator"" bUll(){
-	return __impl::bitsImpl<Digits...>::value;
+    return __impl::bitsImpl<Digits...>::value;
 }
 
 
 } // binary
 } //suffixes
 } // std
-
-
-
 #endif /* BINARY_H_ */
 \end{codeblock}
 
@@ -232,9 +441,9 @@ namespace suffixes{
 namespace string{
 #if 0 // less typing variant
 #define __MAKE_SUFFIX_S(CHAR) \
-	basic_string<CHAR>\
+    basic_string<CHAR>\
 operator "" s(CHAR const *str, size_t len){\
-	return basic_string<CHAR>(str,len);\
+    return basic_string<CHAR>(str,len);\
 }
 
 __MAKE_SUFFIX_S(char)
@@ -275,51 +484,51 @@ namespace suffixes{
 namespace complex{
 constexpr
 std::complex<long double> operator"" _li(long double d){
-	return std::complex<long double>{0,d};
+    return std::complex<long double>{0,d};
 }
 constexpr
 std::complex<long double> operator"" _li(unsigned long long d){
-	return std::complex<long double>{0,static_cast<long double>(d)};
+    return std::complex<long double>{0,static_cast<long double>(d)};
 }
 constexpr
 std::complex<long double> operator"" _lr(long double d){
-	return std::complex<long double>{d,0};
+    return std::complex<long double>{d,0};
 }
 constexpr
 std::complex<long double> operator"" _lr(unsigned long long d){
-	return std::complex<long double>{static_cast<long double>(d),0};
+    return std::complex<long double>{static_cast<long double>(d),0};
 }
 constexpr
 std::complex<double> operator"" _i(long double d){
-	return std::complex<double>{0,static_cast<double>(d)};
+    return std::complex<double>{0,static_cast<double>(d)};
 }
 constexpr
 std::complex<double> operator"" _i(unsigned long long d){
-	return std::complex<double>{0,static_cast<double>(d)};
+    return std::complex<double>{0,static_cast<double>(d)};
 }
 constexpr
 std::complex<double> operator"" _r(long double d){
-	return std::complex<double>{static_cast<double>(d),0};
+    return std::complex<double>{static_cast<double>(d),0};
 }
 constexpr
 std::complex<double> operator"" _r(unsigned long long d){
-	return std::complex<double>{static_cast<double>(d),0};
+    return std::complex<double>{static_cast<double>(d),0};
 }
 constexpr
 std::complex<float> operator"" _fi(long double d){
-	return std::complex<float>{0,static_cast<float>(d)};
+    return std::complex<float>{0,static_cast<float>(d)};
 }
 constexpr
 std::complex<float> operator"" _fi(unsigned long long d){
-	return std::complex<float>{0,static_cast<float>(d)};
+    return std::complex<float>{0,static_cast<float>(d)};
 }
 constexpr
 std::complex<float> operator"" _fr(long double d){
-	return std::complex<float>{static_cast<float>(d),0};
+    return std::complex<float>{static_cast<float>(d),0};
 }
 constexpr
 std::complex<float> operator"" _fr(unsigned long long d){
-	return std::complex<float>{static_cast<float>(d),0};
+    return std::complex<float>{static_cast<float>(d),0};
 }
 }
 }
@@ -332,348 +541,92 @@ std::complex<float> operator"" _fr(unsigned long long d){
 #define CHRONO_SUFFIX_H_
 #include <chrono>
 #include <limits>
+#include "suffixes_parse_integers.h"
 namespace std {
 namespace suffixes {
 namespace chrono {
 
 namespace __impl {
-
-template <char... Digits>
-struct digImpl{
-	static_assert(! sizeof...(Digits), "invalid decimal constant");
-	static constexpr unsigned long long value=0;
-};
-template <char... Digits>
-struct octImpl{
-	static_assert(! sizeof...(Digits), "invalid octal constant");
-	static constexpr unsigned long long value=0;
-};
-template <char... Digits>
-struct hexImpl{
-	static_assert(! sizeof...(Digits), "invalid hexadecimal constant");
-	static constexpr unsigned long long value=0;
-};
-template <char... Digits>
-struct digDispatch;
-
-template <char... Digits>
-struct digDispatch<'0','x',Digits...>{
-	static constexpr unsigned long long value=hexImpl<Digits...>::value;
-};
-template <char... Digits>
-struct digDispatch<'0',Digits...>{
-	static constexpr unsigned long long value=octImpl<Digits...>::value;
-};
-template <char... Digits>
-struct digDispatch{
-	static constexpr unsigned long long value=digImpl<Digits...>::value;
-};
-
-
-template <size_t power>
-struct ten_to{
-static constexpr unsigned long long 	val{ 10 * ten_to<power-1>::val};
-};
-template <>
-struct ten_to<0>{
-	static constexpr unsigned long long 	val{ 1 };
-
-};
-template <size_t power>
-struct eight_to{
-static constexpr unsigned long long 	val{ 8 * eight_to<power-1>::val};
-};
-template <>
-struct eight_to<0>{
-	static constexpr unsigned long long 	val{ 1 };
-
-};
-template <size_t power>
-struct hex_to{
-static constexpr unsigned long long 	val{ 16 * hex_to<power-1>::val};
-};
-template <>
-struct hex_to<0>{
-	static constexpr unsigned long long 	val{ 1 };
-
-};
-template <char... Digits>
-struct octImpl<'0',Digits...>{
-	static constexpr unsigned long long value{ octImpl<Digits...>::value};
-};
-template <char... Digits>
-struct octImpl<'1',Digits...>{
-	static constexpr unsigned long long value{ 1 *eight_to<sizeof...(Digits)>::val 
-						   + octImpl<Digits...>::value};
-};
-template <char... Digits>
-struct octImpl<'2',Digits...>{
-	static constexpr unsigned long long value{ 2 *eight_to<sizeof...(Digits)>::val 
-						   + octImpl<Digits...>::value};
-};
-template <char... Digits>
-struct octImpl<'3',Digits...>{
-	static constexpr unsigned long long value{ 3 *eight_to<sizeof...(Digits)>::val 
-						   + octImpl<Digits...>::value};
-};
-template <char... Digits>
-struct octImpl<'4',Digits...>{
-	static constexpr unsigned long long value{ 4 *eight_to<sizeof...(Digits)>::val 
-						    + octImpl<Digits...>::value};
-};
-template <char... Digits>
-struct octImpl<'5',Digits...>{
-	static constexpr unsigned long long value{ 5 *eight_to<sizeof...(Digits)>::val 
-						    + octImpl<Digits...>::value};
-};
-template <char... Digits>
-struct octImpl<'6',Digits...>{
-	static constexpr unsigned long long value{ 6 *eight_to<sizeof...(Digits)>::val 
-						    + octImpl<Digits...>::value};
-};
-template <char... Digits>
-struct octImpl<'7',Digits...>{
-	static constexpr unsigned long long value{ 7 *eight_to<sizeof...(Digits)>::val
-						    + octImpl<Digits...>::value};
-};
-
-template <char... Digits>
-struct digImpl<'0',Digits...>{
-	static constexpr unsigned long long value{ digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'1',Digits...>{
-	static constexpr unsigned long long value{ 1 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'2',Digits...>{
-	static constexpr unsigned long long value{ 2 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'3',Digits...>{
-	static constexpr unsigned long long value{ 3 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'4',Digits...>{
-	static constexpr unsigned long long value{ 4 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'5',Digits...>{
-	static constexpr unsigned long long value{ 5 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'6',Digits...>{
-	static constexpr unsigned long long value{ 6 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'7',Digits...>{
-	static constexpr unsigned long long value{ 7 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'8',Digits...>{
-	static constexpr unsigned long long value{ 8 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-template <char... Digits>
-struct digImpl<'9',Digits...>{
-	static constexpr unsigned long long value{ 9 *ten_to<sizeof...(Digits)>::val
-						    + digImpl<Digits...>::value};
-};
-
-template <char... Digits>
-struct hexImpl<'0',Digits...>{
-	static constexpr unsigned long long value{ hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'1',Digits...>{
-	static constexpr unsigned long long value{ 1 *hex_to<sizeof...(Digits)>::val
-						    + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'2',Digits...>{
-	static constexpr unsigned long long value{ 2 *hex_to<sizeof...(Digits)>::val
-						    + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'3',Digits...>{
-	static constexpr unsigned long long value{ 3 *hex_to<sizeof...(Digits)>::val
-						    + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'4',Digits...>{
-	static constexpr unsigned long long value{ 4 *hex_to<sizeof...(Digits)>::val
-						    + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'5',Digits...>{
-	static constexpr unsigned long long value{ 5 *hex_to<sizeof...(Digits)>::val
-						    + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'6',Digits...>{
-	static constexpr unsigned long long value{ 6 *hex_to<sizeof...(Digits)>::val
-						    + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'7',Digits...>{
-	static constexpr unsigned long long value{ 7 *hex_to<sizeof...(Digits)>::val
-						    + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'8',Digits...>{
-	static constexpr unsigned long long value{ 8 *hex_to<sizeof...(Digits)>::val
-						    + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'9',Digits...>{
-	static constexpr unsigned long long value{ 9 *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'a',Digits...>{
-	static constexpr unsigned long long value{ 0xa *hex_to<sizeof...(Digits)>::val  
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'b',Digits...>{
-	static constexpr unsigned long long value{ 0xb *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'c',Digits...>{
-	static constexpr unsigned long long value{ 0xc *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'d',Digits...>{
-	static constexpr unsigned long long value{ 0xd *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'e',Digits...>{
-	static constexpr unsigned long long value{ 0xe *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'f',Digits...>{
-	static constexpr unsigned long long value{ 0xf *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'A',Digits...>{
-	static constexpr unsigned long long value{ 0xa *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'B',Digits...>{
-	static constexpr unsigned long long value{ 0xb *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'C',Digits...>{
-	static constexpr unsigned long long value{ 0xc *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'D',Digits...>{
-	static constexpr unsigned long long value{ 0xd *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'E',Digits...>{
-	static constexpr unsigned long long value{ 0xe *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-template <char... Digits>
-struct hexImpl<'F',Digits...>{
-	static constexpr unsigned long long value{ 0xf *hex_to<sizeof...(Digits)>::val
-						   + hexImpl<Digits...>::value};
-};
-
+using namespace std::suffixes::parse_int;
 
 template <unsigned long long val, typename DUR>
 struct select_type:
-	conditional<val <=static_cast<unsigned long long>(
-			std::numeric_limits<typename DUR::rep>::max())
-	, DUR
-	, void > {
-		static constexpr typename select_type::type
-			value{ static_cast<typename select_type::type>(val) };
-	};
-} // namespace __impl
+    conditional<val <=
+      static_cast<unsigned long long>(std::numeric_limits<typename DUR::rep>::max())
+    , DUR
+    , void > {
+        static constexpr typename select_type::type
+            value{ static_cast<typename select_type::type>(val) };
+    };
+}
 
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::digDispatch<Digits...>::value,std::chrono::hours>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::hours>::type
 operator"" h(){
-	return  __impl::select_type<
-	__impl::digDispatch<Digits...>::value,std::chrono::hours>::value;
+    return  __impl::select_type<__impl::base_dispatch<Digits...>::value,
+                std::chrono::hours>::value;
 }
 constexpr std::chrono::duration<long double, ratio<3600,1>> operator"" h(long double hours){
-	return std::chrono::duration<long double,ratio<3600,1>>{hours};
+    return std::chrono::duration<long double,ratio<3600,1>>{hours};
 }
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::digDispatch<Digits...>::value,std::chrono::minutes>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::minutes>::type
 operator"" min(){
-	return __impl::select_type<
-	__impl::digDispatch<Digits...>::value,std::chrono::minutes>::value;
+    return __impl::select_type<__impl::base_dispatch<Digits...>::value,
+               std::chrono::minutes>::value;
 }
 constexpr std::chrono::duration<long double, ratio<60,1>> operator"" min(long double min){
-	return std::chrono::duration<long double,ratio<60,1>>{min};
+    return std::chrono::duration<long double,ratio<60,1>>{min};
 }
 
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::digDispatch<Digits...>::value,std::chrono::seconds>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::seconds>::type
 operator"" s(){
-	return __impl::select_type<
-	__impl::digDispatch<Digits...>::value,std::chrono::seconds>::value;
+    return __impl::select_type<__impl::base_dispatch<Digits...>::value,
+               std::chrono::seconds>::value;
 }
 constexpr std::chrono::duration<long double, ratio<1,1>> operator"" s(long double sec){
-	return std::chrono::duration<long double,ratio<1,1>>{sec};
+    return std::chrono::duration<long double,ratio<1,1>>{sec};
 }
 
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::digDispatch<Digits...>::value,std::chrono::milliseconds>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::milliseconds>::type
 operator"" ms(){
-	return __impl::select_type<
-	__impl::digDispatch<Digits...>::value,std::chrono::milliseconds>::value;
+    return __impl::select_type<__impl::base_dispatch<Digits...>::value,
+               std::chrono::milliseconds>::value;
 }
 constexpr std::chrono::duration<long double, ratio<1,1000>> operator"" ms(long double msec){
-	return std::chrono::duration<long double,ratio<1,1000>>{msec};
+    return std::chrono::duration<long double,ratio<1,1000>>{msec};
 }
 
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::digDispatch<Digits...>::value,std::chrono::microseconds>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::microseconds>::type
 operator"" us(){
-	return __impl::select_type<
-	__impl::digDispatch<Digits...>::value,std::chrono::microseconds>::value;
+    return __impl::select_type<__impl::base_dispatch<Digits...>::value,
+               std::chrono::microseconds>::value;
 }
 constexpr std::chrono::duration<long double, ratio<1,1000000>> operator"" us(long double usec){
-	return std::chrono::duration<long double,ratio<1,1000000>>{usec};
+    return std::chrono::duration<long double,ratio<1,1000000>>{usec};
 }
 
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::digDispatch<Digits...>::value,std::chrono::nanoseconds>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::nanoseconds>::type
 operator"" ns(){
-	return __impl::select_type<
-	__impl::digDispatch<Digits...>::value,std::chrono::nanoseconds>::value;
+    return __impl::select_type<__impl::base_dispatch<Digits...>::value,
+               std::chrono::nanoseconds>::value;
 }
 constexpr std::chrono::duration<long double, ratio<1,1000000000>> operator"" ns(long double nsec){
-	return std::chrono::duration<long double,ratio<1,1000000000>>{nsec};
+    return std::chrono::duration<long double,ratio<1,1000000000>>{nsec};
 }
-}}}
+}
+}
+}
 #endif /* CHRONO_SUFFIX_H_ */
 \end{codeblock}
 
@@ -684,6 +637,182 @@ It must be decided in which section to actually put the proposed changes. I sugg
 \section{namespace suffixes for collecting standard UDLs}
 As a common schema this paper proposes to put all suffixes for user defined literals in separate namespaces that are below the namespace \tcode{std::suffixes}. 
 
+\section{Suffixes Integer Parsing Utilities}
+Append a subclause [suffixes.parseint] to clause [utilities] and expand the table in [utilities.general] accordingly.
+Insert the subclause [suffixes.parseint]
+
+\rSec1[suffixes.parseint]{Parsing integer literals}
+\pnum
+This subclause contains helper template classes for implementing template user-defined literal operators for parsing  integer literals.
+
+\synopsis{Header \tcode{<suffix_parse>} synopsis}
+\begin{codeblock}
+namespace std {
+namespace suffixes {
+
+template <char... Digits>
+struct base_dispatch;
+
+template <unsigned base, char... Digits>
+struct parse_int;
+
+} // suffixes
+
+constexpr unsigned long long
+pow(unsigned base, size_t to);
+
+} // std
+\end{codeblock}
+
+\pnum
+The class templates \tcode{base_dispatch} and \tcode{parse_int} are intended to be used by implementors of a user-defined-literal operator template for parsing integral values. They both provide a \tcode{static constexpr unsigned long long} member variable named \tcode{value}. 
+\pnum
+Class template \tcode{parse_int} can be used when the numerical base is known and not to be determined from \tcode{Digits...}.
+\pnum
+The class template \tcode{base_dispatch} will determine the numerical base to be used like the compiler does with integral literals, i.e., a number starting with \tcode{0} (zero) will be considered octal, a number starting with \tcode{0x} or \tcode{0X} will be considered hexadecimal and all other numbers will be considered decimal.
+\pnum
+The compile-time evaluated function \tcode{pow} is used to perform the positional calculation $base^{power}$ within \tcode{parse_int}.
+
+\enterexample
+\begin{codeblock}
+template <char... Digits>
+constexpr  unsigned long long
+operator"" _testit(){
+    return std::suffixes::base_dispatch<Digits...>::value;
+}
+
+constexpr auto a = 123_testit;   // value 123
+constexpr auto b = 0123_testit;  // value 0123
+constexpr auto c = 0x123_testit; // value 0x123
+
+\end{codeblock}
+\exitexample
+
+\begin{itemdecl}
+template <char... Digits>
+struct base_dispatch;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Creates an integral constant as its \tcode{static constexpr} member variable \tcode{value} which is of type \tcode{unsigned long long} with the value determined from the first or first two \tcode{char} values in \tcode{Digits...} as described below.
+
+\pnum
+If \tcode{Digits...} starts with \tcode{'0', 'x'} or \tcode{'0', 'X'} the remaining characters are parsed as a hexadecimal number. If there are no such subsequent characters or \tcode{Digits...} contains characters beyond those for hexadecimal literals the program is ill formed.
+
+\pnum
+If \tcode{Digits...} starts with \tcode{'0'} the remaining characters are parsed as an octal number. If there are characters in \tcode{Digits...} that are not octal digits ('0'-'7') the program is ill-formed.
+
+\pnum
+Otherwise \tcode{Digits...} is interpreted as a decimal number. If there are characters in \tcode{Digits...} that are not decimal digits, the program is ill formed.
+\end{itemdescr}
+
+\begin{itemdecl}
+template <unsigned base, char... Digits>
+struct parse_int;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\precondition
+\tcode{base > 1 \&\& base <= 16}
+\pnum
+\effects
+Creates an integral constant as its \tcode{static constexpr} member variable \tcode{value} which is of type \tcode{unsigned long long} with the value determined by parsing \tcode{Digits...} as an integer literal of the given \tcode{base}.
+
+\pnum
+If \tcode{Digits...} contains characters outside the digits of the given base, the program is ill-formed.
+
+\enterexample
+\begin{codeblock}
+template <char... Digits>
+constexpr  unsigned long long
+operator"" _ternary(){
+    return std::suffixes::parse_int<3,Digits...>::value;
+}
+constexpr auto three= 010_ternary;
+static_assert(three==3, "_ternary should be three-based");
+constexpr auto invalid=3_ternary; // ill-formed.
+\end{codeblock}
+\exitexample
+\end{itemdescr}
+
+\begin{itemdecl}
+constexpr unsigned long long
+pow(unsigned base, size_t to) ;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\precondition
+\tcode{base > 1 \&\& base <=16}
+
+\pnum
+\returns \tcode{to ? base * pow(base,to-1) : 1}
+
+\pnum
+Overflow is undetected.
+\end{itemdescr}
+%%%%
+\section{ Integer Constant Type Selection}
+Append a subclause [suffixes.selectinttype] to clause [utilities] and expand the table in [utilities.general] accordingly.
+Insert the subclause [suffixes.selectinttype]
+
+\rSec1[suffixes.selectinttype]{Select Matching Type for Integer Constants}
+\pnum
+This subclause contains helper template classes for performing the determination of the type of integer literals as in clause [lex.icon] p 2.
+
+\synopsis{Header \tcode{<select_int_type>} synopsis}
+\begin{codeblock}
+namespace std {
+
+template <unsigned long long val, typename... INTS>
+struct select_int_type;
+}
+\end{codeblock}
+
+\enterexample
+The class template will be used with a list of integral types as those given in clause [lex.icon] p 2 in one of the table 6. The following code demonstrates its use.
+\begin{codeblock}
+using std::select_int_type;
+template <unsigned long long val>
+constexpr
+typename select_int_type<val,
+short, int, long long>::type
+foo() {
+    return  select_int_type<val,
+            short, int, long long>::value;
+}
+static_assert(std::is_same<decltype(foo<100>()), short>::value,"foo<100>() is short");
+static_assert(std::is_same<decltype(foo<0x10000>()), int>::value,"foo<0x10000>() is int");
+static_assert(std::is_same<decltype(foo<0x100000000000>()), long long>::value,"foo<0x100000000000>() is long long");
+\end{codeblock}
+
+\exitexample
+\begin{itemdecl}
+template <unsigned long long val, typename... INTS>
+struct select_int_type;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires
+\tcode{INTS...} must consist of a list of integral types \tcode{T}$_i$ where \tcode{numeric_limits<T}$_i$\tcode{>::max()} is less or equal of \tcode{numeric_limits<T}$_{i+1}$\tcode{>::max()}.
+
+\pnum
+\effects
+The member \tcode{type} of \tcode{select_int_type} corresponds to the first type \tcode{T} in \tcode{INTS...} where \tcode{val <= static_cast<unsigned long long>(numeric_limits<T>::max())}. If no such type exists the member \tcode{type} is \tcode{unsigned long long}.
+
+\pnum
+The member \tcode{value} is of type \tcode{select_int_type::type} and its value is {val}.
+
+\enternote
+No overflow can occur.
+\exitnote 
+
+\end{itemdescr}
+%%%%%
 \section{operator"" b() etc. for binary integer literals}
 Append a subclause [suffixes.binary] to clause [utilities] and expand the table in [utilities.general] accordingly.
 
