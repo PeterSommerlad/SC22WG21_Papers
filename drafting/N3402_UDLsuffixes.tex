@@ -14,7 +14,7 @@
 
 \title{User-defined Literals for Standard Library Types}
 \author{Peter Sommerlad}
-\date{2012-09-07}                                           % Activate to display a given date or no date
+\date{2012-09-08}                                           % Activate to display a given date or no date
 \input{macros}
 \setsecnumdepth{subsection}
 
@@ -22,7 +22,7 @@
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
 Document Number: &  N3402=12-0092 \\\hline
-Date: & 2012-09-07 \\\hline
+Date: & 2012-09-08 \\\hline
 Project: & Programming Language C++\\\hline 
 \end{tabular}
 
@@ -61,8 +61,6 @@ During the creation of this paper, it became apparent that a mechanism for parsi
 \subsection{Suffixes Utilities}
 It has to be decided if the utilities for implementing UDL suffix operators with integers should be standardized.
 
-Especially the \tcode{constexpr unsigned long long pow(unsigned, size_t)} function might be put somewhere else, because it is actually unrelated and might not be standardized at all. I started out with the classic recursive template class with a static const value member, before I recognized that a compile-time \tcode{pow()} for small integer bases is actually what is needed.
-
 The template \tcode{select_int_type} might be a candidate for the clause [meta.type.synop], aka header \tcode{<type_traits>}.
 
 \subsection{Upper-case versions of suffixes}
@@ -77,7 +75,7 @@ It needs to be discussed if this set of suffixes (r, lr, fr, R, LR, FR) for comp
 
 %\section{}
 \section{Acknowledgements}
-Acknowledgements go to the original authors of the sequence of papers the lead to inclusion of UDL in the standard and to the participants of the discussion on UDL on the reflector. Special thanks to Daniel Kr\"ugler for feedback on early drafts and to Jonathan Wakely for guidelines on GCC command line options. Thanks to Alberto Ganesh Barbati for feedback on duration representation overflow and suggestion for also providing the number parsing as a standardized library component. Thanks to Bjarne Stroustrup for suggesting to add more rationale to the proposal.
+Acknowledgements go to the original authors of the sequence of papers the lead to inclusion of UDL in the standard and to the participants of the discussion on UDL on the reflector. Special thanks to Daniel Kr\"ugler for feedback on all drafts and to Jonathan Wakely for guidelines on GCC command line options. Thanks to Alberto Ganesh Barbati for feedback on duration representation overflow and suggestion for also providing the number parsing as a standardized library component. Thanks to Bjarne Stroustrup for suggesting to add more rationale to the proposal.
 
 \chapter{Possible Implementation}
 This section shows some possible implementations of the user-defined-literals proposed.
@@ -120,7 +118,7 @@ struct base_dispatch{
 
 constexpr unsigned long long
 pow(unsigned base, size_t to) {
-    return to?base * pow(base,to-1):1;
+    return to?(to%2?base:1)*pow(base,to/2)*pow(base,to/2):1;
 }
 
 template <unsigned base, char... Digits>
@@ -657,22 +655,19 @@ template <unsigned base, char... Digits>
 struct parse_int;
 
 } // suffixes
-
-constexpr unsigned long long
-pow(unsigned base, size_t to);
-
 } // std
 \end{codeblock}
 
 \pnum
 The class templates \tcode{base_dispatch} and \tcode{parse_int} are intended to be used by implementors of a user-defined-literal operator template for parsing integral values. They both provide a \tcode{static constexpr unsigned long long} member variable named \tcode{value}. 
+
 \pnum
 Class template \tcode{parse_int} can be used when the numerical base is known and not to be determined from \tcode{Digits...}.
+
 \pnum
 The class template \tcode{base_dispatch} will determine the numerical base to be used like the compiler does with integral literals, i.e., a number starting with \tcode{0} (zero) will be considered octal, a number starting with \tcode{0x} or \tcode{0X} will be considered hexadecimal and all other numbers will be considered decimal.
-\pnum
-The compile-time evaluated function \tcode{pow} is used to perform the positional calculation $base^{power}$ within \tcode{parse_int}.
 
+\pnum
 \enterexample
 \begin{codeblock}
 template <char... Digits>
@@ -717,6 +712,7 @@ struct parse_int;
 \pnum
 \precondition
 \tcode{base > 1 \&\& base <= 16}
+
 \pnum
 \effects
 Creates an integral constant as its \tcode{static constexpr} member variable \tcode{value} which is of type \tcode{unsigned long long} with the value determined by parsing \tcode{Digits...} as an integer literal of the given \tcode{base}.
@@ -724,6 +720,7 @@ Creates an integral constant as its \tcode{static constexpr} member variable \tc
 \pnum
 If \tcode{Digits...} contains characters outside the digits of the given base, the program is ill-formed.
 
+\pnum
 \enterexample
 \begin{codeblock}
 template <char... Digits>
@@ -738,22 +735,6 @@ constexpr auto invalid=3_ternary; // ill-formed.
 \exitexample
 \end{itemdescr}
 
-\begin{itemdecl}
-constexpr unsigned long long
-pow(unsigned base, size_t to) ;
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\precondition
-\tcode{base > 1 \&\& base <=16}
-
-\pnum
-\returns \tcode{to ? base * pow(base,to-1) : 1}
-
-\pnum
-Overflow is undetected.
-\end{itemdescr}
 %%%%
 \section{ Integer Constant Type Selection}
 Append a subclause [suffixes.selectinttype] to clause [utilities] and expand the table in [utilities.general] accordingly.
@@ -772,6 +753,7 @@ struct select_int_type;
 }
 \end{codeblock}
 
+\pnum
 \enterexample
 The class template will be used with a list of integral types as those given in clause [lex.icon] p 2 in one of the table 6. The following code demonstrates its use.
 \begin{codeblock}
@@ -784,9 +766,12 @@ foo() {
     return  select_int_type<val,
             short, int, long long>::value;
 }
-static_assert(std::is_same<decltype(foo<100>()), short>::value,"foo<100>() is short");
-static_assert(std::is_same<decltype(foo<0x10000>()), int>::value,"foo<0x10000>() is int");
-static_assert(std::is_same<decltype(foo<0x100000000000>()), long long>::value,"foo<0x100000000000>() is long long");
+static_assert(std::is_same<decltype(foo<100>()), short>::value,
+              "foo<100>() is short");
+static_assert(std::is_same<decltype(foo<0x10000>()), int>::value,
+              "foo<0x10000>() is int");
+static_assert(std::is_same<decltype(foo<0x100000000000>()), long long>::value,
+              "foo<0x100000000000>() is long long");
 \end{codeblock}
 
 \exitexample
@@ -808,7 +793,7 @@ The member \tcode{type} of \tcode{select_int_type} corresponds to the first type
 The member \tcode{value} is of type \tcode{select_int_type::type} and its value is {val}.
 
 \enternote
-No overflow can occur.
+No overflow can occur unless val already was produced by an overflowing operation.
 \exitnote 
 
 \end{itemdescr}
@@ -868,9 +853,8 @@ operator"" bUll();
 template <char... Digits>
 constexpr unsigned long long
 operator"" bULL();
-} // binary
-} //suffixes
-} // std
+
+}}} 
 \end{codeblock}
 
 \pnum
@@ -1078,8 +1062,8 @@ constexpr std::complex<float> operator"" fr(long double);
 constexpr std::complex<float> operator"" FR(long double);
 constexpr std::complex<float> operator"" fr(unsigned long long);}
 constexpr std::complex<float> operator"" FR(unsigned long long);}
-}
-}
+
+}}}
 \end{codeblock}
 
 Append a new subclause after subclause 26.4.10 [ccmplx] as follows
@@ -1201,9 +1185,8 @@ constexpr
 std::chrono::nanoseconds operator"" ns(unsigned long long);
 constexpr 
 std::chrono::duration<@\seebelow@, ratio<1,1000000000>> operator"" ns(long double);
-}
-}
-}
+
+}}}
 \end{codeblock}
 
 Insert in subclause 20.11.5 [time.duration] after subclause 20.11.5.7 [time.duration.cast] a new subclause 20.11.5.8 [time.duration.suffixes] as follows.
