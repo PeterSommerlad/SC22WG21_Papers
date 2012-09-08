@@ -592,39 +592,43 @@ constexpr std::chrono::duration<long double, ratio<1,1>> operator"" s(long doubl
 
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::milliseconds>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,
+std::chrono::milliseconds>::type
 operator"" ms(){
     return __impl::select_type<__impl::base_dispatch<Digits...>::value,
                std::chrono::milliseconds>::value;
 }
-constexpr std::chrono::duration<long double, ratio<1,1000>> operator"" ms(long double msec){
+constexpr std::chrono::duration<long double, ratio<1,1000>> 
+operator"" ms(long double msec){
     return std::chrono::duration<long double,ratio<1,1000>>{msec};
 }
 
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::microseconds>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,
+std::chrono::microseconds>::type
 operator"" us(){
     return __impl::select_type<__impl::base_dispatch<Digits...>::value,
                std::chrono::microseconds>::value;
 }
-constexpr std::chrono::duration<long double, ratio<1,1000000>> operator"" us(long double usec){
+constexpr std::chrono::duration<long double, ratio<1,1000000>> 
+operator"" us(long double usec){
     return std::chrono::duration<long double,ratio<1,1000000>>{usec};
 }
 
 template <char... Digits>
 constexpr typename 
-__impl::select_type<__impl::base_dispatch<Digits...>::value,std::chrono::nanoseconds>::type
+__impl::select_type<__impl::base_dispatch<Digits...>::value,
+std::chrono::nanoseconds>::type
 operator"" ns(){
     return __impl::select_type<__impl::base_dispatch<Digits...>::value,
                std::chrono::nanoseconds>::value;
 }
-constexpr std::chrono::duration<long double, ratio<1,1000000000>> operator"" ns(long double nsec){
+constexpr std::chrono::duration<long double, ratio<1,1000000000>> 
+operator"" ns(long double nsec){
     return std::chrono::duration<long double,ratio<1,1000000000>>{nsec};
 }
-}
-}
-}
+}}}
 #endif /* CHRONO_SUFFIX_H_ */
 \end{codeblock}
 
