@@ -1,0 +1,1318 @@
+
+<!-- saved from url=(0066)http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3677.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<meta name="GENERATOR" content="Microsoft Visual Studio 8.0">
+<title>A Proposal to Add additional RAII Wrappers to the Standard Library</title>
+    <style type="text/css">
+        .style1
+        {
+            color: #000099;
+        }
+        .style2
+        {
+            color: #800000;
+        }
+        .style4
+        {
+            color: #0000A0;
+        }
+        .style5
+        {
+            color: #400080;
+        }
+        .style6
+        {
+            color: #004000;
+        }
+        .style7
+        {
+            color: #004000;
+            font-style: italic;
+        }
+        .style8
+        {
+            color: #FF0000;
+        }
+        .style9
+        {
+            color: #004000;
+            font-weight: bold;
+        }
+        .style10
+        {
+            color: #000000;
+        }
+    </style>
+</head>
+<body>
+
+
+
+    <p><code>
+        Document Number:&nbsp; NXXXX (revision of N3677)<br>
+        Date:&nbsp; 2013-09-30<br>
+        Project:&nbsp; Programming Language C++, Library Working Group<br>
+        Reply-to: Andrew L. Sandoval &lt;sandoval at netwaysglobal dot com&gt;<br>
+        Reply-to: Peter Sommerlad &lt;peter dot sommerlad at hsr dot ch&gt;<br>
+    </code>
+    </p>
+
+<center> <h1>A Proposal to Add additional RAII Wrappers to the Standard Library</h1> </center>
+<h2>I.  Table of Contents</h2>
+<ul>
+<li>Introduction</li>
+<li>Motivation and Scope</li>
+<li>Impact on Standard</li>
+<li>Design Decisions</li>
+<li>Technical Specifications</li>
+<li>Acknowledgments</li>
+<li>References</li>
+</ul>
+<h2>II.  Introduction</h2>
+This proposal seeks to add generic RAII wrappers to the standard library.  These wrappers will be used to manage the lifetime of various types of resources and to guarantee the execution of code blocks on scope exit.  It builds on the concept of smart pointers like <code>unique_ptr</code>, but is designed for use with any type of resource 
+    that requires clean-up prior to scope exit, as well as any block of code (via 
+    lambda or function invocation) that needs to executed prior to scope exit.
+<h2>III.  Motivation and Scope</h2>
+<p>Quality C++ code requires the use of RAII to manage all types of resources in 
+    order to prevent leakage as well as to limit resource lifetime.&nbsp; Resource leakage can occur from the obvious, though often overlooked, failure to clean-up a resource at its intended end-of-life, as well as the less obvious 
+    and arguably more common failure to ensure proper handling of resources during exception unwinding.</p>
+<p>Smart pointers such as <code>unique_ptr</code> and <code>shared_ptr</code> provide an excellent means of managing the lifetime of pointer types.  Many other RAII classes have been written to manage the lifetime and limit the scope of locks, such as Boost's <code>boost::lock_guard</code>.  All of these and the many other types of RAII objects help to 
+    substantially improve C++ code quality.
+  This proposal seeks to add a set of <i>generic</i>, light-weight RAII wrappers intended to manage the scope and lifetime of any other type of resource.&nbsp; 
+    It also proposes an RAII wrapper intended to wrap a function, lambda, or functor 
+    which needs to execute prior to scope exit.</p>
+<p>There are many types of resources that <i>may</i> not justify encapsulation in a broader object -- when a simple RAII wrapper around the resource will suffice or will provide a more obvious implementation. 
+    This is especially true when object re-use is not expected. In addition, RAII 
+    wrappers will simplify the design of objects that <em>do</em> encapsulate resources, 
+    allowing the generation of, or the declaration of the resource, to also declare its method of clean-up.&nbsp; 
+    This results in moving resource clean-up outside of an explicit destructor, 
+    which also assures proper order of destruction when initialization order is 
+    correct.&nbsp; This is common practice with pointers managed by <code>unique_ptr</code> and <code>shared_ptr</code>, and even with buffers allocated and managed by <code>vector</code>.</p>
+<p>This proposal requests the addition of the following RAII wrapper types:
+</p><ul>
+    <li><code><b>scoped_function</b></code></li>
+    <ul>
+        <li>Executes a function, functor, or lambda on scope exit.</li>
+        <li>Is generated with <code><b>make_scoped_function</b>(<i>func</i>);</code></li>
+        <li><code><b>func</b></code> is a function, functor, or lambda that takes no parameters.  A lambda however may capture 
+        and use any scope variables.</li>
+    </ul>
+    <li><code><b>scoped_resource_unchecked</b></code></li>
+    <ul>
+        <li>Manages a resource's lifetime by executing a deleter function, functor, or lambda on scope exit.</li>
+        <li>Is generated with <code><b>make_scoped_resource_unchecked</b>(<i>resource</i>, <i>deleter-func</i>);</code>, or with the 
+        more generic <code><b>make_scoped_resource(<i>resource</i>, <i>deleter-func</i>);</b></code></li>
+        <li><code><b>deleter-func</b></code> is a function, functor, or lambda that takes a single parameter of the same type as <i>resource</i>.</li>
+        <li>Is suitable for no-fail resources, or other resources in which a validity check by comparison to a no-delete value is not possible.</li>
+    </ul>
+    <li><code><b>scoped_resource</b></code></li>
+    <ul>
+        <li>Manages a resource's lifetime by executing a deleter function, functor, or lambda on scope exit, when the resource value can be validated by comparison to a no-delete value.</li>
+        <li>Is generated with <code><b>make_scoped_resource</b>(<i>resource</i>, <i>deleter-func</i>, <i>no-delete-value</i>);</code></li>
+        <li>When generated with <code><b>make_scoped_resource&lt;true&gt;</b>(<i>resource</i>, <i>deleter-func</i>, <i>no-delete-value</i>);</code> the <code>scoped_resource</code> constructor will throw <code>failed_resource_initialization</code> if the resource is equal to the no-delete value.</li>
+        <li><code><b>deleter-func</b></code> is a function, functor, or lambda that takes a single parameter of the same type as <i>resource</i>.</li>
+        <li><code><b>no-delete-value</b></code> is a value of type <i>resource</i> that is used to prevent calling <i>deleter-func</i> when the resource is not valid, as well as to check if the resource is <code>bool <b>valid</b>() const;</code></li>
+    </ul>
+    <li><code><b>unique_resource</b></code></li> 
+    <ul>
+        <li>Manages a resource's lifetime by executing a <i>constexpr</i> deleter function on scope exit, when the resource value can be validated by comparison to a 
+            <em>constexpr</em> no-delete value.</li>
+        <li>It requires template arguments for:</li>
+            <ol>
+            <li>The type of a constexpr deleter function, which function takes a single parameter of the type of the resource, <i>and from which the resource type is deduced</i></li>
+            <li>The constexpr deleter function itself</li>
+            <li>A bool value, which when set to true will cause the constructor to throw <code>failed_resource_initialization</code> if the value passed to the constructor matches the no-delete value.&nbsp; 
+                When false, a validity check is not performed on object construction, but the 
+                deleter function will not be executed in the destructor if the validity check 
+                fails.</li>
+            <li>A no-delete value of the deduced type of the resource.&nbsp; The types is<i> deduced from the sole parameter to the deleter-func type.</i>  The default no-delete value is <code>
+                <span class="style4">static_cast</span>&lt;T&gt;(<span class="style4">nullptr</span>)</code>.</li>
+            </ol>
+        <li>Because of the static or constexpr non-type template arguments for the deleter function and the no-delete value:</li>
+        <ul>
+            <li>The generated code is very tight and should be roughly the equivalent of adding:<br> <code>if(resource != nodelete) { deleter-func(resource); } </code> at a common exit point for the 
+                scope.</li>
+            <li>There is no generator function template.</li>
+            <li>The no-delete value of the same type as the resource.  It is used to prevent calling the deleter function if the resource is not valid, as well as to check if the resource is <code>bool valid() const;</code></li>
+        </ul>
+        <li>Can be constructed without a resource value by using the default constructor.&nbsp; 
+            This allows the resource value to be set using <code>operator=</code> at a later time.</li>
+</ul>
+<h3>A. Motivation for <code>scoped_function</code></h3>
+<code>scoped_function</code> is ideal for tying a block of code -- such as a lambda to a particular scope, ensuring that the block is invoked prior to scope exit.
+Two examples should suffice:
+<h4>Example <code>scoped_function</code> for mandatory logging on function exit:</h4>
+<code><pre><span class="style4">bool</span> <span class="style2">SomeFunction</span>(<span class="style4">const</span> input_t &amp;input, modifier_t &amp;modifier, status_t &amp;status)
+{
+    <span class="style6">// Always log the status on scope-exit whether it changes or not...</span>
+    <span class="style4">auto</span> &amp;&amp;log_status_on_exit = <span class="style4">std</span>::<span class="style2">make_scoped_function</span>([&amp;status, &amp;modifier]() -&gt;<span class="style4">void</span>
+    {
+        LogStatus(status, "SomeFunction", modifier);
+    });
+
+    <span class="style4">if</span>(!<span class="style2">AlterationOne</span>(input, modifier, status))
+    {
+        <span class="style4">return false</span>;
+    }
+    .
+    .
+    .
+    <span class="style4">return</span> <span class="style2">AlterationFour</span>(modifier, status);
+}
+</pre></code>
+<h4>Example <code>scoped_function</code> for loop advancement:</h4>
+<code><pre>LegacyDisassembler dis(pInstructionPointer, length);
+<span class="style4">while</span>(dis.<span class="style2">RemainingBytes</span>())
+{
+    <span class="style6">// Ensure that no matter where else the loop continues, dis gets advanced...</span>
+    <span class="style4">auto</span> &amp;&amp;advance = <span class="style4">std</span>::<span class="style2">make_scoped_function</span>([&amp;dis]() -&gt;<span class="style4">void</span>
+    {
+        dis.<span class="style2">Advance</span>(dis.<span class="style2">InstructionLength</span>());
+    });
+
+    <span class="style4">if</span>(dis.<span class="style2">BadInstruction</span>())
+    {
+        std::cerr &lt;&lt; "<span class="style8">Error on </span>" &lt;&lt; dis &lt;&lt; std::endl;
+        <span class="style4">continue</span>;   <span class="style6">// Skip the bad byte(s)</span>
+    }
+
+    <span class="style6">// Handle special cases</span>
+    .
+    .
+    .
+
+    <span class="style6">// Print the Instruction...</span>
+    std::cerr &lt;&lt; dis.Address &lt;&lt; "<span class="style8">: </span>" &lt;&lt; dis &lt;&lt; std::endl;
+}
+</pre></code>
+<h3>B. Motivation for <code>scoped_resource_unchecked</code></h3>
+<code>scoped_resource_unchecked</code> is ideal for managing a resource that either can't fail to be initialized, or whose deleter function <i>handles</i> exceptional cases (such as an invalid, uninitialized or previously deleted resource).&nbsp; 
+        It provides no validity checking, and unless <code>release()</code>'d the deleter-function 
+        will be invoked with the resource on scope exit.
+<h4><code>scoped_resource_unchecked</code> example:</h4>
+<code>
+<pre>CRITICAL_SECTION cs;
+<span class="style2">InitializeCriticalSection</span>(&amp;cs);
+<span class="style6">// InitializeCriticalSection() can't fail and returns void, but we need the delete to occur prior to scope exit...
+// Otherwise it remains on the process's linked-list of active CRITICAL_SECTION's.</span>
+<span class="style4">auto</span> &amp;&amp;pCS = <span class="style4">std</span>::<span class="style2">make_scoped_resource_unchecked</span>(&amp;cs, <span class="style2">DeleteCriticalSection</span>);   <span class="style6">// DeleteCriticalSection can't fail and return void</span>
+</pre>
+</code>
+<h3>C. Motivation for <code>scoped_resource</code></h3>
+<code>scoped_resource</code> is designed to handle most resources.  It keeps the user congnizant of how the resource will be destroyed when it exits scope, and of the condition that must be met.
+  Though it produces larger object code than <code>unique_resource</code>, it benefits from having a generator function template that deduces the template arguments.
+
+<h4>Example using <code>scoped_resource</code> for with a C API:</h4>
+<code>
+<pre><span class="style6">// Open a file, ensure it is closed when we leave scope, if the file descriptor is valid...</span>
+<span class="style4">auto</span>&amp;&amp; iFileDesc = <span class="style4">std</span>::<span class="style2">make_scoped_resource</span>(<span class="style2">_open</span>(pszPath, <span class="style5">O_WRONLY</span>), <span class="style2">_close</span>, -1);<span class="style6">	// if _open returns -1, don't call _close...</span>
+<span class="style4">if</span>(iFileDesc.<span class="style2">valid</span>())
+{
+    <span class="style2">_write</span>(iFileDesc, &amp;data, <span class="style4">sizeof</span>(data));
+}
+</pre>
+</code>
+
+This could also be done using exception handling 
+        (where exception handling is allowed and expected)...
+<code>
+<pre><span class="style4">try</span>
+{
+<span class="style6">    // Open a file, ensure it is closed when we leave scope, if the file descriptor is valid...</span>
+<span class="style4">    auto</span>&amp;&amp; iFileDesc = <span class="style4">std</span>::<span class="style2">make_scoped_resource</span>(<span class="style2">_open</span>(pszPath, <span class="style5">O_WRONLY</span>), <span class="style2">_close</span>, -1);<span class="style6">	// if _open returns -1, throw...</span>
+
+    <span class="style2">_write</span>(iFileDesc, &amp;data, <span class="style4">sizeof</span>(data));
+}
+<span class="style4">catch</span> (<span class="style4">const std::failed_resource_initialization</span> &amp;e)
+{
+    std::cout &lt;&lt; "<span class="style8">Exception: </span>" &lt;&lt; e.<span class="style2">what</span>() &lt;&lt; std::endl;
+    <span class="style4">return false</span>;
+}
+<span class="style4">return true</span>;
+</pre>
+</code>
+<h4>Example using <code>scoped_resource</code> for with a Windows API:</h4>
+<pre><code>
+<span class="style6">// Create or open an event handle, wait on it, but after being signalled close the handle...</span>
+<span class="style6">// Don't CloseHandle() if we don't have permissions to open it, etc.</span>
+<span class="style6">// Another exception-free example, that with different calls could be used in kernel-mode</span>
+<span class="style4">const HANDLE</span> INVALID_EVENT_HANDLE = <span class="style4">static_cast</span>&lt;<span class="style4">HANDLE</span>&gt;(<span class="style4">nullptr</span>);
+
+<span class="style4">auto</span> hEvent = <span class="style4">std</span>::<span class="style2">make_scoped_resource</span>(<span class="style2">CreateEvent</span>(<span class="style4">nullptr</span>, TRUE, FALSE, <span class="style4">nullptr</span>), <span class="style2">CloseHandle</span>, INVALID_EVENT_HANDLE);
+<span class="style4">if</span>(!hEvent.<span class="style4">valid</span>())
+{
+    <span class="style4">return false</span>;   <span class="style6">// CloseHandle will not be called</span>
+}
+DWORD dwWait = <span class="style2">WaitForSingleObject</span>(hEvent, 1000);
+.
+.
+.
+<span class="style6">// CloseHandle() will be called as soon as hEvent leaves scope</span>
+</code></pre><code>
+</code>
+NOTE: Microsoft defines <code>INVALID_HANDLE_VALUE</code> as <code>-1</code> for the <code>CreateFile</code> API, but returns <code>NULL</code> for most other APIs.  Compliant compilers can handle the case where <code>INVALID_HANDLE_VALUE</code> is passed to <code>scoped_ptr</code> as a no-delete value.&nbsp; 
+        Unfortunately this is not true of some c++11 compliant compilers (such as g++) when <code>INVALID_HANDLE_VALUE</code> is passed as a non-type template parameter:
+<code><pre><span class="style4">auto</span>&amp;&amp; hFile = <span class="style4">std</span>::<span class="style2">make_scoped_resource</span>(<span class="style2">CreateFileW</span>(pwzPath, FILE_GENERIC_WRITE, FILE_SHARE_WRITE, <span class="style4">nullptr</span>, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, <span class="style4">nullptr</span>),
+    <span class="style2">CloseHandle</span>, <span class="style5">INVALID_HANDLE_VALUE</span>);<span class="style6">     // Compiles fine</span>
+</pre>
+<pre><span class="style4">std</span>::<span class="style4">unique_resource</span>&lt;<span class="style5">UNIQUE_DELETER</span>(<span class="style2">CloseHandle</span>),<span class="style5"> INVALID_HANDLE_VALUE</span>&gt; <span class="style6">// Compiler error on gcc-4.7, compiles on Visual Studio 2010</span>
+    hFile(<span class="style2">CreateFileW</span>(pwzPath, FILE_GENERIC_WRITE, FILE_SHARE_WRITE, <span class="style4">nullptr</span>, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, <span class="style4">nullptr</span>));
+</pre>
+</code>
+
+
+<h3>D. Motivation for <code>unique_resource</code></h3>
+<p>The primary motivation for using <code>unique_resource</code> over <code>scoped_resource</code> 
+    is the size of the generated object code.&nbsp; It's use is restricted to resources that have a constexpr deleter function which takes a single argument of the same type as the resource.&nbsp;
+Also, the deleter function and the no-delete value must be constant expressions.<br></p>
+<p>There is no generator like <code><nobr>make_scoped_resource()</nobr></code> for <code>unique_resource</code>. It's construction requires 
+    4 template parameters, but unlike <code><nobr>make_scoped_resource()</nobr></code>, the static 
+    (constexpr) no-delete value has a default value of <code><span class="style4">static_cast</span>&lt;T&gt;(<span class="style4">nullptr</span>)</code>, where <code>T</code> is the type of the first argument passed to the deleter function.<br></p>
+
+<p>In the reference implementation <code>unique_resource</code> uses a parent implementation class called <code>unique_resource_impl</code>.  This allows the type of the resource to be deduced using template metaprogramming.  <code>unique_resource_impl</code> requires 
+    5 template parameters.  The <code>TFuncInfo1</code> template resolves the parameter type of the deleter function for <code>unique_resource</code> which inherits from <code>unique_resource_impl</code>.<br></p>
+
+<p>To simplify use of <code>unique_resource</code>, a convenience macro is used in the examples below, and in the reference implementation.  It is defined as:</p>
+<code><pre>#<span class="style4">define</span> <span class="style5">UNIQUE_DELETER</span>(deleter_fn) decltype(&amp;deleter_fn), deleter_fn, <span class="style4">false</span>
+#<span class="style4">define</span> <span class="style5">UNIQUE_DELETER_THROW</span>(deleter_fn) decltype(&amp;deleter_fn), deleter_fn, <span class="style4">true</span></pre></code>
+
+<p>Another consideration when using <code>unique_resource</code> over <code>make_scoped_resource()</code> is the benefit it provides for member variable resources.  For example, both of the following classes will accomplish the same end-goal, of calling <code>CloseHandle</code>
+ on <code>m_hEvent</code> when an instance of the class is destroyed, but the <code>unique_resource</code> example is slightly easier to read, especially with the help of <code>UNIQUE_DELETER</code>.
+
+<code>
+</code></p><pre><code><span class="style4">class</span> TestClassMember
+{
+<span class="style4">private</span>:
+    <span class="style6">// auto &amp;&amp;m_hEvent; // error C3531: 'm_hEvent': a symbol whose type contains 'auto' must have an initializer</span>
+    <span class="style4">std</span>::<span class="style2">scoped_resource</span>&lt;<span class="style4">decltype</span>(&amp;<span class="style2">CloseHandle</span>), HANDLE&gt; m_hEvent;	<span class="style6">// </span><span class="style9">ok, but a bit bulky...  And a macro can't deduce the resource type...</span>
+
+<span class="style4">public</span>:
+    <span class="style6">// TestClassMember() : m_hEvent(std::make_scoped_resource(CreateEvent(nullptr, TRUE, FALSE, nullptr), [](HANDLE hEvent) { if(hEvent) CloseHandle(hEvent); }))</span>
+<span class="style6">    // {  // ^^: error C2440: 'initializing' : cannot convert from 'std::scoped_resource_unchecked&lt;T,R&gt;' to 'int'</span>
+<span class="style6">    // }</span>
+
+    TestClassMember() : m_hEvent(<span class="style4">std</span>::<span class="style2">make_scoped_resource</span>(<span class="style2">CreateEvent</span>(<span class="style4">nullptr</span>, TRUE, FALSE, <span class="style4">nullptr</span>), <span class="style2">CloseHandle</span>, <span class="style4">static_cast</span><handle>(<span class="style4">nullptr</span>)))
+    {
+        <span class="style6">// ^^ </span><span class="style9">This however works, but it isn't quite as easy to follow as the example in TestClassMember2</span>
+    }
+
+    <span class="style4">void</span> Wait()
+    {
+        DWORD dwX = <span class="style2">WaitForSingleObject</span>(m_hEvent, <span class="style5">INFINITE</span>);
+        <span class="style6">// Other stuff here...</span>
+    }
+
+    <span class="style4">void</span> Set()
+    {
+        <span class="style2">SetEvent</span>(m_hEvent);
+    }
+
+    <span class="style6">// Other stuff here...</span>
+};
+
+<span class="style4">class</span> TestClassMember2
+{
+<span class="style4">private</span>:
+    <span class="style4">std</span>::<span class="style4">unique_resource</span>&lt;<span class="style5">UNIQUE_DELETER</span>(<span class="style2">CloseHandle</span>)&gt; m_hEvent;
+   <span class="style6"> // </span><span class="style9">^^ This is easy to understand, ^^ draws attention to the deleter function</span>
+
+<span class="style4">public</span>:
+    TestClassMember2() : m_hEvent(<span class="style2">CreateEvent</span>(<span class="style4">nullptr</span>, TRUE, FALSE, <span class="style4">nullptr</span>))   <span class="style6">// </span><span class="style9">Initialization is natural, similar to the raw resource type</span>
+    {
+    }
+
+    <span class="style4">void</span> Wait()
+    {
+        DWORD dwX = <span class="style2">WaitForSingleObject</span>(m_hEvent, <span class="style5">INFINITE</span>);
+        <span class="style6">// Other stuff here...</span>
+    }
+
+    <span class="style4">void</span> Set()
+    {
+        <span class="style2">SetEvent</span>(m_hEvent);
+    }
+    <span class="style6">// Other stuff here...</span>
+};
+</handle></code>
+</pre>
+
+<p></p>
+
+<h4>Example of <code>unique_resource</code> compared to a <code>scoped_resource</code> generated with <code><nobr>make_scoped_resource()</nobr></code></h4>
+The following two (obviously useless) functions were compiled with Visual Studio 2010 for 32-bit Windows.  Notice that the code generated by <code><nobr>test_unique_resource()</nobr></code> is only 32 bytes, compared to the 57 byte <code><nobr>test_scoped_resource()</nobr></code>, which does the same thing.
+
+<code>
+<pre><span class="style1">void</span> <span class="style2">test_unique_resource</span>(...)    <span class="style6">//... added to prevent inlining</span>
+{
+    <span class="style6">// Create an event which will be closed on scope-exit, if NOT NULL.  It can be passed to SetEvent/WFSO as hEvent</span>
+   <span class="style4"> std</span><span class="style10">::</span><span class="style4">unique_resource</span>&lt;<span class="style5">UNIQUE_DELETER</span>(<span class="style2">CloseHandle</span>)&gt; hEvent(<span class="style2">CreateEvent</span>(<span class="style4">nullptr</span>, TRUE, FALSE, <span class="style4">nullptr</span>));
+}
+
+<span class="style6">// Object Code: (32 bytes, no prologue, no epilogue, 1 byte for ret)</span>
+<span class="style6">// scope_exit!test_unique_resource [scope_exit\scope_exit.cpp @ 243]:</span>
+<span class="style6">//   243 003d1310 6a00            push    0</span>
+<span class="style6">//   245 003d1312 6a00            push    0</span>
+<span class="style6">//   245 003d1314 6a01            push    1</span>
+<span class="style6">//   245 003d1316 6a00            push    0</span>
+<span class="style6">//   245 003d1318 ff1510303d00    call    dword ptr [scope_exit!_imp__CreateEventW (003d3010)]</span>
+<span class="style6">//   246 003d131e 85c0            test    eax,eax</span>
+<span class="style6">//   246 003d1320 7407            je      scope_exit!test_unique_resource+0x19 (003d1329)</span>
+<span class="style6">//   246 003d1322 50              push    eax</span>
+<span class="style6">//   246 003d1323 ff1514303d00    call    dword ptr [scope_exit!_imp__CloseHandle (003d3014)]</span>
+<span class="style6">//   246 003d1329 c3              ret</span>
+
+<span class="style6">///////////////////////////////////////////////////////////////////////////////</span>
+<span class="style6">///////////////////////////////////////////////////////////////////////////////</span>
+
+<span class="style4">const HANDLE</span> INVALID_EVENT_HANDLE = <span class="style4">static_cast</span>&lt;<span class="style4">HANDLE</span>&gt;(<span class="style4">nullptr</span>);
+<span class="style4">void</span> <span class="style2">test_scoped_resource</span>(...)   <span class="style6"> //... added to prevent inlining</span>
+{
+    <span class="style6">// Create an event which will be closed on scope-exit, if NOT NULL.  It can be passed to SetEvent/WFSO as hEvent</span>
+    <span class="style4">auto</span> hEvent = <span class="style4">std</span>::<span class="style2">make_scoped_resource</span>(<span class="style2">CreateEvent</span>(<span class="style4">nullptr</span>, TRUE, FALSE, <span class="style4">nullptr</span>), <span class="style2">CloseHandle</span>, INVALID_EVENT_HANDLE);
+}
+
+<span class="style6">// Object Code: (57 bytes, 3 prologue bytes and 3 epilogue bytes, </span><span class="style7">to allow for scoped_resource (12 bytes, aligned) on the stack</span><span class="style6">, + 1 for ret)</span>
+<span class="style6">// scope_exit!test_scoped_resource [scope_exit.cpp @ 250]:</span>
+<span class="style6">//   250 003d1330 55              push    ebp</span>
+<span class="style6">//   250 003d1331 8bec            mov     ebp,esp</span>
+<span class="style6">//   250 003d1333 83ec0c          sub     esp,0Ch</span>
+<span class="style6">//   252 003d1336 6a00            push    0</span>
+<span class="style6">//   252 003d1338 6a00            push    0</span>
+<span class="style6">//   252 003d133a 6a00            push    0</span>
+<span class="style6">//   252 003d133c 6a01            push    1</span>
+<span class="style6">//   252 003d133e 6a00            push    0</span>
+<span class="style6">//   252 003d1340 ff1510303d00    call    dword ptr [scope_exit!_imp__CreateEventW (003d3010)]</span>
+<span class="style6">//   252 003d1346 8b0d14303d00    mov     ecx,dword ptr [scope_exit!_imp__CloseHandle (003d3014)]</span>
+<span class="style6">//   252 003d134c 8bd0            mov     edx,eax</span>
+<span class="style6">//   252 003d134e 8d45f4          lea     eax,[ebp-0Ch]</span>
+<span class="style6">//   252 003d1351 e83a060000      call    scope_exit!std::make_scoped_resource&lt;int (__stdcall*)(void *),void *&gt; (003d1990)</span>
+<span class="style6">//   253 003d1356 8b45f8          mov     eax,dword ptr [ebp-8]</span>
+<span class="style6">//   253 003d1359 83c404          add     esp,4</span>
+<span class="style6">//   253 003d135c 3b45fc          cmp     eax,dword ptr [ebp-4]</span>
+<span class="style6">//   253 003d135f 7404            je      scope_exit!test_scoped_resource+0x35 (003d1365)</span>
+<span class="style6">//   253 003d1361 50              push    eax</span>
+<span class="style6">//   253 003d1362 ff55f4          call    dword ptr [ebp-0Ch]</span>
+<span class="style6">//   253 003d1365 8be5            mov     esp,ebp</span>
+<span class="style6">//   253 003d1367 5d              pop     ebp</span>
+<span class="style6">//   253 003d1368 c3              ret</span>
+</pre></code>
+
+<h3>Reference Implementation</h3>
+<ul>
+<li><a href="http://www.andrewlsandoval.com/scope_exit/scoped_resource.h">http://www.andrewlsandoval.com/scope_exit/scoped_resource.h</a> : <code><b>&lt;scoped_resource&gt;</b></code> header file</li>
+<li><a href="http://www.andrewlsandoval.com/scope_exit/scope_exit.cpp">http://www.andrewlsandoval.com/scope_exit/scope_exit.cpp</a> : <code><b>scope_exit.cpp</b></code> file with tests</li>
+<ul><li>Compiles on Windows x86 and x64, using Visual Studio 2010+ and MinGW g++ 4.7</li>
+<li>Should compile on other platforms if Windows specific APIs are not used</li></ul> 
+</ul>
+<h3>Scope</h3>
+As demonstrated above, the scope of this proposal is intended to provide the 4 new classes and 3 new function templates (as a generator for those 
+        the first three classes), to allow wrapping any type of resource or code block in an object that ensures execution or clean-up 
+        of a resource on scope exit.  There will be no impact on users that opt not to use <code>scoped_resource</code>.  Otherwise the impact and scope should be much the same as the impact and scope of <code>unique_ptr</code>, only 
+        with the intended use focused on non-pointer resources, and pointer based 
+        resources for which one of these wrappers may be a better fit than <code>unique_ptr</code>.
+
+<h3>Final Notes on Motivations and Scope:</h3>
+NOTE: Despite similarity in name, this proposal is not related to Boost's Scope.Exit.  Though the goals are similar Scope.Exit uses macros to achieve its goals.
+
+<h2>IV.  Impact on Standard</h2>
+This proposal is a pure library extension. It proposes adding a new header, <code>&lt;scope_resource&gt;</code>, but it does not require changes to any standard classes or functions. It does not require any changes in the core language, and it has been implemented in standard C++ conforming to c++11. The proposal does not depend on any other library extensions.  The reference implementation utilizes the standard <code>&lt;utility&gt;</code> 
+    header, for <code>std::move</code>, as well as <code>&lt;type_traits&gt;</code> for <code>std::remove_pointer</code>, and <code>std::add_reference</code>.
+<h2>V.  Design Decisions</h2>
+<h3>A.  General Principles</h3>
+<ol>
+<li>Simplicity</li>
+<blockquote>Using an RAII resource wrapper should be as easy as using a raw data 
+    type. Generally the cast operator accomplishes this goal.&nbsp; The <code>get()</code> method 
+    would be a reasonable alternative to the cast operator if it were to meet with insurmountable opposition.&nbsp; 
+    Other operators are also provided to simplify usage in a natural manner for the wrapped resource.</blockquote>
+<blockquote>Simple construction and generation should encourage use of the wrappers over raw resource types. This is as true when resources are used within functions and methods as it is when the wrappers are used in objects designed to encapsulate and provided additional related functionality around the resource in a class.</blockquote>
+<blockquote>The "generator" function templates <code>make_scoped_function</code>, and <code>make_scoped_resource</code> help ensure simplicity.</blockquote>
+<blockquote>Though macros are generally frowned upon, the <code>UNIQUE_DELETER</code> macro used to simplify the passing of template parameters to <code>unique_resource</code>, can also claim to improve simplicity.
+  Unlike other macros, it does not hide functionality -- instead it draws attention to the the template arguments that matter most.  The end result is a very easy to use and understand <code>unique_resource</code>.</blockquote>
+<blockquote>Code written with these RAII wrappers becomes simple to maintain.  Lifetime of resources and their method of clean-up is evident from the time of declaration or generation.  The order of operations in clean-up is expected and simple.  And object lifetime is managed by scope rather than the hopefully correct ordering of clean-up at scope-exit or in traditional destructors.</blockquote>
+<li>Transparency</li>
+<blockquote>It should be obvious from a glance what each RAII resource wrapper does.  Constructors and generator function templates should clearly show the binding of the resource's clean-up to the resource.&nbsp; 
+    Similarly a glance at a <code>scoped_function</code> should make it obvious what will happen when the object reaches scope exit.</blockquote>
+<li>Resource Conservation and Lifetime Management</li>
+<blockquote>Each wrapper is designed to encourage consideration of a resource's lifetime when it is created.  The cost of using these wrappers should not out weigh the benefits.</blockquote>
+<li>Generated Object Code Size</li>
+<blockquote>Code bloat should be avoided, and options should exist to minimize generated object code size.  These wrappers should be usable in resource constrained environments.</blockquote>
+<li>Exception Safety</li>
+<blockquote>These RAII resource wrappers should be able to be used without introducing any new risk of throwing exceptions due to allocation failures, etc.  They should be usable for example in kernel code where C++ exceptions often can't be handled.</blockquote>
+<blockquote>Both types of RAII wrappers that allow for a vailidity check (<code>scoped_resource</code>, and <code>unique_resource</code>) default to a <b>nothrow</b> implementation.  Each also offer a 
+    simple means by which <code>failed_resource_initialization</code> may be thrown on construction when a validity check fails.&nbsp; 
+    This provides the broadest opportunity for use, and adaptation to the users 
+    needs.</blockquote>
+<li>Use of Lambdas</li>
+<blockquote>These RAII resource wrappers should allow for the use of lambdas with and without capturing.&nbsp; 
+    Because lambda's may be used to capture by reference, these RAII wrappers can utilize or update references just prior to scope-exit, etc.&nbsp; Lambda's also provide a means of adding logic to deleter "functions", and of returning status from a deleter function.</blockquote>
+</ol>
+<p>B.&nbsp; Prior implementations</p>
+<ol>
+<li>RAIIFunction and RAIIWrapper</li>
+<blockquote><code>RAIIFunction</code> and <code>RAIIWrapper</code> have been in shipping commercial products.  They were initially posted to std-proposals to begin the discussion leading to this proposal.  <code>RAIIWrapper</code> is very similar to <code>unique_resource</code>.
+  <code>RAIIFunction</code> was original designed to inherit from <code>std::function&lt;void ()&gt;</code>, and was later changed to use the same in composition.  This class was posted to the Boost Developer mailing list, where encouragement and feedback where given on possible inclusion in Boost.  It was noted however that <code>std::function</code> can throw on an allocation failure.  This was mentioned when posting to the std-proposals list, and 
+  the current solution -- of using template types (and generator function templates) instead of <code>std::function&lt;void ()&gt;</code> was recommended by one of the list participants (DeadMG).  <code>scoped_function</code>, <code>scoped_resource_unchecked</code>, and <code>scoped_resource</code> along with their <code>make_scoped_function</code> and <code>make_scoped_resource()</code> generators are the result of reworking <code>RAIIFunction</code> based on feedback from the group in general.
+  The result is a much more usable set of classes, where lambda's can be used to clean-up resources with or without capturing, etc.
+</blockquote>
+<li>Boost Scope.Exit</li>
+<blockquote>
+During discussion on the Boost Developer mail list, attention was drawn to the Boost Scope.Exit library.  This library uses macros to provide the ability to execute clean-up code on scope exit.  For the purposes of this proposal, macros have been avoided, other than the very simple <code>UNIQUE_DELETER</code> macro that is used only for template parameters.  Macros often hide details, including from debuggers, that can be crucial to understand and troubleshooting problems.  For that reason, and because of the general distaste for macros in C++, Boost Scope.Exit was not considered for this proposal.  
+That should not be in anyway interpreted as disrespect to the author of Boost Scope.Exit, as it was designed to work with earlier C++ compilers that lack C++11 support.  It should also be noted that the Boost Scope.Exit documentation also includes a suggested alternative for a class compositing <code>std::function&lt;void (void)&gt;</code><sub><b><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3677.html#reference1">1</a></b></sub>.
+</blockquote>
+<li>std::unique_ptr</li>
+<blockquote>During discussions on the std-proposal list, many examples were given, and some suggestions that <code>std::unique_ptr</code> is sufficient and additional RAII classes are not needed.  This proposal rejects those suggestions.  
+Though <code>std::unique_ptr</code> is vital to the Standard Library it is designed to work with pointers, not resources of other types.
+Converting resources, whether they are <code>int</code>'s of a file descriptors, or other non-pointer types isn't straightforward -- and requires that the deleter be able to dereference the pointer.  That would rule out use with many functions, unless the deleter function was first wrapped in a lambda or another function or functor for that purpose.
+  Additionally, <code>std::unique_ptr</code> does not provide a cast operator to allow natural use of the wrapped resource in API calls, etc.
+</blockquote>
+<li>ScopeGuard</li>
+<blockquote>
+An article<sub><b><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3677.html#reference2">2</a></b></sub> written by Andrei Alexandrescu and Petru Marginean, published by Dr. Dobbs Magazine in December 2000 introduces a class called <code>ScopeGuard</code>, which is very similar to <code>scope_resource_uc</code> as presented in the reference implementation associated with this proposal.
+</blockquote>
+
+</ol>
+<p>C.&nbsp; Risks</p>
+<blockquote>
+The cast operator provided by each of the classes does pose a minor risk.  For example, if a confused user where to try to to mix the <code>make_scoped_resource()</code> call with construction of a <code>unique_resource</code>, the cast operator will allow initialization of <code>unique_resource</code>, 
+but the return of the <code>make_scoped_resource()</code> will result in a temporary object, which after transfering the wrapped resource to the <code>unique_resource</code> will then be "deleted" by the deleter function passed to <code>make_scoped_resource</code>.  This would lead to the deleter being invoked more than once, and the resource being used after deletion.
+  This is a minor risk.  The template parameters to <code>unique_resource</code> should make it obvious that it does not match up to <code>make_scoped_resource()</code>.
+</blockquote>
+
+<h2>VI.  Technical Specifications</h2>
+<h3>Header</h3>
+Add an extra row to table 44
+<center>
+<table border="">
+<caption>Table 44 — General utilities library summary</caption>
+<tbody><tr><td>Subclause</td><td>Header(s)</td>
+</tr><tr><td>20.14  Scoped resources</td><td><code>&lt;scoped_resource&gt;</code></td>
+</tr>
+
+</tbody></table>
+</center>
+<h3>20.14  Scoped resources</h3>
+<h3>20.14.1  Class template <code>scoped_function</code></h3>
+<table>
+<tbody><tr><td>1</td><td>A <i>scoped function</i> is an object <i>s</i> that manages a function object <i>f</i> such that <i>f</i> will be invoked when <i>s</i> is destroyed (e.g., when leaving block scope (6.7)).</td></tr>
+<tr><td>2</td><td>The function object managed by <code>scoped_function&lt;T&gt;</code> takes no parameters, so that <i>s</i> may invoke <i>f</i> as <code>f();</code>.</td></tr>
+<tr><td>3</td><td><i>f</i> may be a function pointer, functor, callable function as returned from <code>std::bind</code>, or a lambda 
+    taking no parameters.</td></tr>
+</tbody></table>
+<code>
+<pre>namespace std
+{
+    template&lt;typename T&gt; class scoped_function
+    {
+    public:
+        // 20.14.1.1 constructors
+        explicit scoped_function(T&amp;&amp; f) noexcept;
+        explicit scoped_function(const T&amp; f) noexcept;
+
+        // 20.14.1.2 destructor
+        ~scoped_function();
+
+        // 20.14.1.3 modifiers
+        scoped_function&amp; release() noexcept();
+        scoped_function&amp; reset(T&amp;&amp; f);
+        scoped_function&amp; reset(const T&amp; f);
+        scoped_function&amp; invoke(bool bRelease = true);
+        void operator()();
+
+        // 20.14.1.4 assignment
+        void operator=(T&amp;&amp; f) noexcept;
+        void operator=(const T&amp; f) noexcept;
+    };
+
+    // 20.14.1.5 generator
+    // Make a scoped_function
+    // Takes 1 parameter - the function to be run on scope exit...
+    template&lt;typename T&gt; scoped_function&lt;T&gt; make_scoped_function(T f) noexcept;
+    {
+        return scoped_function&lt;T&gt;(std::move(f));
+    }
+}
+</pre>
+</code>
+<p>
+</p><h4>20.14.1.1 scoped_function constructors</h4>
+The <code>scoped_function</code> constructors take one argument, the type of which must be a callable function taking no parameters.  It is intended that <code>std::make_scoped_function( f )</code> be used to generate a <code>scoped_function</code>, as in the following examples:
+<code><pre>//
+// Using a lambda:
+auto logOnScopeExit = std::make_scoped_function([&amp;syslog, &amp;someStateVariable]() -&gt;void
+{
+    syslog &lt;&lt; "Exiting with state: " &lt;&lt; someStateVariable;
+});
+
+//
+// Using a function:
+// e.g. void SetFinalStatus();
+auto setFinalStatus = std::make_scoped_function(SetFinalStatus);
+
+//
+// Using bind
+auto closeFile = std::make_scoped_function( std::bind(close, fd) );     // std::bind may throw
+</pre></code>
+
+<p></p>
+<h4>20.14.1.2 scoped_function's destructor</h4>
+The <code>scoped_function</code> destructor will invoke the function object passed to the constructor, as long as the <code>scoped_function</code> has not been "released" via a call to <code>release()</code>, or <code>invoke(true)</code>.
+
+<h4>20.14.1.3 scoped_function's modifiers</h4>
+<ul>
+<li><code>release()</code> instructs <code>scoped_function</code> that the function passed to the constructor (or reset / assignment operators) is not to be called when the destructor is invoked.</li>
+<li><code>reset()</code> accepts a new function, function object, or lambda to be called when the <code>scoped_function</code> destructor is invoked.  The argument is the same as what is accepted by the constructors.  Reseting the function also resets the state of a previously "released" <code>scoped_function</code></li>
+<li><code>invoke(true)</code> performs an early (pre-destructor) invocation of the function passed to the constructor, reset method, or assignment operator.  The default true parameter sets the <code>scoped_function</code> to the "released" state so that the function will not be invoked again when the destructor is called.</li>
+<li><code>invoke(false)</code> performs an early (pre-destructor) invocation of the function passed to the constructor, reset method, or assignment operator.  The false parameter leaves the <code>scoped_function</code> in the "unreleased" state so that the function <b>will</b> be invoked again when the destructor is called.</li>
+<li><code>operator()()</code> performs an early (pre-destructor) invocation of the function passed to the constructor, the same as if <code>invoke(true)</code> had been called.</li>
+</ul>
+
+<h4>20.14.1.4 scoped_function's assignment operators</h4>
+The assignment operator invokes <code>reset()</code> to replace the function that will be invoked when the destructor is called.  The object is set to the "unreleased" state so that even if <code>release()</code>, or <code>invoke(true)</code> had been previously called, the new function will be invoked when the destructor is called.
+
+<h4>20.14.1.5 <code>make_scoped_function</code></h4>
+<code>make_scoped_function(func)</code> is used to generate a <code>scoped_function</code> object.
+
+<h3>20.14.2  Class template <code>scoped_resource_unchecked</code></h3>
+<table>
+    <tbody><tr><td>1</td><td>A <i>scoped_resource_unchecked</i> is an object <i>s</i> that manages a generic resource <i>r</i> such that a clean-up function, function object, or lambda, <i>f(r)</i> will be invoked when <i>s</i> is destroyed (e.g., when leaving block scope (6.7)).</td></tr>
+    <tr><td>2</td><td>The function object <i>f</i> managed by <code>scoped_resource_unchecked&lt;TDel, 
+        TRes&gt;</code> takes a single parameter of the type of the resource <i>r</i> so that <i>s</i> may invoke <i>f(r)</i> as <code>f(r);</code>, when <i>s</i> leaves the current scope.</td></tr>
+    <tr><td>3</td><td><i>f</i> may be a function pointer, functor, a callable function as returned from <code>std::bind</code>, or a lambda, taking a single argument of the type of the resource.
+    </td></tr><tr><td>4</td><td><i>r</i> may be accessed through cast operators as if it were of the type of the resource <i>r</i>.</td></tr>
+    <tr><td>5</td><td>Unlike scoped_resource, <i>r</i> is not compared to a "no-delete value" prior to the invocation of <code>f(r)</code>.</td></tr>
+    <tr><td>6</td><td>A <code>scoped_resource_unchecked</code> may be generated (is intended to be generated) using <code>make_scoped_resource(r, f)</code></td></tr>
+</tbody></table>
+<code>
+<pre>namespace std
+{
+    template&lt;typename TDel, typename TRes&gt; class scoped_resource_unchecked
+    {
+    public:
+        // 20.14.2.1 constructors
+        explicit scoped_resource_unchecked(TDel&amp;&amp; arg, TRes&amp;&amp; resource) noexcept;
+        explicit scoped_resource_unchecked(const TDel&amp; arg, const TRes&amp; resource) noexcept;
+
+        // 20.14.2.2 destructor
+        ~scoped_resource_unchecked();
+
+        // 20.14.2.3 modifiers
+        TRes release() throw();
+        scoped_resource_unchecked&amp; reset(TRes&amp;&amp; resource);
+        scoped_resource_unchecked&amp; reset(const TRes&amp; resource);
+        scoped_resource_unchecked&amp; invoke(bool bRelease = true);
+        void operator()();
+
+        // 20.14.2.4 access
+        TRes get() const throw();
+        operator TRes() const throw();
+        TRes operator-&gt;() const;
+        TRes* operator&amp;();
+        TDel&amp; get_deleter();
+        const TDel&amp; get_deleter() const;
+    };
+
+    // 20.14.2.5 Specific Generator
+    // Make a scoped_resource_unchecked (unchecked)
+    // Takes 2 arguments: The resource and the deleter
+    template&lt;typename TDel, typename TRes&gt;
+    scoped_resource_unchecked&lt;TDel, TRes&gt; make_scoped_resource_unchecked(TRes r, TDel d) throw()    // Specific request
+    {
+        return scoped_resource_unchecked&lt;TDel, TRes&gt;(std::move(d), std::move(r));
+    }
+
+    // 20.14.2.6 Generic Generator
+    template&lt;typename TDel, typename TRes&gt;
+    scoped_resource_unchecked&lt;TDel, TRes&gt; make_scoped_resource(TRes r, TDel d) throw()              // Generic request
+    {
+        return scoped_resource_unchecked&lt;TDel, TRes&gt;(std::move(d), std::move(r));
+    }
+}
+</pre>
+</code>
+<p>
+</p><h4>20.14.2.1 scoped_resource_unchecked constructors</h4>
+The <code>scoped_resource_unchecked</code> constructors take two arguments. The type of the first must be a callable function taking a single parameter of the type of the second template argument.  It is intended that <code>std::make_scoped_resource(resource, deleter)</code> be used to generate a <code>scoped_resource_unchecked</code>, as in the following examples:
+<code><pre>//
+// Most common usage - close "handle" types on scope-exit, using a function...
+extern PACCESS_TOKEN PsReferencePrimaryToken(IN PEPROCESS pProcess);    // Assumption: Always returns a valid value that can be passed to ObDerferenceToken
+extern void ObDereferenceToken(PACCESS_TOKEN pToken);                   // Deleter: Handles any value (including nullptr) from PsReferencePrimaryToken()
+
+// Manual Construction (not intended):
+std::scoped_resource_unchecked&lt;decltype(&amp;ObDereferenceToken), PACCESS_TOKEN&gt; pToken(PsReferencePrimaryToken(PsGetCurrentProcess(), ObDereferenceToken));
+
+// Construction via Generic Generator (preferred method) (see 20.14.2.6):
+auto pToken = std::make_scoped_resource(PsReferencePrimaryToken(PsGetCurrentProcess(), ObDereferenceToken));
+
+//
+// Using a lambda:
+extern PACCESS_TOKEN PsReferencePrimaryToken(IN PEPROCESS pProcess);    // Assumption: Always returns a valid value that can be passed to ObDerferenceToken
+extern void ObDereferenceObject(PVOID pObject);                         // Generic deleter
+auto pToken = std::make_scoped_resource(PsReferencePrimaryToken(PsGetCurrentProcess()), [](PACCESS_TOKEN pToken) -&gt;void
+{
+    if(pToken == nullptr)
+    {
+        syslog &lt;&lt; "Warning, closing nullptr primary token on scope-exit!!!";
+    }
+    ObDereferenceObject(pToken);
+});
+
+//
+// Using bind
+extern void * VirtualAllocGuaranteed(PVOID pPreferredBaseAddr, size_t szSize, unsigned int flags, unsigned int pageProtection);  // System API that always returns usable pointer (even if nullptr / page zero)
+extern void VirtualFree(void *pAddress, size_t size, unsigned int freeFlags);       // Generic System API for releasing, freeing, etc. virtual memory
+
+auto pVirtMem = std::make_scoped_resource(VirtualAllocGuaranteed(nullptr, 4096, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE),
+    std::bind(VirtualFree, _1, 0, MEM_RELEASE));
+</pre></code>
+
+<p></p>
+<h4>20.14.2.2 scoped_resource_unchecked's destructor</h4>
+The <code>scoped_resource_unchecked</code> destructor will invoke the "deleter" function object passed to the constructor, passing it the 
+        tracked resource, as long as the <code>scoped_resource_unchecked</code> has not been "released" via a call to <code>release()</code>, or <code>invoke(true)</code>.  By this means the resource clean-up is carried out by the "deleter" function on scope-exit or unwind.
+
+<h4>20.14.2.3 scoped_resource_unchecked's modifiers</h4>
+<ul>
+<li><code>release()</code> prevents the <code>scoped_resource_unchecked</code> from 
+    invoking the "deleter" function in the destructor.  It returns a copy of the resource so that it may if needed, be assigned to another tracking object.</li>
+<li><code>reset(resource)</code> causes the <code>scoped_resource_unchecked</code> to invoke the "deleter" function for any currently tracked resource that has not been "released", and assigns a new resource to the <code>scoped_resource_unchecked</code> to be tracked.  The <code>scoped_resource_unchecked</code> will be set to an "un-released" state when a new resource is assigned.</li>
+<li><code>invoke(true)</code> performs an early (pre-destructor) invocation of the "deleter" function.  The 
+    <em>default</em> true parameter sets the <code>scoped_resource_unchecked</code> to the "released" state so that the deleter function will not be invoked again when the destructor is called, unless the object is subsequently "reset."</li>
+<li><code>invoke(false)</code> performs an early (pre-destructor) invocation of the "deleter" function.  The false parameter leaves the <code>scoped_resource_unchecked</code> in the "un-released" state so that the deleter function <b>will</b> be invoked again when the destructor is called.</li>
+<li><code>operator()()</code> performs an early (pre-destructor) invocation of the deleter function, the same as if <code>invoke(true)</code> had been called.</li>
+</ul>
+
+<h4>20.14.2.4 scoped_resource_unchecked's accessors</h4>
+<ul>
+<li><code>TRes get() const throw()</code> returns the resource being managed by the <code>scoped_resource_unchecked</code> object.</li> 
+<li><code>operator TRes() const throw()</code> returns the resource being managed by the <code>scoped_resource_unchecked</code> object.</li> 
+<li><code>TRes operator-&gt;() const</code> returns the resource being managed by the <code>scoped_resource_unchecked</code> object.</li>
+<li><code>TRes* operator&amp;()</code> returns a pointer to the resource being managed by the <code>scoped_resource_unchecked</code> object, where the <code>scoped_resouce_unchecked</code> has a private member of type <code>TRes</code> such as <code>TRes m_resource;</code> which is returned from this accessor with <code>return &amp;m_resource;</code></li>
+<li><code>TDel&amp; get_deleter()</code> returns a reference to the deleter function. 
+    This allows the caller to modify the deleter function if needed on a non-const 
+    object.</li>
+<li><code>const TDel&amp; get_deleter() const</code> returns a reference to the deleter 
+    function.</li>
+</ul>
+
+<h4>20.14.2.5 <code>make_scoped_resource_unchecked</code></h4>
+<code>make_scoped_resource_unchecked(resource, deleterfunc)</code> is used to generate a <code>scoped_resource_unchecked</code> object.&nbsp; 
+        See the examples above in 20.14.2.1.
+
+<h4>20.14.2.6 <code>make_scoped_resource</code></h4>
+<code>make_scoped_resource(resource, deleterfunc)</code> is used to generate a <code>scoped_resource_unchecked</code> object in a manner that is compatible with the generation of a <code>scoped_resource</code> object.  The difference between the generator for a <code>scoped_resource_unchecked</code> object and the generator for a <code>scoped_resource</code> is that the <code>scoped_resource</code> requires a 3rd parameter that is used for validity checking prior to invoking the deleter function.  Also, <code>scoped_resource</code> can be controlled through template parameters to <code>throw failed_resource_initialization();</code> when it is constructed with a resource that matches the "no-delete" value.
+
+<h3>20.14.3  Addition of <code>std::failed_resource_initialization exception</code></h3>
+It is necessary to add an exception to the standard library to be thrown when invalid resources are assigned (or passed to the constructor) of a <code>scoped_resource</code> or <code>unique_resource</code> object.  The following is an example implementation.
+
+<pre><code>
+namespace std
+{
+    ////////////////////////////////////////////////////////////////////////////
+    // failed_resource_initialization
+    // An exception thrown when a no-delete value is passed to a scoped_resource
+    // or unique_resource constructor, assignment, or reset IF the template
+    // arguments allow for throwing.  Throwing is optional so that these classes
+    // may be used in environment where exception can not be handled (e.g.
+    // kernel drivers, etc.)  In those cases the resource should be validated
+    // using .valid() prior to use.
+    ////////////////////////////////////////////////////////////////////////////
+    class failed_resource_initialization : public exception
+    {
+    public:
+        explicit failed_resource_initialization(const char * = nullptr) throw()
+        {
+        }
+
+        virtual const char * what() const throw()
+        {
+            return "resource initialization failed";
+        }
+    };
+}
+</code>
+</pre>
+
+<h3>20.14.4  Class template <code>scoped_resource</code></h3>
+<table>
+    <tbody><tr><td>1</td><td>A <i>scoped_resource</i> is an object <i>s</i> that manages a generic resource <i>r</i> such that a clean-up function, function object, or lambda, <i>f(r)</i> will be invoked when <i>s</i> is destroyed (e.g., when leaving block scope (6.7)), as long as the resource passes a validity check.</td></tr>
+    <tr><td>2</td><td>The function object <i>f</i> managed by <code>scoped_resource&lt;TDel, 
+        TRes, const bool throw_on_init_failure = false&gt;</code> takes a single parameter of the type of the resource <i>r</i> so that <i>s</i> may invoke <i>f(r)</i> as <code>f(r);</code>, when <i>s</i> leaves the current scope 
+        or is otherwise destructed.</td></tr>
+    <tr><td>3</td><td><i>f</i> may be a function pointer, functor, a callable function as returned from <code>std::bind</code>, or a lambda, taking a single argument of the type of the resource.
+    </td></tr><tr><td>4</td><td><i>r</i> may be accessed through cast operators as if it were of the type of the resource <i>r</i>.</td></tr>
+    <tr><td>5</td><td>Unlike scoped_resource_unchecked, <i>r</i> <b>is</b> compared to a "no-delete value" prior to the invocation of <code>f(r)</code>.</td></tr>
+    <tr><td>6</td><td>A <code>scoped_resource</code> may be generated (is intended to be generated) using <code>make_scoped_resource(r, f, nd)</code></td></tr>
+    <tr><td>7</td><td>The 3rd template parameter, when true, allows the constructors to throw if the resource matches the "invalid" or "no-delete" value.</td></tr>
+</tbody></table>
+<code>
+<pre>namespace std
+{
+    template&lt;typename TDel, typename TRes, const bool throw_on_init_failure&gt; class scoped_resource
+    {
+    public:
+        // 20.14.4.1 constructors
+        explicit scoped_resource(TDel&amp;&amp; arg, TRes&amp;&amp; resource, TRes no_delete_value);
+        explicit scoped_resource(const TDel&amp; arg, const TRes&amp; resource, TRes no_delete_value);
+
+        // 20.14.4.2 destructor
+        ~scoped_resource();
+
+        // 20.14.4.3 modifiers
+        TRes release() throw();
+        scoped_resource&amp; reset(TRes&amp;&amp; resource);
+        scoped_resource&amp; reset(const TRes&amp; resource);
+        scoped_resource&amp; invoke(bool bRelease = true);
+        void operator()();
+
+        // 20.14.4.4 access
+        TRes get() const throw();
+        operator TRes() const throw();
+        TRes operator-&gt;() const;
+        TRes* operator&amp;();
+        TDel&amp; get_deleter();
+        const TDel&amp; get_deleter() const;
+
+        // 20.14.4.5 validity checking
+        bool valid() const throw();
+    };
+
+    // 20.14.4.6 Default Generator Function
+    // Takes 3 parameters: The Resource, the Deleter, and a "invalid" or "no-delete" value
+    template&lt;typename TDel, typename TRes&gt;
+    scoped_resource&lt;TDel, TRes, false&gt; make_scoped_resource(TRes resource, TDel deleter, TRes nodelete)
+    {
+       return scoped_resource&lt;TDel, TRes, false&gt;(std::move(deleter), std::move(resource), std::move(nodelete));
+    }
+
+    // 20.14.4.7 Generator Function for throw_on_init
+    template&lt;bool t_throw_on_init_failure, typename T, typename R&gt;
+    scoped_resource&lt;T, R, t_throw_on_init_failure&gt; make_scoped_resource(R r, T t, R nd)
+    {
+       return scoped_resource&lt;T, R, t_throw_on_init_failure&gt;(std::move(t), std::move(r), std::move(nd));
+    }
+}
+</pre>
+</code>
+<p>
+</p><h4>20.14.4.1 scoped_resource constructors</h4>
+The <code>scoped_resource</code> constructors take three arguments:
+<ol>
+<li>The deleter function - a callable function (or lambda) taking a single parameter of the type of the second template argument.</li>
+<li>The resource to be managed / tracked by the <code>scoped_resource.</code>
+</li><li>A no-delete or "invalid" value of the type of the resource which may be used for comparision to:
+<ul>
+<li>Prevent calling the deleter function in the destructor, when the resource has an invalid value (e.g. -1 for a file descriptor).</li>
+<li>Allow a comparision for the valid() method.</li>
+<li>Allow a comparision for when throwing an exception is enabled in the constructor when passed an invalid value.</li>
+</ul>
+</li>
+</ol>It is intended that <code>std::make_scoped_resource(resource, deleter, nodelete)</code> be used to generate a <code>scoped_resource</code>, as in the following examples:
+<code><pre>//
+// Most common usage - close "handle" types on scope-exit, using a function...
+extern HANDLE CreateEventW(PSECURITY_ATTRIBUTES pEventAttributes, BOOL bManualReset, BOOL bInitialState, PCWSTR pName);
+extern void CloseHandle(HANDLE h);
+extern int open(const char *pszFilename, int oflags, ...);
+extern void close(int iFileDesc);
+
+// Construction via Generic Generator with nullptr check, no-throw option
+auto hEvent = std::make_scoped_resource(CreateEvent(nullptr, FALSE, FALSE, nullptr), CloseHandle, nullptr);
+if(hEvent.valid()) // After Initialization check if (hEvent == nullptr)
+
+//
+// Construction via Generic Generator with nullptr check, throw on allocation failure...
+try
+{
+    auto hEvent = std::make_scoped_resource&lt;true&gt;(CreateEvent(nullptr, FALSE, FALSE, nullptr), CloseHandle, nullptr);
+}
+catch (const std::failed_resource_initialization &amp;e)
+{
+    // Deal with failure to CreateEvent, IOW hEvent == nullptr
+}
+
+//
+// Construction via Generic Generator with -1 check, no-throw option
+auto iFileDesc = std::make_scoped_resource(open("/tmp/log.txt", O_WRONLY|O_APPEND), close, -1);
+if(iFileDesc.valid()) // Check validity
+{
+    write(iFileDesc, ...);
+}
+
+//
+// Construction via Generic Generator with -1 check, throw on allocation failure
+try
+{
+    auto iFileDesc = std::make_scoped_resource&lt;true&gt;(open("/tmp/log.txt", O_WRONLY|O_APPEND), close, -1);
+    write(iFileDesc, ...);  // Can't get here if allocation failed
+}
+catch (const std::failed_resource_initialization &amp;e)
+{
+    // Deal with failure to open file, IOW iFileDesc == -1
+}
+</pre></code>
+Note: Manual constuction is also possible with <code>scoped_resource</code> in much the same way as with <code>scoped_resource_unchecked</code>.  Also, leaving the decision on whether to throw, or require testing for allocation failures up to the user makes it possible to use <code>scoped_resource</code> in places, such as kernel-mode code, where exceptions can not be tolerated.
+
+<p></p>
+<h4>20.14.4.2 scoped_resource_unchecked's destructor</h4>
+The <code>scoped_resource</code> destructor will invoke the "deleter" function object passed to the constructor, passing it the tracked resource, as long as the <code>scoped_resource</code> has not been "released" via a call to <code>release()</code>, or <code>invoke(true)</code>, and if the resource does not match the no-delete value.  By this means the resource clean-up is carried out by the "deleter" function on scope-exit or unwind.
+
+<h4>20.14.4.3 scoped_resource's modifiers</h4>
+<ul>
+<li><code>release()</code> prevents the <code>scoped_resource</code> from invoking the "deleter" function in the destructor.  It returns a copy of the resource so that if needed it may be assigned to a new tracking object, such as a <code>scoped_resource</code> within a different scope.</li>
+<li><code>reset(resource)</code> causes the <code>scoped_resource</code> to invoke the "deleter" function for any currently tracked <i>and valid</i> resource that has not been "released", and assigns a new resource to the <code>scoped_resource</code> to be tracked.  The <code>scoped_resource</code> will be set to the "un-released" state when a new resource is assigned.  The deleter function does not change.  If the <code>scoped_resource</code> was constructed with the throw-option, the new resource will be compared to the no-delete value passed to the constructor and <code>std::failed_resource_initialization</code> exception will be thrown if it matches.</li>
+<li><code>invoke(true)</code> performs an early (pre-destructor) invocation of the "deleter" function <i>for a valid resource</i>.  The <em>default</em> true parameter sets the <code>scoped_resource</code> to the "released" state so that the deleter function will not be invoked again when the destructor is called, unless the object is subsequently "reset."</li>
+<li><code>invoke(false)</code> performs an early (pre-destructor) invocation of the "deleter" function <i>for a valid resource</i>.  The false parameter leaves the <code>scoped_resource</code> in the "un-released" state so that the deleter function <b>will</b> be invoked again when the destructor is called.</li>
+<li><code>operator()()</code> performs an early (pre-destructor) invocation of the deleter function, the same as if <code>invoke(true)</code> had been called.</li>
+</ul>
+
+<h4>20.14.4.4 scoped_resource accessors</h4>
+<ul>
+<li><code>TRes get() const throw()</code> returns the resource being managed by the <code>scoped_resource</code> object.</li> 
+<li><code>operator TRes() const throw()</code> returns the resource being managed by the <code>scoped_resource</code> object.</li> 
+<li><code>TRes operator-&gt;() const</code> returns the resource being managed by the <code>scoped_resource</code> object.</li>
+<li><code>TRes* operator&amp;()</code> returns a pointer to the resource being managed by the <code>scoped_resource</code> object, where the <code>scoped_resouce</code> has a private member of type <code>TRes</code> such as <code>TRes m_resource;</code> which is returned from this accessor with <code>return &amp;m_resource;</code></li>
+<li><code>TDel&amp; get_deleter()</code> returns a reference to the deleter function. This allows the caller to modify the deleter function if needed on a non-const object.</li>
+<li><code>const TDel&amp; get_deleter() const</code> returns a reference to the deleter function.</li>
+</ul>
+
+<h4>20.14.4.5 scoped_resource validity checking</h4>
+The <code>valid()</code> member may be used to compare the tracked resource to the no-delete value used when constructing the <code>scoped_resource</code> object.  It returns true if the resource is NOT equal to the no-delete value.
+
+<h4>20.14.4.6 <code>make_scoped_resource - Default Generator Function</code></h4>
+<code>make_scoped_resource_unchecked(resource, deleterfunc, no_delete_value)</code> is used to generate a <code>scoped_resource</code> object.&nbsp;See the examples above in 20.14.3.1.
+The absence of the true bool template parameter indicates that an exception should NOT be thrown if the tracked resource is assigned a value equal to the no_delete_value, or in other words, <code>if(resource == no_delete_value)</code>.  In this case the user is responsible for checking the validity of the resource via the <code>valid()</code> member function.  This allows <code>scoped_resource</code> to be used in enviroments (such as kernel-mode code) where exceptions can not be tolerated.
+
+<h4>20.14.4.7 <code>make_scoped_resource&lt;true&gt; - Generator Function which allows throws on allocation failure</code></h4>
+<code>make_scoped_resource_unchecked&lt;bool&gt;(resource, deleterfunc, no_delete_value)</code> is used to generate a <code>scoped_resource</code> object.&nbsp;See the examples above in 20.14.3.1.
+The bool template parameter indicates whether or not a <code>std::failed_resource_initialization</code> exception should be thrown if the tracked resource is assigned a value equal to the no_delete_value, or in other words:<br>
+<code>if(resource == no_delete_value)</code>.
+
+<h3>20.14.5  Class template <code>unique_resource</code></h3>
+<table>
+    <tbody><tr><td>1</td><td>A <i>unique_resource</i> is an object <i>s</i> that manages a generic resource <i>r</i> such that a <i>static</i> clean-up function, <i>f(r)</i> will be invoked when <i>s</i> is destroyed (e.g., when leaving block scope (6.7)), as long as the resource passes a validity check.</td></tr>
+    <tr><td>2</td><td>The clean-up function <i>f</i> managed by <code>unique_resource</code> takes a single parameter of the type of the resource <i>r</i> so that <i>s</i> may invoke <i>f(r)</i> as <code>f(r);</code>, when <i>s</i> leaves the current scope 
+        or is otherwise destructed.</td></tr>
+    <tr><td>3</td><td><i>f</i> must be a function that can be passed and invoked as a template argument, known at compile time.  The no-delete value must also be a static value that may be passed and evaluated as a template argument.  This allows the compiler to generate the least possible amount of code for each <code>unique_resource</code>.
+    </td></tr><tr><td>4</td><td><i>r</i> may be accessed through cast operators as if it were of the type of the resource <i>r</i>.</td></tr>
+    <tr><td>5</td><td>Like scoped_resource, <i>r</i> <b>is</b> compared to a "no-delete value" prior to the invocation of <code>f(r)</code>.</td></tr>
+    <tr><td>6</td><td>There is no generator for <code>unique_resource</code>.  It is designed for use in places where a generator is not convenient, and where the smallest generated code possible is needed.</td></tr>
+    <tr><td>7</td><td>The 3rd template parameter, when true, allows the constructors to throw if the resource matches the "invalid" or "no-delete" value.</td></tr>
+    <tr><td>8</td><td>Convenience macros are provided to simplify the declaration of template parameters.</td></tr>
+    <tr><td>9</td><td>As shown below, the reference implementation uses an implementation-defined class and a set of implementation defined helper classes to aid in deducing template parameters.  While these classes are not part of the specification, the interfaces they expose must be carried forward to the actual <code>unique_resource</code> implementation which in this case inherits from the base class.</td></tr>
+</tbody></table>
+<code>
+<pre>namespace std
+{
+    // 20.14.5.1 unique_resource_impl
+    template&lt;typename TResource, typename TDeleter, TDeleter t_deleter, bool throw_on_init_failure, TResource t_nodelete&gt;
+    class unique_resource_impl
+    {
+    private:
+        unique_resource_impl(const unique_resource_impl &amp;);
+        void operator=(const unique_resource_impl &amp;);
+
+    public:
+        unique_resource_impl() : m_resource(t_nodelete)    // Allows for operator=(TResource) later...
+        {
+        }
+
+        explicit unique_resource_impl(TResource&amp;&amp; resource) : m_resource(std::move(resource))
+        {
+            if(throw_on_init_failure &amp;&amp; t_nodelete == m_resource)
+            {
+                throw failed_resource_initialization();
+            }
+        }
+
+        explicit unique_resource_impl(const TResource&amp; resource) : m_resource(resource)
+        {
+            if(throw_on_init_failure &amp;&amp; t_nodelete == m_resource)
+            {
+                throw failed_resource_initialization();
+            }
+        }
+
+        ~unique_resource_impl()
+        {
+            invoke(true);
+        }
+
+        TResource release() throw()
+        {
+            TResource tempcopy = m_resource;
+            m_resource = t_nodelete;
+            return tempcopy;
+        }
+
+        unique_resource_impl&amp; reset(TResource&amp;&amp; resource)
+        {
+            invoke(false);        // false because we are going to change it manually here...
+            m_resource = std::move(resource);
+            if(throw_on_init_failure &amp;&amp; t_nodelete == m_resource)
+            {
+                throw failed_resource_initialization();
+            }
+            return *this;
+        }
+
+        unique_resource_impl&amp; reset(TResource const&amp; resource)
+        {
+            invoke(false);        // false because we are going to change it manually here...
+            m_resource = resource;
+            if(throw_on_init_failure &amp;&amp; t_nodelete == m_resource)
+            {
+                throw failed_resource_initialization();
+            }
+            return *this;
+        }
+
+        void operator()()
+        {
+            invoke(true);
+        }
+
+        TResource get() const throw()
+        {
+            return m_resource;
+        }
+
+        void operator=(TResource &amp;&amp;res)
+        {
+            reset(res);
+        }
+
+        void operator=(TResource const &amp;res)
+        {
+            reset(res);
+        }
+
+        //
+        // Cast operator - for access to resource
+        // WARNING: This can cause make_scoped_resource*(R, T) to return a temporary that initializes something else!  Be careful with usage!
+        // Nevertheless, it provides transparency for API calls, etc.
+        operator TResource() const throw()
+        {
+            return m_resource;
+        }
+
+        //
+        // operator-&gt; for accessing members on pointer types
+        TResource operator-&gt;() const
+        {
+            return m_resource;
+        }
+
+        //
+        // operator&amp; for getting the address of the resource - not const!
+        TResource* operator&amp;()
+        {
+            return &amp;m_resource;
+        }
+
+        const TDeleter get_deleter() const
+        {
+            return t_deleter;
+        }
+
+        //
+        // invoke...(e.g. early invocation), allows for repeated
+        // invocation, if bRelease = false.  Use with caution!
+        unique_resource_impl&amp; invoke(bool bRelease = true)
+        {
+            if(valid())
+            {
+                t_deleter(m_resource);
+                if(bRelease)
+                {
+                    m_resource = t_nodelete;
+                }
+            }
+            return *this;
+        }
+
+        //
+        // Check for a valid / usable resource
+        bool __inline valid() const throw()
+        {
+            return m_resource != t_nodelete;
+        }
+    };
+
+    // 20.14.5.2 implementation specific helper classes used to deduce template parameters
+    //
+    // Extract First Parameter Type
+    //
+    template &lt;typename T&gt;
+    struct TFuncInfo1;
+
+    #if defined(_WIN32) &amp;&amp; !defined(_WIN64)        // Support Microsoft calling conventions
+    template &lt;typename TReturn, typename TParam&gt;
+    struct TFuncInfo1&lt;TReturn (__stdcall *)(TParam)&gt;
+    {
+        typedef TReturn tReturnType;
+        typedef TParam tParameter1;
+    };
+
+    template &lt;typename TReturn, typename TParam&gt;
+    struct TFuncInfo1&lt;TReturn (__cdecl *)(TParam)&gt;
+    {
+        typedef TReturn tReturnType;
+        typedef TParam tParameter1;
+    };
+
+    template &lt;typename TReturn, typename TParam&gt;
+    struct TFuncInfo1&lt;TReturn (__fastcall *)(TParam)&gt;
+    {
+        typedef TReturn tReturnType;
+        typedef TParam tParameter1;
+    };
+    #else    // All other compilers
+    template &lt;typename TReturn, typename TParam&gt;
+    struct TFuncInfo1&lt;TReturn (*)(TParam)&gt;
+    {
+        typedef TReturn tReturnType;
+        typedef TParam tParameter1;
+    };
+    #endif    // _WIN32 &amp;&amp; !_WIN64
+
+    // 20.14.5.3 unique_resource (reference implementation)
+    template&lt;typename TDeleter,
+        TDeleter t_deleter,
+        bool throw_on_init_failure = false,        // Set to true if you want throw(failed_resource_initialization) when m_resource == t_nodelete_value
+        typename TFuncInfo1&lt;TDeleter&gt;::tParameter1 t_nodelete_value = static_cast&lt;typename TFuncInfo1&lt;TDeleter&gt;::tParameter1&gt;(nullptr)&gt;
+    struct unique_resource : public
+        unique_resource_impl&lt;typename TFuncInfo1&lt;TDeleter&gt;::tParameter1, TDeleter, t_deleter, throw_on_init_failure, t_nodelete_value&gt; 
+    {
+        typedef typename TFuncInfo1&lt;TDeleter&gt;::tParameter1 TResource;
+
+        unique_resource() : 
+            unique_resource_impl&lt;typename TFuncInfo1&lt;TDeleter&gt;::tParameter1, TDeleter, t_deleter, throw_on_init_failure, t_nodelete_value&gt;()
+        {
+        }
+
+        unique_resource(TResource &amp;&amp;resource) : 
+            unique_resource_impl&lt;typename TFuncInfo1&lt;TDeleter&gt;::tParameter1, TDeleter, t_deleter, throw_on_init_failure, t_nodelete_value&gt;(std::move(resource))
+        {
+        }
+
+        unique_resource(TResource const &amp;resource) : 
+            unique_resource_impl&lt;typename TFuncInfo1&lt;TDeleter&gt;::tParameter1, TDeleter, t_deleter, throw_on_init_failure, t_nodelete_value&gt;(resource)
+        {
+        }
+
+        void operator=(TResource &amp;&amp;resource)
+        {
+            this-&gt;reset(resource);
+        }
+
+        void operator=(TResource const &amp;resource)
+        {
+            this-&gt;reset(resource);
+        }
+    };
+
+    //
+    // 20.14.5.4 unique_resource (specification)
+    template&lt;typename TDeleter,
+        TDeleter t_deleter,
+        bool throw_on_init_failure = false,        // Set to true if you want throw(failed_resource_initialization) when m_resource == t_nodelete_value
+        typename TFuncInfo1&lt;TDeleter&gt;::tParameter1 t_nodelete_value = static_cast&lt;typename TFuncInfo1&lt;TDeleter&gt;::tParameter1&gt;(nullptr)&gt;
+    class unique_resource 
+    {
+        typedef typename TFuncInfo1&lt;TDeleter&gt;::tParameter1 TResource;
+
+        // 20.14.5.4.1 - unique_resource constructors
+        unique_resource();
+        unique_resource(TResource &amp;&amp;resource);
+        unique_resource(TResource const &amp;resource);
+
+        // 20.14.5.4.2 - unique_resource destructor
+        ~unique_resource();
+
+        // 20.14.5.4.3 - unique_resource modifiers
+        TResource release() throw();
+        unique_resource_impl&amp; reset(TResource&amp;&amp; resource);
+        unique_resource_impl&amp; reset(TResource const&amp; resource);
+        unique_resource_impl&amp; invoke(bool bRelease = true);
+        void operator()();
+        void operator=(TResource &amp;&amp;resource);
+        void operator=(TResource const &amp;resource);
+
+        // 20.14.5.4.4 - unique_resource accessors
+        TResource get() const throw();
+        operator TResource() const throw();
+        TResource operator-&gt;() const;
+        TResource* operator&amp;();
+        const TDeleter get_deleter() const;
+
+        // 20.14.5.4.5 - unique_resource validity checking
+        bool __inline valid() const throw();
+    };
+
+    //
+    // 20.14.5.5 Helper Macros
+    // The following macros simplify template parameters for unique_resource
+    #define UNIQUE_DELETER(deleter_fn) decltype(&amp;deleter_fn), deleter_fn, false
+    #define UNIQUE_DELETER_THROW(deleter_fn) decltype(&amp;deleter_fn), deleter_fn, true
+    #define UNIQUE_DELETER_NOTHROW(deleter_fn) decltype(&amp;deleter_fn), deleter_fn, false
+}
+</pre>
+</code>
+<p>
+</p><h4>20.14.5.1 The Reference Implementation - <code>unique_resource_impl</code></h4>
+The reference implementation is shown above to provide insight on the intended design of <code>unique_resource</code> with its implementation specific classes the accomodate template deduction.  All code shown in the reference implementation is provided as an example only and not part of an official specification.  Each actual implemenation will need to supply it's own methods of providing adequate template deduction methods to support construction of a <code>unique_resource</code> as shown in section 20.14.5.4.1.
+
+<h4>20.14.5.2 Helper Classes</h4>
+The classes and template metaprogramming shown here is also provided only as an example so that the definition provided in section 20.14.5.4 makes sense.  These helper classes are implementation specific and are used to allow automatic deducing of the type of the resource being tracked by <code>unique_resource</code>.  An implementation that can satisify the construction specification shown in section 20.14.5.4.1 below may or may not need these helper classes (specifically) <code>TFuncInfo</code>.
+
+<h4>20.14.5.3 The Reference Implentation - <code>unique_resource</code></h4>
+The reference implementation is shown above to provide insight on the intended design of <code>unique_resource</code> and how it utilizes template metaprogramming to deduce template arguments for the construction of <code>unique_resource</code> and it's implementation specific base class <code>unique_resource_impl</code> (20.14.5.1) to satisify the construction specifications laid out in section 20.14.5.4.1.
+
+<h4>20.14.5.4 <code>unique_resource</code></h4>
+<h5>20.14.5.4.1 <code>unique_resource</code> construction</h5>
+
+<code>unique_resource</code> may be constructed using one (1) or zero (0) arguments.  This is possible because the template parameters supplied provide a deleter function used to clean-up the resource on <code>unique_resource</code> destruction.  A zero parameter constructor creates an object that has no resource to track until a subsequent assignment or reset.
+
+Template Parameters:
+<ol>
+<li>The <i>type</i> of the deleter function - a function taking a single parameter of the <i>type</i> of the resource being tracked.  The resource <i>type</i> is deduced from the argument to the deleter function.</li>
+<li>The deleter function itself.  A static value that is known at compile time and can be expressed as a template parameter and invoked in the destructor by passing the tracked resource as the solitary parameter.</li>
+<li>A bool value indicating whether or not the constructor or assignment operator should throw <code>std::failed_resource_initialization</code> if the resource is assigned (or constructed with) a value matching the no-delete or "invalid" value.  The no-delete value must be of the <i>type</i> of the resource which is deduced from the argument required by the deleter function.</li>
+<li>A no-delete or "invalid" value of the <i>type</i> of the resource being tracked.  This parameter defaults to <code>nullptr</code> after having been cast (<code>static_cast</code> to the <i>type</i> of the resource.)  The no-delete value must be a static value known at compile time that may be passed as a template parameter and used in a comparison withing the invoke() method or the destructor.</li>
+</ol>
+<br>
+<code>unique_resource</code> is meant to be used in places where:
+<ul>
+<li><code>make_scoped_resource()</code> is unsuitable or awkward, such as is the case for class member variables that can not be declared as <code>auto</code>.</li>
+<li>Where very small (tight) code generation is desired, since the deleter function and no-delete value are static values that <i>should not</i> be stored in member variables.</li>
+</ul>
+<br>
+The following are examples of <code>unique_resource</code> objects being constructed:
+<code><pre>//
+// Most common usage - close "handle" types on scope-exit or class destruction...
+extern HANDLE OpenFileW(const wchar_t *pwzFilename);
+extern HANDLE CreateEventW(PSECURITY_ATTRIBUTES pEventAttributes, BOOL bManualReset, BOOL bInitialState, PCWSTR pName);
+extern void SetEvent(HANDLE hEvent);
+extern void CloseHandle(HANDLE h);
+extern int open(const char *pszFilename, int oflags, ...);
+extern void close(int iFileDesc);
+extern ssize_t pwrite(int iFileDes, const void *pBuf, size_t szBytes, off_t offset);
+
+class MyDataFile
+{
+private:
+    const std::unique_resource&lt;UNIQUE_DELETER(CloseHandle)&gt; m_hWriteSignaledEvent;            // NOTE: Using helper macro
+    std::unique_resource&lt;decltype(&amp;CloseHandle), CloseHandle, INVALID_HANDLE_VALUE&gt; m_hFile;  // NOTE: Not using helper macro, also with non-default no-delete value
+    std::unique_resource&lt;UNIQUE_DELETER_NOTHROW(SetEvent)&gt; hSignalThread;                     // NOTE: In this case we only want a .valid() event handle if it is created/assigned later - using default constructor
+    std::vector&lt;unsigned char&gt; m_vData;
+public:
+
+    MyDataFile(const wchar_t *pwzFileName) :
+        m_hWriteSignaledEvent(CreateEvent(nullptr, FALSE, FALSE, nullptr)),     // Note, very simple construction
+        m_hFile(OpenFileW(pwzFileName))                                          // Notice that we let m_hSignalThread use the default constructor, it starts with .valid() == false
+    {
+    }
+    .
+    .
+    .
+    void SetEventToSignalOnClassDestruction(HANDLE hEvent)
+    {
+        m_hSignalThread = hEvent;           // Contrived example, but showing assignment operator after default construction...
+        // When this class is destroyed, the event handle will be passed to SetEvent.  Also happens to an existing event handle prior to assignment of a new value.
+    }
+
+    DWORD WriteOnSignal()
+    {
+        DWORD dwWait = WaitForSingleObject(m_hWriteSignaledEvent, INFINITE);
+        if(false == m_hFile.valid())        // Use validation method
+        {
+            return;
+        }
+
+        DWORD dwWritten = 0;
+        if(WAIT_OBJECT_O == dwWait)
+        {
+            WriteFile(m_hFile, &amp;m_vData, m_vData.size(), &amp;dwWritten, nullptr);
+        }
+        return dwWritten;
+    }
+};
+
+//
+// Example using throw option...
+void DumpVector(const char *pszFilename, std::vector&lt;unsigned char&gt; &amp;vBuffer, off_t where)
+{
+    try
+    {
+        std::unique_resource&lt;UNIQUE_DELETER_THROW(close, -1)&gt; iFileDesc(open(pszFilename, O_RDWR|O_APPEND));
+        if(pwrite(iFileDesc, &amp;vBuffer[0], vBuffer.size(), where) != vBuffer.size())
+        {
+            throw write_failed;     // example, not defined here...
+        }
+    }
+    catch (const std::failed_resource_initialization &amp;e)
+    {
+        // Deal with error (file open failed) condition!
+    }
+}
+</pre></code>
+
+<p></p>
+<h5>20.14.5.4.2 unique_resource's destructor</h5>
+The <code>unique_resource</code> destructor will invoke the "deleter" function object supplied as a template parameter, passing it the tracked resource, as long as the <code>unique_resource</code> has not been "released" via a call to <code>release()</code>, or <code>invoke(true)</code>, and does not match the no-delete value.  By this means the resource clean-up is carried out by the "deleter" function on scope-exit or unwind.
+
+<h5>20.14.5.4.3 unique_resource's modifiers</h5>
+<ul>
+<li><code>release()</code> prevents the <code>unique_resource</code> from invoking the "deleter" function in the destructor, by assigning the no-delete value to the internally tracked resource.  Returns a copy of the resource so that if needed it may be assigned to another tracking object, such as a <code>unique_resource</code> in another instance of a class (e.g. in a copy constructor).</li>
+<li><code>reset(resource)</code> causes the <code>unique_resource</code> to invoke the "deleter" function for any currently tracked <i>and valid</i> resource that has not been "released", and assigns a new resource to the <code>unique_resource</code> to be tracked.  The <code>unique_resource</code> will be set to the "un-released" state when a new resource is assigned.  The deleter function does not change.  If the <code>unique_resource</code> was constructed with the throw-option, the new resource will be compared to the no-delete value passed to the constructor and <code>std::failed_resource_initialization</code> exception will be thrown if it matches.</li>
+<li><code>invoke(true)</code> performs an early (pre-destructor) invocation of the "deleter" function <i>for a valid resource</i>.  The <em>default</em> true parameter sets the <code>unique_resource</code> to the "released" state so that the deleter function will not be invoked again when the destructor is called, unless the object is subsequently "reset."</li>
+<li><code>invoke(false)</code> performs an early (pre-destructor) invocation of the "deleter" function <i>for a valid resource</i>.  The false parameter leaves the <code>unique_resource</code> in the "un-released" state so that the deleter function <b>will</b> be invoked again when the destructor is called.</li>
+<li><code>operator()()</code> performs an early (pre-destructor) invocation of the deleter function <i>for a valid resource</i>, the same as if <code>invoke(true)</code> had been called.</li>
+<li><code>operator=(TResource &amp;&amp;res)</code> performs an early (pre-destructor) invocation of the deleter function <i>for a valid, assigned resource</i>, and assigns a tracks a new resource the same as if <code>reset(res)</code> had been called.</li>
+<li><code>operator=(TResource const &amp;res)</code> performs an early (pre-destructor) invocation of the deleter function <i>for a valid, assigned resource</i>, and assigns a tracks a new resource the same as if <code>reset(res)</code> had been called.</li>
+</ul>
+
+<h5>20.14.5.4.4 unique_resource accessors</h5>
+<ul>
+<li><code>TResource get() const throw()</code> returns the resource being managed by the <code>unique_resource</code> object.</li> 
+<li><code>operator TResource() const throw()</code> returns the resource being managed by the <code>unique_resource</code> object.</li> 
+<li><code>TResource operator-&gt;() const</code> returns the resource being managed by the <code>unique_resource</code> object.</li>
+<li><code>TResource* operator&amp;()</code> returns a pointer to the resource being managed by the <code>unique_resource</code> object, where the <code>unique_resource</code> has a private member of type <code>TResource</code> such as <code>TResource m_resource;</code> which is returned from this accessor with <code>return &amp;m_resource;</code></li>
+<li><code>const TDeleter&amp; get_deleter() const</code> returns a reference to the deleter function.  The deleter function can not be modified.</li>
+</ul>
+        // 20.14.5.4.5 - unique_resource validity checking
+        bool __inline valid() const throw();
+
+<h5>20.14.5.4.5 unique_resource validity checking</h5>
+The <code>valid()</code> member may be used to compare the tracked resource to the no-delete value specified in the template parameters.  It returns true if the resource is NOT equal to the no-delete value.
+
+<h4>20.14.5.5 Helper Macros</h4>
+The following helper macros are defined to simplify the passing of template parameters for <code>unique_resource</code>:
+<ul>
+<li><code>UNIQUE_DELETER(delter_fn)</code> - supplies the <i>type of</i> the deleter function, and the deleter function parameters, supplying false for the throw option.</li>
+<li><code>UNIQUE_DELETER_THROW(delter_fn)</code> - supplies the <i>type of</i> the deleter function, and the deleter function parameters, supplying true for the throw option.</li>
+<li><code>UNIQUE_DELETER_NOTHROW(delter_fn)</code> - supplies the <i>type of</i> the deleter function, and the deleter function parameters, supplying false for the throw option.</li>
+</ul>
+For usage examples please see section 20.14.5.4.1.  Use of the macros is not a requirement.  They are provided only to simplify declaration of an otherwise long list of parameters.
+
+
+<h2>VII.  Acknowledgements</h2>
+<ul>
+<li>Special thanks and recognition to those on both the Boost Developer mailing list and the ISO C++ std-proposal mailing list for advancing the design of the classes presented in this proposal and for general encouragement!&nbsp; 
+    Also, recognition is due to <a href="http://www.openspan.com/">OpenSpan, Inc</a>. 
+    for supporting the production of this proposal and for early adoption and 
+    testing of the reference implementation and prior implementations of the 
+    proposal in real world (and for that matter world class) products.</li>
+</ul> 
+<h2>VIII.  Reference Implemenation</h2>
+A <a href="http://www.andrewlsandoval.com/scope_exit/scoped_resource.h">reference implementation</a> may be viewed, downloaded, and used from <a href="http://www.andrewlsandoval.com/scope_exit/scoped_resource.h">http://www.andrewlsandoval.com/scope_exit/scoped_resource.h</a>.
+
+<h2>IX.  References</h2>
+<ol>
+<a name="reference1"></a><li><a name="reference1"></a><a href="http://www.boost.org/doc/libs/1_52_0/libs/scope_exit/doc/html/scope_exit/alternatives.html">Boost.org, Boost Scope.Exit: Annex - Alternatives</a></li>
+<a name="reference2"></a><li><a name="reference2"></a><a href="http://www.drdobbs.com/cpp/generic-change-the-way-you-write-excepti/184403758">Dr. Dobbs Magazine, <u>Change the Way You Write Exception-Safe Code — Forever</u>, Andrei Alexandrescu and Petru Marginean, December 01, 2000</a></li>
+</ol>
+
+
+
+</ul></body></html>

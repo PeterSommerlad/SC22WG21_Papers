@@ -1,0 +1,166 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{N3660 2013-04-19}{N3660 2013-04-19}
+%%TODO
+% namespace std { inline namespace literals { inline namespace chrono_literals, string_literals, complex_literals
+% put b on the side
+% complex: i_f, i, il optional i_l
+
+\title{User-defined Literals for std::complex\\
+{ part 2 of UDL for Standard Library Types (version 4)\\(part 1 is N3642) }
+}
+\author{Peter Sommerlad}
+\date{2013-04-19}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: &  N3660 (part 2 of update of N3531/N3468/N3402)\\\hline
+Date: & 2013-04-19 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+\chapter{History}
+\section{Changes from N3531}
+The following changes (or non-changes) result from the discussion in Bristol.
+\begin{itemize}
+\item Split the proposal to enable voting on imaginary literal suffixes for \tcode{std::complex} separately. This is the \tcode{std::complex} only part. All other parts (including the demo implementation) are given in N3642.
+\item Discussion about whether the "Imaginary Literal Suffixes for std::complex" should be \tcode{noexcept} as well as \tcode{constexpr}.   \tcode{complex<float>} converts from \tcode{double}, and hence can have undefined behavior, i.e., a narrow contract, and hence maybe should not be \tcode{noexcept}.  Alisdair’s suggestion is to advance this paper now and open an issue to look at what should be \tcode{noexcept}. 
+
+I conclude no change for \tcode{noexcept}. IMHO it is a non-issue for \tcode{constexpr} UDL operators, since they are applied by the compiler. Exceptions might only be thrown if called at run-time explicitly, i.e., \tcode{operator"" i_f(3.14);} never by using the suffix.
+\item  Change "Effects: creates a complex literal as XXX" to "Returns XXX". %done
+\item "[Note: The keyword if is not available as a suffix.]" was criticized by STL for being too helpful, and not consistent with the rest of the standard. % removed
+\end{itemize}
+
+\section{Changes from N3468}
+The following changes were made based on input from BSI.
+\begin{itemize}
+\item move implementation code to appendix.
+\item add discussion on a suffix for \tcode{std::string_ref}.
+\item refer to SI units abbreviations definition.
+\end{itemize}
+
+\section{Changes from N3402}
+The following changes result from discussions in Portland.
+\begin{itemize}
+\item drop binary literals and ask core/evolution first if it would be done by core. it should be done in code via a prefix "\tcode{0b}".
+\item drop real-part \tcode{std::complex} literals \tcode{operator"" r()} and make the imaginary-part operators \tcode{i}, \tcode{il}, and \tcode{i_f}.
+\item drop mechanics for type deduction of integers from standard. They should be part of type traits anyway and should be also an integral\_constant. This paper still provides their updated implementation as an example for potential implementors.
+\item make the floating point representation type of \tcode{chrono::duration} floating point literals unspecified.
+\end{itemize}
+
+
+\chapter{Introduction}
+see N3642 for other proposed UDL operators.
+
+Based on the discussion this paper proposes to include UDL operators for the following library component.
+\begin{itemize}
+\item \tcode{std::complex}, suffixes \tcode{i, il, i_f} in inline namespace \tcode{std::literals::complex_literals}
+\end{itemize}
+
+\section{Rationale}
+see N3642.
+
+\section{Open Issues Discussed}
+see N3642.
+
+\section{Acknowledgements}
+Acknowledgements go to the original authors of the sequence of papers the lead to inclusion of UDL in the standard and to the participants of the discussion on UDL on the reflector. Special thanks to Daniel Kr\"ugler for tremendous feedback on all drafts and to Jonathan Wakely for guidelines on GCC command line options. Thanks to Alberto Ganesh Barbati for feedback on duration representation overflow and suggestion for also providing the number parsing as a standardized library component. Thanks to Bjarne Stroustrup for suggesting to add more rationale to the proposal.
+
+Thanks to all participants in the discussions in groups "library" and "evolution" in Portland.
+
+Thanks to the BSI reviewers of N3468 and Roger Orr as their spokesperson.
+
+Thanks to the library group participants in Bristol discussing the paper N3531 and draft versions of this paper for their feedback and making me aware of it in time.
+
+\chapter{Proposed Library Additions}
+The addition proposed in the next section that are not specific to user-defined literals for imaginary numbers are identical to those proposed in N3642. They are included here only to allow voting separately on the two papers. I propose that N3642 is voted first and if successful the proposed change in the next section is skipped by the editor.
+
+It must be decided in which section to actually put the proposed changes. I suggest we add them to the corresponding library parts, where appropriate. The following change should only be applied if N3642 is not voted for inclusion but this paper is.
+
+
+%%%%%%%%%%% STEFANUS %%%%% put this into standard library section of your choice
+
+\section{namespace literals for collecting standard UDLs}
+As a common schema this paper proposes to put all suffixes for user defined literals in separate inline namespaces that are below the inline namespace \tcode{std::literals}. 
+\enternote
+This allows a user either to do a \tcode{using namespace std::literals;} to import all literal operators from the standard available through header file inclusion, or to use \tcode{using namespace std::complex_literals;} to just obtain the literals operators for a specific type.
+\exitnote
+
+
+%%%%
+%%%%%
+
+%%%%%%%%%% STEFANUS %%%%% the following goes into [complex] and below...
+\section{Imaginary Literal Suffixes for std::complex}
+Make the following additions and changes to library subclause 26.4 [complex.numbers] to accommodate user-defined literal suffixes for complex number literals.
+
+Insert in subclause 26.4.1 [complex.syn] in the synopsis at the appropriate place the namespace std::literals::complex_literals
+\begin{codeblock}
+namespace std{
+inline namespace literals{
+inline namespace complex_literals{
+constexpr complex<long double> operator"" il(long double);
+constexpr complex<long double> operator"" il(unsigned long long);
+constexpr complex<double> operator"" i(long double);
+constexpr complex<double> operator"" i(unsigned long long);
+constexpr complex<float> operator"" i_f(long double);
+constexpr complex<float> operator"" i_f(unsigned long long);
+}}}
+\end{codeblock}
+
+Insert a new subclause before subclause 26.4.9 [ccmplx] as follows
+\rSec1[complex.literals]{Suffix for complex number literals}
+\pnum
+This section describes literal suffixes for constructing complex number literals. The suffixes \tcode{i}, \tcode{il}, \tcode{i_f} create complex numbers with their imaginary part denoted by the given literal number and the real part being zero of the types \tcode{complex<double>}, \tcode{complex<long double>}, and \tcode{complex<float>} respectively. 
+
+\begin{itemdecl}
+constexpr complex<long double> operator"" il(long double d);
+constexpr complex<long double> operator"" il(unsigned long long d);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns
+\tcode{complex<long double>\{0.0L, static_cast<long double>(d)\}}.
+\end{itemdescr}
+
+\begin{itemdecl}
+constexpr complex<double> operator"" i(long double d);
+constexpr complex<double> operator"" i(unsigned long long d);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns
+\tcode{complex<double>\{0.0, static_cast<double>(d)\}}.
+\end{itemdescr}
+
+\begin{itemdecl}
+constexpr complex<float> operator"" i_f(long double d);
+constexpr complex<float> operator"" i_f(unsigned long long d);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns
+\tcode{complex<float>\{0.0f, static_cast<float>(d)\}}.
+%% note removed as per request by STL
+%\enternote
+%The keyword \tcode{if} is not available as a suffix.
+%\exitnote
+\end{itemdescr}
+%%%%%%%%%%% STEFANUS %%%%% end of contribution to draft.
+
+\end{document}   
