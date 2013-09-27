@@ -1,0 +1,99 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{N3779 2013-09-01}{N3779 2013-09-24}
+%%TODO
+% namespace std { inline namespace literals { inline namespace chrono_literals, string_literals, complex_literals
+% put b on the side
+% complex: if, i, il optional i_l
+
+\title{apply() call a function with arguments from a tuple
+}
+\author{Peter Sommerlad}
+\date{2013-09-27}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: &  NXXXX \\\hline
+Date: & 2013-09-27 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+\chapter{History}
+\section{integer_sequence}
+N3658 and its predecessor N3493 introduced \tcode{integer_sequence} facility and provide application of this features, for example \tcode{apply()} that is proposed in this paper.
+\section{Observations}
+There is a lot of history I am unaware of and several implementations posted on StackOverflow. Also the C++14 CD contains an implementation of \tcode{apply()} as an example of \tcode{std::integer_sequence} in [intseq.general].
+\section{Using tuplevar... or operator...}
+Mike Spertus made me aware of the proposed language extension to form a parameter pack from a tuple, i.e., by overloading an \tcode{operator...} which might make the provision of \tcode{apply()} moot. However, up to now, no such feature has been proposed to the standard committee and it is unclear if it would make it into C++17. Even if it would, it would just make the implementation of apply trivial.
+\chapter{Introduction}
+Tuples are great for generic programming with variadic templates. However, the standard does not define a general purpose facility that allows to call a function/functor/lambda with the tuple elements as arguments. Such a feature should be provided, because it is useful (at least for me). It even is given as an example of \tcode{std::integer_sequence} in [intseq.general] coming from N3658. 
+\section{Rationale}
+It is easy to create tuples from variadic templates either from types directly as \tcode{std::tuple<PACK...>} or  with \tcode{std::make_tuple()} or \tcode{std::forward_as_tuple()} the opposite mechanism of passing a tuple's elements as function arguments is not available.
+%\section{Open Issues Discussed}
+
+\section{Acknowledgements}
+Acknowledgements go to Jonathan Wakely for providing integer_sequence and providing apply() as the example in the working draft.
+
+Acknowledgements go to Mike Spertus for making me aware of the ... pack formation approaches.
+%more
+
+\chapter{Possible Implementation}
+The following implementation suggestion was derived from N3658, N3690, and StackOverflow (http://stackoverflow.com/a/12650100) and some simplification. It actually seems to work with current \tcode{clang -std=c++1y}.
+
+\begin{codeblock}
+template<typename F, typename Tuple, size_t ... I>
+auto apply_impl(F&& f, Tuple&& t, index_sequence<I...>) {
+	return forward<F>(f)(get<I>(forward<Tuple>(t))...);
+}
+template<typename F, typename Tuple>
+auto apply(F&& f, Tuple&& t) {
+  using Indices = make_index_sequence<tuple_size<decay_t<Tuple>>::value>;
+  return apply_impl(forward<F>(f), forward<Tuple>(t), Indices{});
+}
+\end{codeblock}
+
+\chapter{Proposed Library Additions}
+
+Add the following declaration in [tuple.general] in the synopsis under the group \emph{element access}:
+
+\begin{codeblock}
+template <typename F, typename Tuple>
+auto apply(F&& f, Tuple&& args);
+\end{codeblock}
+
+Append the following to section [tuple.elem] after paragraph 11.
+
+\begin{itemdecl}
+template <typename F, typename Tuple>
+auto apply(F&& f, Tuple&& args);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\requires \tcode{args} is a \tcode{std::tuple}. \tcode{f} is a function object.
+
+\returns The result of calling \tcode{f} with the \tcode{args}' tuple elements as arguments.
+\end{itemdescr}
+
+
+
+%%%%%%%%%%% STEFANUS %%%%% 
+
+\section{}
+
+
+%%%%
+%%%%%
+
+\end{document}   
