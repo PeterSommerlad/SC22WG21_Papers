@@ -69,75 +69,62 @@
 <li>References</li>
 </ul>
 <h2>II.  Introduction</h2>
-This proposal seeks to add generic RAII wrappers to the standard library.  These wrappers will be used to manage the lifetime of various types of resources and to guarantee the execution of code blocks on scope exit.  It builds on the concept of smart pointers like <code>unique_ptr</code>, but is designed for use with any type of resource 
+This proposal seeks to add a generic RAII wrapper to the standard library.
+This wrapper will be used to manage the lifetime of various types of resources and to
+guarantee the execution of code blocks on scope exit. While existing smart pointers in 
+the standard can be "misused" to provide that facility, it might is nicer to have directly 
+usable facility to wrap handles etc.
     that requires clean-up prior to scope exit, as well as any block of code (via 
     lambda or function invocation) that needs to executed prior to scope exit.
+<br/>    
+This paper is an update of N3677 based on the discussion in LEWG in Chicago. It tries to simplify N3677 by removing special cases and put everything in a single class. We now bring forward this version to discuss the simplified design and ask if some of the API is really needed or what parts might be missing.
+<br/>
+Especially we want feedback if the multi-value version is really required or needed. It was invented to simplify the resulting code into a single class.
+
+<!--  These wrappers will be used to manage the lifetime of various types of resources and to guarantee the execution of code blocks on scope exit.  It builds on the concept of smart pointers like <code>unique_ptr</code>, but is designed for use with any type of resource -->
 <h2>III.  Motivation and Scope</h2>
 <p>Quality C++ code requires the use of RAII to manage all types of resources in 
     order to prevent leakage as well as to limit resource lifetime.&nbsp; Resource leakage can occur from the obvious, though often overlooked, failure to clean-up a resource at its intended end-of-life, as well as the less obvious 
     and arguably more common failure to ensure proper handling of resources during exception unwinding.</p>
 <p>Smart pointers such as <code>unique_ptr</code> and <code>shared_ptr</code> provide an excellent means of managing the lifetime of pointer types.  Many other RAII classes have been written to manage the lifetime and limit the scope of locks, such as Boost's <code>boost::lock_guard</code>.  All of these and the many other types of RAII objects help to 
     substantially improve C++ code quality.
-  This proposal seeks to add a set of <i>generic</i>, light-weight RAII wrappers intended to manage the scope and lifetime of any other type of resource.&nbsp; 
+  This proposal seeks to add a set of <i>generic</i>, light-weight RAII wrappers intended to manage the scope and lifetime of any other type of resource. 
     It also proposes an RAII wrapper intended to wrap a function, lambda, or functor 
     which needs to execute prior to scope exit.</p>
 <p>There are many types of resources that <i>may</i> not justify encapsulation in a broader object -- when a simple RAII wrapper around the resource will suffice or will provide a more obvious implementation. 
     This is especially true when object re-use is not expected. In addition, RAII 
     wrappers will simplify the design of objects that <em>do</em> encapsulate resources, 
-    allowing the generation of, or the declaration of the resource, to also declare its method of clean-up.&nbsp; 
+    allowing the generation of, or the declaration of the resource, to also declare its method of clean-up.  
     This results in moving resource clean-up outside of an explicit destructor, 
     which also assures proper order of destruction when initialization order is 
     correct.&nbsp; This is common practice with pointers managed by <code>unique_ptr</code> and <code>shared_ptr</code>, and even with buffers allocated and managed by <code>vector</code>.</p>
-<p>This proposal requests the addition of the following RAII wrapper types:
+<p>This proposal requests the addition of a single RAII wrapper type:
 </p><ul>
-    <li><code><b>scoped_function</b></code></li>
-    <ul>
-        <li>Executes a function, functor, or lambda on scope exit.</li>
-        <li>Is generated with <code><b>make_scoped_function</b>(<i>func</i>);</code></li>
-        <li><code><b>func</b></code> is a function, functor, or lambda that takes no parameters.  A lambda however may capture 
-        and use any scope variables.</li>
-    </ul>
-    <li><code><b>scoped_resource_unchecked</b></code></li>
-    <ul>
-        <li>Manages a resource's lifetime by executing a deleter function, functor, or lambda on scope exit.</li>
-        <li>Is generated with <code><b>make_scoped_resource_unchecked</b>(<i>resource</i>, <i>deleter-func</i>);</code>, or with the 
-        more generic <code><b>make_scoped_resource(<i>resource</i>, <i>deleter-func</i>);</b></code></li>
-        <li><code><b>deleter-func</b></code> is a function, functor, or lambda that takes a single parameter of the same type as <i>resource</i>.</li>
-        <li>Is suitable for no-fail resources, or other resources in which a validity check by comparison to a no-delete value is not possible.</li>
-    </ul>
     <li><code><b>scoped_resource</b></code></li>
     <ul>
-        <li>Manages a resource's lifetime by executing a deleter function, functor, or lambda on scope exit, when the resource value can be validated by comparison to a no-delete value.</li>
-        <li>Is generated with <code><b>make_scoped_resource</b>(<i>resource</i>, <i>deleter-func</i>, <i>no-delete-value</i>);</code></li>
-        <li>When generated with <code><b>make_scoped_resource&lt;true&gt;</b>(<i>resource</i>, <i>deleter-func</i>, <i>no-delete-value</i>);</code> the <code>scoped_resource</code> constructor will throw <code>failed_resource_initialization</code> if the resource is equal to the no-delete value.</li>
-        <li><code><b>deleter-func</b></code> is a function, functor, or lambda that takes a single parameter of the same type as <i>resource</i>.</li>
-        <li><code><b>no-delete-value</b></code> is a value of type <i>resource</i> that is used to prevent calling <i>deleter-func</i> when the resource is not valid, as well as to check if the resource is <code>bool <b>valid</b>() const;</code></li>
+        <li>Executes a function, functor, or lambda on scope exit, thus allowing to manage the lifetime of resources passed as additional arguments.</li>
+        <li>Is generated with <code><b>make_scoped_resource</b>(<i>func</i>, ...);</code></li>
+        <li><code><b>func</b></code> is a function, functor, or lambda that takes the number of parameters corresponding to the parameters.</li>
+        <li>any number of arguments might follow representing the to-be managed resources passed to the cleanup function.
     </ul>
-    <li><code><b>unique_resource</b></code></li> 
+    </ul>
+Objects of this class will always be instantiated through a factory function. Its name might even be completely hidden from the user, be we didn't opt to do so yet.
+<p>
+We propose the following factory functions.
     <ul>
-        <li>Manages a resource's lifetime by executing a <i>constexpr</i> deleter function on scope exit, when the resource value can be validated by comparison to a 
-            <em>constexpr</em> no-delete value.</li>
-        <li>It requires template arguments for:</li>
-            <ol>
-            <li>The type of a constexpr deleter function, which function takes a single parameter of the type of the resource, <i>and from which the resource type is deduced</i></li>
-            <li>The constexpr deleter function itself</li>
-            <li>A bool value, which when set to true will cause the constructor to throw <code>failed_resource_initialization</code> if the value passed to the constructor matches the no-delete value.&nbsp; 
-                When false, a validity check is not performed on object construction, but the 
-                deleter function will not be executed in the destructor if the validity check 
-                fails.</li>
-            <li>A no-delete value of the deduced type of the resource.&nbsp; The types is<i> deduced from the sole parameter to the deleter-func type.</i>  The default no-delete value is <code>
-                <span class="style4">static_cast</span>&lt;T&gt;(<span class="style4">nullptr</span>)</code>.</li>
-            </ol>
-        <li>Because of the static or constexpr non-type template arguments for the deleter function and the no-delete value:</li>
-        <ul>
-            <li>The generated code is very tight and should be roughly the equivalent of adding:<br> <code>if(resource != nodelete) { deleter-func(resource); } </code> at a common exit point for the 
-                scope.</li>
-            <li>There is no generator function template.</li>
-            <li>The no-delete value of the same type as the resource.  It is used to prevent calling the deleter function if the resource is not valid, as well as to check if the resource is <code>bool valid() const;</code></li>
-        </ul>
-        <li>Can be constructed without a resource value by using the default constructor.&nbsp; 
-            This allows the resource value to be set using <code>operator=</code> at a later time.</li>
+    <li><code><b>make_scoped_resource(DELETER f, R ... r)</b></code></li>
+    <ul>
+        <li>The deleter function f must not throw exceptions, because it is called during stack unwinding.</li>
+        <li>The managed resources r... are copied into the scoped_resource object, because they will be kept in a tuple. This shouldn't impose a problem for the expected low-level system types which are classic handle values, i.e., of integral type.</li>
+    </ul>
+    <li><code><b>make_scoped_resource_checked(DELETER f, RES r, RES invalid) </b></code></li>
+    <ul>
+        <li>This is covering a special case from the original paper to allow using the factory function be called immediately by preparing the argument for r. There might be cases where the creation fails and thus is marked by a special invalid value, such as -1 on POSIX APIs. This value can not be passed safely to the deleter function, so the invalid value marks it in a way so that the deleter function f is not called.</li>
+        <li><code><b>deleter-func</b></code> is a function, functor, or lambda that takes a single parameter of the same type as <i>resource</i>.</li>
+        <li><code><b>invalid</b></code> is a value of type <i>resource</i> that is used to prevent calling <i>deleter-func</i> f when the resource is not valid.</li>
+    </ul>
 </ul>
+<hr>
 <h3>A. Motivation for <code>scoped_function</code></h3>
 <code>scoped_function</code> is ideal for tying a block of code -- such as a lambda to a particular scope, ensuring that the block is invoked prior to scope exit.
 Two examples should suffice:
