@@ -41,12 +41,20 @@ Mike Spertus made me aware of the proposed language extension to form a paramete
 Tuples are great for generic programming with variadic templates. However, the standard does not define a general purpose facility that allows to call a function/functor/lambda with the tuple elements as arguments. Such a feature should be provided, because it is useful (at least for me). It even is given as an example of \tcode{std::integer_sequence} in [intseq.general] coming from N3658. 
 \section{Rationale}
 It is easy to create tuples from variadic templates either from types directly as \tcode{std::tuple<PACK...>} or  with \tcode{std::make_tuple()} or \tcode{std::forward_as_tuple()} the opposite mechanism of passing a tuple's elements as function arguments is not available.
-%\section{Open Issues Discussed}
+
+Some suggested to not use the name \tcode{apply() }and reserve that to a mechanism like \emph{\tcode{INVOKE}} in the standard library and use \tcode{apply_from_tuple()} instead.
+
+\section{Open Issues to be Discussed}
+It is open, if \tcode{apply()} should get a \tcode{noexcept(noexcept(xxx))} specification delegating to the underlying effect. Advice from library working group is requested.
+
+Should \tcode{apply()} be \tcode{constexpr} to make it applicable in meta programming or concepts?
 
 \section{Acknowledgements}
 Acknowledgements go to Jonathan Wakely for providing integer_sequence and providing apply() as the example in the working draft.
 
 Acknowledgements go to Mike Spertus for making me aware of the ... pack formation approaches.
+
+Acknowledgements to the following persons on the c++std-lib reflector for their feedback and encouragement: Jonathan Wakely, Andy Sawyer, Stephan T. Lavavej, Jared Hoberock, and Tony van Eerd.
 %more
 
 \chapter{Possible Implementation}
@@ -54,11 +62,11 @@ The following implementation suggestion was derived from N3658, N3690, and Stack
 
 \begin{codeblock}
 template<typename F, typename Tuple, size_t ... I>
-auto apply_impl(F&& f, Tuple&& t, index_sequence<I...>) {
+decltype(auto) apply_impl(F&& f, Tuple&& t, index_sequence<I...>) {
 	return forward<F>(f)(get<I>(forward<Tuple>(t))...);
 }
 template<typename F, typename Tuple>
-auto apply(F&& f, Tuple&& t) {
+decltype(auto) apply(F&& f, Tuple&& t) {
   using Indices = make_index_sequence<tuple_size<decay_t<Tuple>>::value>;
   return apply_impl(forward<F>(f), forward<Tuple>(t), Indices{});
 }
@@ -69,28 +77,34 @@ auto apply(F&& f, Tuple&& t) {
 Add the following declaration in [tuple.general] in the synopsis under the group \emph{element access}:
 
 \begin{codeblock}
+template<typename F, typename Tuple, size_t ... I>
+decltype(auto) apply_impl(F&& f, Tuple&& t, index_sequence<I...>) // exposition only
+{
+	return forward<F>(f)(get<I>(forward<Tuple>(t))...); // exposition only
+}
+
 template <typename F, typename Tuple>
-auto apply(F&& f, Tuple&& args);
+decltype(auto) apply(F&& f, Tuple&& args);
 \end{codeblock}
 
 Append the following to section [tuple.elem] after paragraph 11.
 
 \begin{itemdecl}
 template <typename F, typename Tuple>
-auto apply(F&& f, Tuple&& args);
+decltype(auto) apply(F&& f, Tuple&& args);
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\requires \tcode{args} is a \tcode{std::tuple}. \tcode{f} is a function object.
+\requires \tcode{args} provides tuple-like access. \tcode{f} is a function object.
 
-\returns The result of calling \tcode{f} with the \tcode{args}' tuple elements as arguments.
+\effects Equivalent to \tcode{return apply_impl(forward<F>(f), forward<Tuple>(t),
+ make_index_sequence<tuple_size<std::decay_t<Tuple>>::value>\{\});}
 \end{itemdescr}
 
 
 
 %%%%%%%%%%% STEFANUS %%%%% 
 
-\section{}
 
 
 %%%%
