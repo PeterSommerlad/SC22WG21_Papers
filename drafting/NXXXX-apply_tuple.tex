@@ -77,29 +77,33 @@ decltype(auto) apply(F&& f, Tuple&& t) {
 Add the following declaration in [tuple.general] in the synopsis under the group \emph{element access}:
 
 \begin{codeblock}
-template<typename F, typename Tuple, size_t ... I>
+template <typename F, typename Tuple, size_t... I>
 decltype(auto) apply_impl(F&& f, Tuple&& t, index_sequence<I...>) // exposition only
 {
 	return forward<F>(f)(get<I>(forward<Tuple>(t))...); // exposition only
 }
 
 template <typename F, typename Tuple>
-decltype(auto) apply(F&& f, Tuple&& args);
+decltype(auto) apply(F&& f, Tuple&& t);
 \end{codeblock}
+
 
 Append the following to section [tuple.elem] after paragraph 11.
 
 \begin{itemdecl}
 template <typename F, typename Tuple>
-decltype(auto) apply(F&& f, Tuple&& args);
+decltype(auto) apply(F&& f, Tuple&& t);
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
 \requires \tcode{args} provides tuple-like access. \tcode{f} is a function object.
 
+\pnum
 \effects Equivalent to \tcode{return apply_impl(forward<F>(f), forward<Tuple>(t),
- make_index_sequence<tuple_size<std::decay_t<Tuple>>::value>\{\});}
+ make_index_sequence<tuple_size<decay_t<Tuple>>::value>\{\});}
 \end{itemdescr}
+
+Delete the example code in [intseq.general] p 2.
 
 
 
