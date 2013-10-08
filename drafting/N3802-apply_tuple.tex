@@ -10,7 +10,7 @@
 \usepackage{underscore}   % remove special status of '_' in ordinary text
 \usepackage{xspace}
 \pagestyle{myheadings}
-\markboth{N3779 2013-09-01}{N3779 2013-09-24}
+\markboth{N3802 2013-09-01}{N3802 2013-09-24}
 %%TODO
 % namespace std { inline namespace literals { inline namespace chrono_literals, string_literals, complex_literals
 % put b on the side
@@ -26,8 +26,8 @@
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: &  NXXXX \\\hline
-Date: & 2013-09-27 \\\hline
+Document Number: &  N3802 \\\hline
+Date: & 2013-10-08 \\\hline
 Project: & Programming Language C++\\\hline 
 \end{tabular}
 \chapter{History}
@@ -45,9 +45,9 @@ It is easy to create tuples from variadic templates either from types directly a
 Some suggested to not use the name \tcode{apply() }and reserve that to a mechanism like \emph{\tcode{INVOKE}} in the standard library and use \tcode{apply_from_tuple()} instead.
 
 \section{Open Issues to be Discussed}
-It is open, if \tcode{apply()} should get a \tcode{noexcept(noexcept(xxx))} specification delegating to the underlying effect. Advice from library working group is requested.
+It is open, if \tcode{apply()} should get a \tcode{noexcept(noexcept(xxx))} specification delegating to the underlying effect. Advice from library working group was requested, but it seems that it shouldn't get one, because library only provides noexcept specifications for "special" functions, like ctors or swap.
 
-Should \tcode{apply()} be \tcode{constexpr} to make it applicable in meta programming or concepts?
+Should \tcode{apply()} be \tcode{constexpr} to make it applicable in meta programming or concepts? LEWG advice is required.
 
 \section{Acknowledgements}
 Acknowledgements go to Jonathan Wakely for providing integer_sequence and providing apply() as the example in the working draft.
@@ -61,11 +61,11 @@ Acknowledgements to the following persons on the c++std-lib reflector for their 
 The following implementation suggestion was derived from N3658, N3690, and StackOverflow (http://stackoverflow.com/a/12650100) and some simplification. It actually seems to work with current \tcode{clang -std=c++1y}.
 
 \begin{codeblock}
-template<typename F, typename Tuple, size_t ... I>
+template <typename F, typename Tuple, size_t... I>
 decltype(auto) apply_impl(F&& f, Tuple&& t, index_sequence<I...>) {
 	return forward<F>(f)(get<I>(forward<Tuple>(t))...);
 }
-template<typename F, typename Tuple>
+template <typename F, typename Tuple>
 decltype(auto) apply(F&& f, Tuple&& t) {
   using Indices = make_index_sequence<tuple_size<decay_t<Tuple>>::value>;
   return apply_impl(forward<F>(f), forward<Tuple>(t), Indices{});
@@ -78,9 +78,10 @@ Add the following declaration in [tuple.general] in the synopsis under the group
 
 \begin{codeblock}
 template <typename F, typename Tuple, size_t... I>
-decltype(auto) apply_impl(F&& f, Tuple&& t, index_sequence<I...>) // exposition only
+decltype(auto) 
+apply_impl(F&& f, Tuple&& t, index_sequence<I...>) // exposition only
 {
-	return forward<F>(f)(get<I>(forward<Tuple>(t))...); // exposition only
+	return forward<F>(f)(get<I>(forward<Tuple>(t))...); 
 }
 
 template <typename F, typename Tuple>
@@ -95,8 +96,8 @@ template <typename F, typename Tuple>
 decltype(auto) apply(F&& f, Tuple&& t);
 \end{itemdecl}
 \begin{itemdescr}
-\pnum
-\requires \tcode{args} provides tuple-like access. \tcode{f} is a function object.
+%\pnum
+%\requires \tcode{t} provides tuple-like access. \tcode{f} is a function object.
 
 \pnum
 \effects Equivalent to \tcode{return apply_impl(forward<F>(f), forward<Tuple>(t),
