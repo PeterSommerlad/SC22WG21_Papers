@@ -1,0 +1,580 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}	% See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}	% ... or a4paper or a5paper or ... 
+%\geometry{landscape}	% Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}	% Activate to begin paragraphs with an empty line rather than an indent
+
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{Dnnnn 2013-12-09}{Dnnnn 2013-12-09}
+
+\title{Scoped Resource - Generic RAII Wrapper for the Standard Library}
+\author{Peter Sommerlad and Andrew L. Sandoval}
+\date{2013-12-09}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: &  Dnnnn (update of N3677)\\\hline
+Date: & 2013-12-09 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+
+\chapter{Changes from N3677}
+\begin{itemize}
+\item Replace all 4 proposed classes with a single class covering all use cases, using variadic templates, as determined in the Fall 2013 LEWG meeting.
+\end{itemize}
+
+\chapter{Introduction}
+The Standard Template Library provides RAII classes for managing pointer types, such as \tcode{std::unique_ptr} and \tcode{std::shared_ptr}.  This proposal seeks to add a new generic RAII class which ties zero or more resources to a clean-up/completion routine which is bound by scope, ensuring execution at scope exit (as the object is destroyed) unless released or executed early.
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item This proposal would not have been possible without the impressive work of Peter Sommerlad who produced the sample implementation during the Fall 2013 committee meetings in Chicago.  Peter took what Andrew Sandoval produced for N3677 and demonstrated the possibility of using C++14 features to make a single, general purpose RAII wrapper capable of fullfilling all of the needs presented by the original 4 classes (from N3677) with none of the compromises.
+\item Gratitude is also owed to members of the LEWG participating in the Fall 2013 (Chicago) meeting for their support, encouragement, and suggestions that have led to this proposal.
+\item Special thanks and recognition goes to OpenSpan, Inc. (http://www.openspan.com) for supporting the production of this proposal, and for sponsoring Andrew L. Sandoval's first proposal (N3677) and the trip to Chicago for the Fall 2013 LEWG meeting.
+\end{itemize}
+
+\chapter{Motivation and Scope}
+The quality of C++ code can often be improved through the use of "smart" container objects.  For example, using \tcode{std::unique_ptr} or \tcode{std::shared_ptr} to manage pointers can prevent common mistakes that lead to memory leaks, as well as the less common leaks that occur when exceptions unwind.  The latter case is especially difficult to diagnose and debug and is a commonly made mistake -- especially on systems where unexpected events (such as access violations) in third party libraries may cause deep unwinding that a developer did not expect.  (One example would be on Microsoft Windows with Structured Exception Handling and libraries like MFC that issue callbacks to user-defined code wrapped in a \tcode{try/catch(...)} block.  The developer is usually unaware that their code is wrapped with an exception handler that depending on compile-time options will quietly unwind their code, masking any exceptions that occur.)
+
+This proposal introduces a new RAII "smart" container called \tcode{scoped_resource} which can bind a resource to "clean-up" code regardless of type or the number of arguments required by the "clean-up" function.
+
+\section {Without Coercion}
+Existing smart pointer types can often be coerced into providing the needed functionality.  For example, \tcode{std::unique_ptr} could be coerced into invoking a function used to close an opaque handle type.  For example, given the following system APIs, \tcode{std::unique_ptr} can be used to ensure the file handle is not leaked on scope exit:
+
+\begin{codeblock}
+typedef void *HANDLE;        // System defined opaque handle type
+typedef unsigned long DWORD;
+#define INVALID_HANDLE_VALUE reinterpret_cast<HANDLE>(-1)	
+// Can't help this, that's from the OS
+
+// System defined APIs
+void CloseHandle(HANDLE hObject);
+
+HANDLE CreateFile(const char *pszFileName, 
+	DWORD dwDesiredAccess, 
+	DWORD dwShareMode, 
+	DWORD dwCreationDisposition, 
+	DWORD dwFlagsAndAttributes, 
+	HANDLE hTemplateFile);
+
+bool ReadFile(HANDLE hFile, 
+	void *pBuffer, 
+	DWORD nNumberOfBytesToRead, 
+	DWORD*pNumberOfBytesRead);
+
+// Using std::unique_ptr to ensure file handle is closed on scope-exit:
+void CoercedExample()
+{
+	// Initialize hFile ensure it will be "closed" (regardless of value) on scope-exit
+	std::unique_ptr<void, decltype(&CloseHandle)> hFile(
+		CreateFile("test.tmp", 
+			FILE_ALL_ACCESS, 
+			FILE_SHARE_READ, 
+			OPEN_EXISTING, 
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr), 
+		CloseHandle);
+
+	// Read some data using the handle
+	std::array<char, 1024> arr = { };
+	DWORD dwRead = 0;
+	ReadFile(hFile.get(),	// Must use hFile.get()
+		&arr[0], 
+		static_cast<DWORD>(arr.size()), 
+		&dwRead);
+}
+\end{codeblock}
+
+While this works, there are a few problems with coercing \tcode{std::unique_ptr} into handling the resource in this manner:
+\begin{itemize}
+\item The type used by the \tcode{std::unique_ptr} does not match the type of the resource.  \tcode{void} is not a \tcode{HANDLE}.  (Thus the word coercion is used to describe it.)
+\item There is no convenient way to check the value returned by \tcode{CreateFile} and assigned to the \tcode{std::unique_ptr<void>} to prevent calling \tcode{CloseHandle} when an invalid handle value is returned.  \tcode{std::unique_ptr} will check for a null pointer, but the \tcode{CreateFile} API may return another pre-defined value to signal an error.
+\item Because hFile does not have a cast operator that converts the contained "pointer" to a \tcode{HANDLE}, the \tcode{get()} method must be used when invoking other system APIs needing the underlying \tcode{HANDLE}.
+\end{itemize}
+
+Each of these problems is solved by \tcode{scoped_resource} as shown in the following example:
+
+\begin{codeblock}
+void ScopedResourceExample1()
+{
+	// Initialize hFile ensure it will be "closed" (regardless of value) on scope-exit
+	auto hFile = std::make_scoped_resource(
+		CloseHandle,				// Clean-up API
+		CreateFile("test.tmp", 
+			FILE_ALL_ACCESS, 
+			FILE_SHARE_READ, 
+			OPEN_EXISTING, 
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr), 			// The resource
+		INVALID_HANDLE_VALUE);	// Don't call CloseHandle if it failed!
+
+	// Read some data using the handle
+	std::array<char, 1024> arr = { };
+	DWORD dwRead = 0;
+	// cast operator makes it seamless to use with other APIs needing a HANDLE
+	ReadFile(hFile,
+		&arr[0], 
+		static_cast<DWORD>(arr.size()), 
+		&dwRead);
+}
+\end{codeblock}
+
+\section{Multiple Parameters}
+In some cases it is convenient to invoke a "clean-up" API that requires multiple parameters.  While this could be done using \tcode{std::bind}, it is not necessary with \tcode{std::scoped_resource}.  Variadic template parameters and \tcode{std::tuple} make it possible to bind more than one value to a resource's clean-up function.  In the example shown below, the system defined clean-up function \tcode{VirtualFree} requires 3 parameters, only one of which is the "resource" (which in this case is a block of virtual memory.)
+
+\begin{codeblock}
+// System defined APIs:
+void* VirtualAlloc(
+    void *pAddress,
+    size_t size,
+    unsigned int fAllocationType,
+    unsigned int fProtect);
+
+bool VirtualFree(
+    void *pAddress,
+    size_t size,
+    unsigned int uiFreeType);
+
+void ScopedResourceMultiExample()
+{
+	auto pVirtualMem = make_scoped_resource(
+		VirtualFree,			// Clean-up function
+		VirtualAlloc(nullptr,
+			PAGE_SIZE,
+			MEM_COMMIT,
+			PAGE_READWRITE),	// Resource (1st parameter)
+		0,				// 2nd parameter to VirtualFree
+		MEM_RELEASE);			// 3rd Parameter to VirtualFree
+
+	if(nullptr == pVirtualMem)
+	{
+		// Handle error...
+	}
+	.
+	.
+	.
+}
+\end{codeblock}
+In this example, \tcode{VirtualFree} will be invoked with all three required parameters on scope exit.  Though useless in this example, it is also possible to access the other parameters.  The cast operator will always cast to the type of and return the first parameter (the real resource in this example), but the \tcode{get<T>()} method allows access to the other parameters as in this example:
+\begin{codeblock}
+
+
+if(pVirtualMem.get<2>() != MEM_RELEASE)
+{
+	// Something is not right!
+}
+\end{codeblock}
+
+\section{Lambdas, etc.}
+It is also possible to use lambdas instead of a function pointer to initialize a \tcode{scoped_resource}.  The following is a very simple and otherwise useless example:
+
+\begin{codeblock}
+void TalkToTheWorld(const std::string &strFarewell)
+{
+	// Always say goodbye before returning, 
+	// but if given a non-empty farewell message use it...
+	auto goodbye = std::make_scoped_resource([]() ->void
+	{
+		std::cout << "Goodbye world..." << std::endl;
+	});
+	
+	auto altgoodbye = std::make_scoped_resource([](const std::string &strBye) ->void
+	{
+		std::cout << strFarewell.c_str() << std::endl;
+	},
+	strFarewell);
+
+	if(false == strFarewell.empty())
+	{
+		goodbye.release();		// Don't use goodbye!
+	}
+	else
+	{
+		altgoodbye.release();	// Don't use the alternate
+	}
+	// Say hello first!
+	std::cout << "Hello World" << std::endl;
+}
+\end{codeblock}
+Though there is obviously no need for a \tcode{scoped_resource} for something this simple, the example not only shows that a lambda may be used in place of a function, but also that no "resource value" is required if the "clean-up" function takes no parameters.  The example also shows that a resource can be released (that is the clean-up function is not called).  Methods also exist to allow it to execute earlier than at scope exit.
+
+\section{Other Functionality}
+In addition to the basic features shown above, \tcode{scoped_resource} also provides various operators (cast, \tcode{->}, \tcode{()}, \tcode{*}, and accessor methods (\tcode{get}, \tcode{get_deleter}).  The most complicated of these is the \tcode{invoke()} method which allows the "clean-up" function to be executed early, just as it would be at scope exit.  This method takes a parameter indicating whether or not the function should again be executed at scope exit.  There is also a \tcode{release_all()} method which returns a \tcode{std::tuple<R...>} containing all of the parameter values released, and a \tcode{reset(R\&\&... resource)} method that allows all parameter values to be reset.
+
+As already shown in the examples, the expected method of construction is to use one of the two generator functions:
+\begin{itemize}
+\item \tcode{make_scoped_resource(deleter, resources...)} - non-checking instance, allows multiple parameters.
+\item \tcode{make_scoped_resource_checked(deleter, resource, invalid-value)} - checked instance, allowing only one resource which is validated prior to invoking the deleter function.
+\end{itemize}
+
+\section{What's not included}
+\tcode{scoped_resource} does not do reference counting like \tcode{shared_ptr} does.  Though there is very likely a need for a class similar to \tcode{scoped_resource} that includes reference counting it is beyond the scope of this proposal.
+
+One other limitation with \tcode{scoped_resource} is that while the resources themselves may be \tcode{reset()}, the "deleter" or "clean-up" function/lambda can not be altered.  Generally there should be no need to reset the deleter, and especially with lambdas type matching would be difficult or impossible.
+
+\chapter{Impact on the Standard}
+This proposal is a pure library extension. A new header, \tcode{<scope_resource>} is proposed, but it does not require changes to any standard classes or functions. It does not require any changes in the core language, and it has been implemented in standard C++ conforming to c++14.
+
+\chapter{Design Decisions}
+\section{General Principles}
+\begin{itemize}
+\item Simplicity - Using \tcode{scoped_resource} should be nearly as simple as using an unwrapped type.  The generator functions, cast operator, and accessors all enable this.
+\item Transparency - It should be obvious from a glance what each instance of a \tcode{scoped_resource} object does.  By binding the resource to it's clean-up routine, the declaration of \tcode{scoped_resource} makes its itention clear.
+\item Resource Conservation and Lifetime Management - Using \tcode{scoped_resource} makes it possible to "allocate it and forget about it" in the sense that deallocation is always accounted for after the \tcode{scoped_resource} has been initialized.
+\item Exception Safety - Exception unwinding is one of the primariy reasons that \tcode{scoped_resource} is needed.  Nevertheless the goal is to introduce a new container that will not throw during construction of the \tcode{scoped_resource} itself.
+\item Flexibility - \tcode{scoped_resource} is designed to be flexible, allowing the use of lambdas or existing functions for clean-up of resources, as well as allowing for zero or more parameters.  This is a vast improvement over the originally proposed classes in N3677.
+\end{itemize}
+
+\section{Prior Implementations}
+Please see N3677 from the May 2013 mailing (or http://www.andrewlsandoval.com/scope_exit/) for the previously proposed solution and implementation.  Discussion of N3677 in the (Chicago) Fall 2013 LEWG meeting led to the creation of \tcode{scoped_resource} with the general agreement that such an implementation would be vastly superior to N3677 and would find favor with the LEWG.  Professor Sommerlad produced the implementation backing this proposal during the days following that discussion.
+
+N3677 has a more complete list of other prior implementations.
+
+\section{Open Issues to be Discussed}
+\begin{itemize}
+\item Should \tcode{scoped_resource} be move-able like \tcode{unique_ptr} ?
+\item Should there be a companion class for sharing the resource \tcode{shared_resource} ? 
+\item Is the set of provided overloaded operators really useful ? Which could be removed without harm ? Is there something missing ?
+\item Is scoped_resource lightweight enough, or should the mechanics for early-release and re-assignment be omitted ?
+\end{itemize}
+
+
+\chapter{Technical Specifications}
+\section{Header}
+Add an extra row to table 44 
+%%TODO clearer specification 
+\begin{codeblock}
+Table 44 - General utilities library summary
+---------------------------------------------
+|Subclause             |  Header(s)         |
+---------------------------------------------
+|20.14 Scoped Resource | <scoped_resource>  |
+---------------------------------------------
+\end{codeblock}
+
+\section{Additional section}
+Ad a new section to chapter 20 introducing the contents of the header \tcode{scoped_resource}.
+
+
+
+\chapter{Example Implementation}
+\begin{codeblock}
+// Copyright Peter Sommerlad and Andrew L. Sandoval 2012 - 2013.
+// Distributed under the Boost Software License, Version 1.0.
+//   (See accompanying file LICENSE_1_0.txt or copy at
+//         http://www.boost.org/LICENSE_1_0.txt)
+
+//
+// scoped_resource - sample implementation
+// Written by Professor Peter Sommerlad
+// In response to N3677 (http://www.andrewlsandoval.com/scope_exit/)
+// which was discussed in the Fall 2013 ISO C++ LEWG committee meeting.
+//
+// scoped_resource is a more versatile replacement for the 4 RAII classes
+// presented in N3677.
+//
+// Subsequent (editing, etc.) work by:
+// -Andrew L. Sandoval
+
+#ifndef SCOPED_RESOURCE_H_
+#define SCOPED_RESOURCE_H_
+#include <cstddef>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+
+// mechanics to call function through tuple, stolen from
+// http://stackoverflow.com/questions/687490/how-do-i-expand-a-tuple-into-variadic-template-functions-arguments
+// should be part of the standard, if it isn't already.
+namespace apply_ns
+{
+	template<size_t N>
+	struct Apply
+	{
+		template<typename F, typename T, typename... A>
+		static inline auto apply(F && f, T && t, A &&... a)
+		{
+			return Apply<N-1>::apply(::std::forward<F>(f),
+				::std::forward<T>(t),
+				::std::get<N-1>(
+					::std::forward<T>(t)),
+					::std::forward<A>(a)...);
+    		}
+	};
+
+	template<>
+	struct Apply<0>
+	{
+		template<typename F, typename T, typename... A>
+		static inline auto apply(F && f, T &&, A &&... a)
+		{
+			return ::std::forward<F>(f)(::std::forward<A>(a)...);
+		}
+	};
+
+	template<typename F, typename T>
+	inline auto apply(F && f, T && t)
+	{
+		return Apply< ::std::tuple_size< ::std::decay_t<T> >::value>::apply(::std::forward<F>(f), ::std::forward<T>(t));
+	}
+}
+
+// Something like the following should be available in the standard...
+// If not it should be - tuple_element gets problems with the empty case...
+namespace select_first
+{
+	// The following idea doesn't work, because it instantiates
+	// tuple_element with an empty tuple:
+	/*
+	   template <typename ... L>
+	   using first_type=std::conditional<sizeof...(L)!=0,typename std::tuple_element<0,std::tuple<L...>>::type,void>::type;
+	 */
+
+	template <typename ... L> struct first_type_or_void;
+	template <typename F, typename ...L>
+	struct first_type_or_void<F,L...>
+	{
+		using type=F;
+	};
+
+	template <> struct first_type_or_void<>
+	{
+		using type=void;
+	};
+
+	template <typename ... L> struct only_one
+	{
+	};
+
+	template <typename F>
+	struct only_one<F>
+	{
+		using type=F;
+	};
+}
+
+// Shouldn't be a member type of scoped_resource, because it will be impossible to spell...
+// The following enum is used when a deleter is invoked early, to 
+// indicate whether or not the destructor should still (again) invoke
+// the deleter.  once means once!
+enum class invoke_it
+{
+	once,
+	again
+};
+
+// scoped_resource as variadic template
+template<typename DELETER, typename ... R>
+class scoped_resource
+{
+private:
+	DELETER m_deleter;
+	std::tuple<R...> m_resource;
+	bool m_bExecute;
+	scoped_resource& operator=(scoped_resource const &)=delete;
+	scoped_resource(scoped_resource const &)=delete; // no copies!
+
+public:
+	//
+	// non-const copy constructor
+	scoped_resource(scoped_resource &&other) :
+		m_deleter { std::move(other.m_deleter) },
+		m_resource { std::move(other.m_resource) },
+		m_bExecute { other.m_bExecute }
+	{
+		other.m_bExecute = false; // move enable the type
+	}
+
+	//
+	// non-const copy operator
+	// Assignment not wanted because we can not easily create
+	// a default object anyway...
+
+	scoped_resource& operator=(scoped_resource  &&other) = delete;
+
+	explicit
+	scoped_resource(DELETER&& deleter, R&&... resource, bool bShouldRun = true) noexcept :
+		m_deleter { std::move(deleter) },
+		m_resource { std::make_tuple(std::move(resource...)) },
+		m_bExecute { bShouldRun }
+	{
+	}
+
+	explicit
+	scoped_resource(const DELETER& deleter, const R&... resource,bool bShouldRun=true) noexcept :
+		m_deleter { deleter },
+		m_resource{ std::make_tuple(resource...) },
+		m_bExecute { bShouldRun }
+	{
+	}
+
+	//
+	// On scope exit (destructor) clean-up the resource via invoke...
+	~scoped_resource()
+	{
+		invoke(invoke_it::once);
+	}
+
+	//
+	// release() - special case where it is decided the clean-up (deleter)
+	// need not run...  Returns the first resource or a default initialized
+	// bool
+	auto release() noexcept
+	{
+		m_bExecute = false;
+		return std::get<0>(std::tuple_cat(m_resource, std::tuple<bool>{}));
+	}
+
+	std::tuple<R...>
+	release_all() noexcept
+	{
+		m_bExecute = false;
+		return m_resource;
+	}
+
+	// reset -- only resets the resource, not the deleter!
+	scoped_resource& reset(R&&... resource)
+	{
+		//
+		// Release the existing resource...
+		invoke(invoke_it::again);
+
+		//
+		// Assign the new one...
+		m_resource = std::make_tuple(std::move(resource...));
+		return *this;
+	}
+
+	//
+	// functor - run the clean-up early and release, synonym for .invoke()
+	void operator()(invoke_it how = invoke_it::once)
+	{
+		invoke(how);
+	}
+
+	// get - for cases where cast operator is undesirable (e.g. as a ... parameter)
+	template<size_t n = 0>
+	auto const & get() const noexcept
+	{
+		return std::get<n>(m_resource);
+	}
+
+	template<size_t n = 0>
+	auto & get() noexcept
+	{
+		return std::get<n>(m_resource);
+	}
+
+	//
+	// cast operator
+	// provide that for the single/first value case (typical usage)
+	operator typename select_first::first_type_or_void<R...>::type() const noexcept
+	{
+		return std::get<0>(m_resource);
+	}
+
+	// ?? are the following operators useful?
+	// operator-> for accessing members on pointer types
+	typename std::add_const<
+	    typename select_first::first_type_or_void<R...>::type>::type
+	operator->() const
+	{
+		return std::get<0>(m_resource);
+	}
+
+	typename select_first::first_type_or_void<R...>::type
+	operator->()
+	{
+		return std::get<0>(m_resource);
+	}
+
+	//
+	// operator* for dereferencing pointer types
+	typename std::add_const<
+	    typename std::add_lvalue_reference<
+	        typename std::remove_pointer<
+	            typename select_first::first_type_or_void
+                       <R...>::type>::type>::type>::type
+	operator*() const
+	{
+		return *std::get<0>(m_resource);		// If applicable
+	}
+
+	typename std::add_lvalue_reference<
+	    typename std::remove_pointer<
+	        typename select_first::first_type_or_void<R...>::type>::type>::type
+	operator*()
+	{
+		return *std::get<0>(m_resource);		// If applicable
+	}
+
+	//
+	// operator\& for getting the address of the resource - not const!
+	typename select_first::first_type_or_void<R...>::type*
+	operator&()
+	{
+		return &std::get<0>(m_resource);
+	}
+
+	// I doubt the non-const version is useful, since you can't/don't want to change the function object
+	DELETER& get_deleter()
+	{
+		return m_deleter;
+	}
+
+	const DELETER& get_deleter() const
+	{
+		return m_deleter;
+	}
+
+	//
+	// invoke() can be called directly, and will be called by the destructor...
+	scoped_resource& invoke(invoke_it const strategy = invoke_it::once)
+	{
+		if(m_bExecute)
+		{
+			//
+			// Invoke the deleter, passing the specified arguments, if any...
+			apply_ns::apply(m_deleter, m_resource);
+		}
+		m_bExecute = strategy==invoke_it::again;
+		return *this;
+	}
+};
+
+//
+// Generator functions...
+// First one is used when there is no invalid value to compare against
+// to prevent execution of the deleter on scope exit / invoke()
+template<typename DELETER, typename ... R>
+auto make_scoped_resource(DELETER t, R ... r)
+{
+	return scoped_resource<DELETER, R...>(t, r...);
+}
+
+//
+// The second one allows for a check against an invalid resource
+// value (e.g. file desc == -1, or hHandle == INVALID_HANDLE_VALUE, etc.)
+// which on match prevents the deleter function from being invoked on
+// scope exit / invoke()...
+template<typename DELETER, typename RES>
+auto make_scoped_resource_checked(DELETER t, RES r, RES invalid)
+{
+	return scoped_resource<DELETER, RES>(t, r, (r != invalid));
+}
+
+#endif /* SCOPED_RESOURCE_H_ */
+\end{codeblock}
+
+
+\end{document}
+
