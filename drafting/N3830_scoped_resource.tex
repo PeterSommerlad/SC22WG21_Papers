@@ -11,19 +11,19 @@
 \usepackage{underscore}   % remove special status of '_' in ordinary text
 \usepackage{xspace}
 \pagestyle{myheadings}
-\markboth{Dnnnn 2013-12-09}{Dnnnn 2013-12-09}
+\markboth{D3830 2013-12-09}{D3830 2013-12-09}
 
-\title{Scoped Resource - Generic RAII Wrapper for the Standard Library}
+\title{D3830 - Scoped Resource - Generic RAII Wrapper for the Standard Library}
 \author{Peter Sommerlad and Andrew L. Sandoval}
-\date{2013-12-09}                                           % Activate to display a given date or no date
+\date{2013-12-23}                                           % Activate to display a given date or no date
 \input{macros}
 \setsecnumdepth{subsection}
 
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: &  Dnnnn (update of N3677)\\\hline
-Date: & 2013-12-09 \\\hline
+Document Number: &  D3830 (update of N3677)\\\hline
+Date: & 2013-12-23 \\\hline
 Project: & Programming Language C++\\\hline 
 \end{tabular}
 
@@ -40,6 +40,7 @@ The Standard Template Library provides RAII classes for managing pointer types, 
 \item This proposal would not have been possible without the impressive work of Peter Sommerlad who produced the sample implementation during the Fall 2013 committee meetings in Chicago.  Peter took what Andrew Sandoval produced for N3677 and demonstrated the possibility of using C++14 features to make a single, general purpose RAII wrapper capable of fullfilling all of the needs presented by the original 4 classes (from N3677) with none of the compromises.
 \item Gratitude is also owed to members of the LEWG participating in the Fall 2013 (Chicago) meeting for their support, encouragement, and suggestions that have led to this proposal.
 \item Special thanks and recognition goes to OpenSpan, Inc. (http://www.openspan.com) for supporting the production of this proposal, and for sponsoring Andrew L. Sandoval's first proposal (N3677) and the trip to Chicago for the Fall 2013 LEWG meeting.
+\item This proposal refers to N3829 for the implementation of \tcode{std::apply()}. It should be voted in after N3829, because its description relies on the existence of \tcode{apply()} in the standard library. However, it can also be applied independently with appropriate changes to the specification.
 \end{itemize}
 
 \chapter{Motivation and Scope}
@@ -250,7 +251,7 @@ N3677 has a more complete list of other prior implementations.
 
 \chapter{Technical Specifications}
 \section{Header}
-Add an extra row to table 44 
+In section [utilities.general] add an extra row to table 44 
 %%TODO clearer specification 
 \begin{codeblock}
 Table 44 - General utilities library summary
@@ -262,7 +263,195 @@ Table 44 - General utilities library summary
 \end{codeblock}
 
 \section{Additional section}
-Ad a new section to chapter 20 introducing the contents of the header \tcode{scoped_resource}.
+Add a new section to chapter 20 introducing the contents of the header \tcode{scoped_resource}.
+
+%\rSec1[utilities.scoped_resource]{Scoped Resource Wrapper}
+\section{Scoped Resource Wrapper [utilities.scoped_resource]}
+This subclause contains infrastructure for a generic RAII resource wrapper.
+
+
+\synopsis{Header \tcode{<scoped_resource>} synopsis}
+
+\pnum
+The header  \tcode{<scoped_resource>} defines the class template \tcode{scoped_resource}, the enumeration invoke_it and function templates to create its instances.
+
+\begin{codeblock}
+namespace std {
+enum class invoke_it
+{
+	once,
+	again
+};
+template<typename DELETER, typename ... R>
+class scoped_resource
+{
+	DELETER deleter; // exposition only
+	std::tuple<R...> resource; // exposition only
+	bool execute_on_destruction; // exposition only
+	scoped_resource& operator=(scoped_resource const &)=delete;
+	scoped_resource(scoped_resource const &)=delete; 
+public:
+	// construction
+	explicit 
+	scoped_resource(DELETER&& deleter, R&&... resource, bool shouldRun = true) noexcept;
+	explicit 
+	scoped_resource(const DELETER& deleter, const R&... resource, bool shouldRun=true) noexcept;
+	// move
+	scoped_resource(scoped_resource &&other) noexcept;
+	scoped_resource& operator=(scoped_resource  &&other) noexcept;
+
+	// resource release	
+	~scoped_resource();
+	void invoke(invoke_it const strategy = invoke_it::once) noexcept;
+	@\seebelow@ release() noexcept;
+	void reset(R... newresource) noexcept;
+	
+	// resource accessors
+	operator  @\seebelow@() const noexcept; // resource type cast
+
+	template<size_t n = 0>
+	@\seebelow@  get() const noexcept;
+	@\seebelow@  operator*() const noexcept;
+	@\seebelow@  operator->() const noexcept;
+	
+	// deleter access
+	const DELETER & get_deleter() const noexcept;
+
+};
+// factory functions
+template<typename DELETER, typename ... R>
+	auto make_scoped_resource(DELETER t, R ... r) {
+	return scoped_resource<DELETER, R...>(std::move(t), std::move(r)...);
+}
+
+template<typename DELETER, typename RES>
+auto make_scoped_resource_checked(DELETER t, RES r, RES invalid) {
+	auto shouldrun=(r != invalid);
+	return scoped_resource<DELETER, RES>(std::move(t), std::move(r), shouldrun);
+}
+} // namespace std
+\end{codeblock}
+
+\pnum
+\enternote
+\tcode{scoped_resource} is meant to be a universal RAII wrapper for resource handles provided by an operating system or platform.
+Typically, such resource handles come with a factory function and a release function and are of trivial type.
+The release function together with the result of the factory function is used to create a scoped_resource variable, that on destruction will call the release function. Access to the underlying resource handle is achieved through a set of convenience functions or type conversion.
+\exitnote
+
+%\rSec2[scoped_resource.scoped_resource]{Class Template \tcode{scoped_resource}}
+\subsection {Class Template \tcode{scoped_resource} [scoped_resource.scoped_resource]}
+\begin{itemdecl}
+explicit 
+scoped_resource(DELETER&& deleter, R&&... resource, 
+                bool shouldRun = true) noexcept;
+explicit 
+scoped_resource(const DELETER& deleter, const R&... resource, 
+                bool shouldRun = true) noexcept;
+\end{itemdecl}
+
+\pnum
+\requires \tcode{deleter} is a \tcode{noexcept} function (object) taking \tcode{resource...} as arguments.
+
+\pnum
+\effects construct a scoped_resource that will call \tcode{deleter(resource...)} on its destruction if \tcode{shouldRun} is true.
+
+\begin{itemdecl}
+	scoped_resource(scoped_resource &&other) noexcept;
+\end{itemdecl}
+
+\pnum
+\effects move construct a scoped_resource by moving members. Sets \tcode{other.execute_on_destruction} to {false}.
+
+\begin{itemdecl}
+	scoped_resource& operator=(scoped_resource  &&other) noexcept;
+\end{itemdecl}
+
+\pnum
+\effects \tcode{this->invoke();} moves all members from other. Sets \tcode{other.execute_on_destruction} to {false}.
+
+\begin{itemdecl}
+	~scoped_resource();
+\end{itemdecl}
+
+\pnum
+\effects \tcode{this->invoke();}
+
+\begin{itemdecl}
+	void invoke(invoke_it const strategy = invoke_it::once) noexcept;
+\end{itemdecl}
+
+\pnum
+\effects 
+\begin{codeblock}
+if (execute_on_destruction) 
+    apply(deleter,resource); 
+execute_on_destruction=(strategy==invoke_it::again);
+\end{codeblock}
+
+\begin{itemdecl}
+	@\seebelow@ release() noexcept;
+\end{itemdecl}
+
+\pnum
+\effects \tcode{execute_on_destruction=false;}
+
+\pnum
+\returns \tcode{resource}. 
+\\Return type is \tcode{tuple<R...>}, if \tcode{sizeof(R...)>1} or \tcode{tuple_element_t<0,tuple<R...>>} if \tcode{sizeof(R...)==1}, or \tcode{void}.
+
+\begin{itemdecl}
+	void reset(R... newresource) noexcept;
+\end{itemdecl}
+
+\pnum
+\effects 
+\begin{codeblock}
+this->invoke(invoke_it::again); 
+resource=make_tuple(move(newresource)...);
+\end{codeblock}
+
+\pnum
+\enternote This function takes the role of an assignment of a new resource.
+\exitnote
+
+\begin{itemdecl}
+	operator  @\seebelow@() const noexcept;
+\end{itemdecl}
+
+\pnum
+\returns \tcode{get<0>(resource)}.
+\\Return type and \tcode{operator} name is the underlying type \tcode{tuple_element_t<0,tuple<R...>>}. 
+
+\begin{itemdecl}
+	template<size_t n = 0>
+	@\seebelow@  get() const noexcept;
+\end{itemdecl}
+
+\pnum
+\returns \tcode{get<n>(resource)}.
+\\Return type is \tcode{tuple_element_t<n,tuple<R...>> const \&}. 
+\\\enternote An implementation might chose \tcode{auto const \&} return type deduction.
+\exitnote
+
+\begin{itemdecl}
+	@\seebelow@  operator*() const noexcept;
+	@\seebelow@  operator->() const noexcept;
+\end{itemdecl}
+
+\pnum
+\requires These functions are only available if \tcode{is_pointer<tuple_element_t<0,tuple<R...>>>::value} is \tcode{true}. The second one only applies if the return type is a class or union type.
+
+\pnum
+\returns \tcode{*get<0>(resource)}
+\\Return type is \tcode{decltype(*get<0>(resource))}. 
+
+\begin{itemdecl}
+	const DELETER & get_deleter() const noexcept;
+\end{itemdecl}
+
+\pnum
+\returns \tcode{deleter}
 
 
 
@@ -285,6 +474,7 @@ Ad a new section to chapter 20 introducing the contents of the header \tcode{sco
 // Subsequent (editing, etc.) work by:
 // -Andrew L. Sandoval
 
+
 #ifndef SCOPED_RESOURCE_H_
 #define SCOPED_RESOURCE_H_
 #include <cstddef>
@@ -292,285 +482,154 @@ Ad a new section to chapter 20 introducing the contents of the header \tcode{sco
 #include <type_traits>
 #include <utility>
 
-// mechanics to call function through tuple, stolen from
-// http://stackoverflow.com/questions/687490/how-do-i-expand-a-tuple-into-variadic-template-functions-arguments
-// should be part of the standard, if it isn't already.
-namespace apply_ns
+// should actually be part of the standard, if it isn't already.
+namespace apply_ns{
+using namespace std;
+// from C++14 standard draft example, doesn't work perfect, but fixable here
+// fixed by removing reference from std::tuple_size<Tuple>
+template<typename F, typename Tuple, size_t ... I>
+auto apply_impl(F&& f, Tuple&& t, index_sequence<I...>)
+//noexcept(noexcept(forward<F>(f)(get<I>(forward<Tuple>(t))...)))
 {
-	template<size_t N>
-	struct Apply
-	{
-		template<typename F, typename T, typename... A>
-		static inline auto apply(F && f, T && t, A &&... a)
-		{
-			return Apply<N-1>::apply(::std::forward<F>(f),
-				::std::forward<T>(t),
-				::std::get<N-1>(
-					::std::forward<T>(t)),
-					::std::forward<A>(a)...);
-    		}
-	};
-
-	template<>
-	struct Apply<0>
-	{
-		template<typename F, typename T, typename... A>
-		static inline auto apply(F && f, T &&, A &&... a)
-		{
-			return ::std::forward<F>(f)(::std::forward<A>(a)...);
-		}
-	};
-
-	template<typename F, typename T>
-	inline auto apply(F && f, T && t)
-	{
-		return Apply< ::std::tuple_size< ::std::decay_t<T> >::value>::apply(::std::forward<F>(f), ::std::forward<T>(t));
-	}
+	return forward<F>(f)(get<I>(forward<Tuple>(t))...);
+}
+template<typename F, typename Tuple>
+auto apply(F&& f, Tuple&& t)
+//noexcept(noexcept(apply_impl(forward<F>(f), forward<Tuple>(t), make_index_sequence<tuple_size<decay_t<Tuple>>::value>{})))
+{
+  using Indices = make_index_sequence<tuple_size<decay_t<Tuple>>::value>;
+  return apply_impl(forward<F>(f), forward<Tuple>(t), Indices{});
+}
 }
 
-// Something like the following should be available in the standard...
-// If not it should be - tuple_element gets problems with the empty case...
-namespace select_first
-{
-	// The following idea doesn't work, because it instantiates
-	// tuple_element with an empty tuple:
-	/*
-	   template <typename ... L>
-	   using first_type=std::conditional<sizeof...(L)!=0,typename std::tuple_element<0,std::tuple<L...>>::type,void>::type;
-	 */
+// something like the following should be available in the standard, if not it should
+// tuple_element gets problems with the empty case...
+namespace select_first{
+// the following idea doesn't work, because it instantiates tuple_element with an empty tuple
+/*
+template <typename ... L>
+using first_type=std::conditional<sizeof...(L)!=0,typename std::tuple_element<0,std::tuple<L...>>::type,void>::type;
+ */
 
-	template <typename ... L> struct first_type_or_void;
-	template <typename F, typename ...L>
-	struct first_type_or_void<F,L...>
-	{
-		using type=F;
-	};
-
-	template <> struct first_type_or_void<>
-	{
-		using type=void;
-	};
-
-	template <typename ... L> struct only_one
-	{
-	};
-
-	template <typename F>
-	struct only_one<F>
-	{
-		using type=F;
-	};
-}
-
-// Shouldn't be a member type of scoped_resource, because it will be impossible to spell...
-// The following enum is used when a deleter is invoked early, to 
-// indicate whether or not the destructor should still (again) invoke
-// the deleter.  once means once!
-enum class invoke_it
-{
-	once,
-	again
+template <typename ... L> struct first_type_or_void;
+template <typename F, typename ...L>
+struct first_type_or_void<F,L...>{
+	using type=F;
 };
+template <> struct first_type_or_void<>{
+	using type=void;
+};
+template <typename ...L>
+using first_type_or_void_t = typename first_type_or_void<L...>::type;
+}
 
-// scoped_resource as variadic template
+// shouldn't be e member type of scoped_resource, because it will be impossible to spell
+enum class invoke_it { once, again };
+// provide it as variadic template
 template<typename DELETER, typename ... R>
-class scoped_resource
-{
-private:
-	DELETER m_deleter;
-	std::tuple<R...> m_resource;
-	bool m_bExecute;
+class scoped_resource {
+	DELETER deleter; // deleter must be void(R...) noexcept compatible
+	std::tuple<R...> resource;
+	bool execute_on_destruction;
 	scoped_resource& operator=(scoped_resource const &)=delete;
 	scoped_resource(scoped_resource const &)=delete; // no copies!
-
+	auto do_release(std::true_type is_size_one){
+		execute_on_destruction = false;
+		return std::get<0>(std::tuple_cat(resource,std::tuple<bool>{})); 
+		// avoid compile errors if sizeof(R...) is 0.
+	}
+	auto do_release(std::false_type is_some_other_size){
+		execute_on_destruction = false;
+		return resource;
+	}
 public:
-	//
-	// non-const copy constructor
-	scoped_resource(scoped_resource &&other) :
-		m_deleter { std::move(other.m_deleter) },
-		m_resource { std::move(other.m_resource) },
-		m_bExecute { other.m_bExecute }
-	{
-		other.m_bExecute = false; // move enable the type
+	scoped_resource(scoped_resource &&other)
+	:deleter{std::move(other.deleter)}
+	,resource{std::move(other.resource)}
+	,execute_on_destruction{other.execute_on_destruction}{
+		other.execute_on_destruction=false;
 	}
-
-	//
-	// non-const copy operator
-	// Assignment not wanted because we can not easily create
-	// a default object anyway...
-
-	scoped_resource& operator=(scoped_resource  &&other) = delete;
-
+	scoped_resource& operator=(scoped_resource  &&other){
+		this->invoke();
+		deleter=std::move(other.deleter);
+		resource=std::move(other.resource);
+		execute_on_destruction=other.execute_on_destruction;
+		other.execute_on_destruction = false;
+		return *this;
+	}
 	explicit
-	scoped_resource(DELETER&& deleter, R&&... resource, bool bShouldRun = true) noexcept :
-		m_deleter { std::move(deleter) },
-		m_resource { std::make_tuple(std::move(resource...)) },
-		m_bExecute { bShouldRun }
-	{
-	}
-
-	explicit
-	scoped_resource(const DELETER& deleter, const R&... resource,bool bShouldRun=true) noexcept :
-		m_deleter { deleter },
-		m_resource{ std::make_tuple(resource...) },
-		m_bExecute { bShouldRun }
-	{
-	}
-
-	//
-	// On scope exit (destructor) clean-up the resource via invoke...
-	~scoped_resource()
-	{
+	scoped_resource(DELETER deleter, R... resource, bool shouldrun=true) noexcept
+		: deleter{std::move(deleter)}
+		, resource{std::make_tuple(std::move(resource)...)}
+		, execute_on_destruction{shouldrun}{}
+	~scoped_resource() {
 		invoke(invoke_it::once);
 	}
 
-	//
-	// release() - special case where it is decided the clean-up (deleter)
-	// need not run...  Returns the first resource or a default initialized
-	// bool
-	auto release() noexcept
-	{
-		m_bExecute = false;
-		return std::get<0>(std::tuple_cat(m_resource, std::tuple<bool>{}));
-	}
-
-	std::tuple<R...>
-	release_all() noexcept
-	{
-		m_bExecute = false;
-		return m_resource;
+	auto release(){
+		return do_release(std::conditional_t<sizeof...(R)==1,
+                             std::true_type,std::false_type>{});
 	}
 
 	// reset -- only resets the resource, not the deleter!
-	scoped_resource& reset(R&&... resource)
-	{
-		//
-		// Release the existing resource...
+	void reset(R... newresource) noexcept {
 		invoke(invoke_it::again);
-
-		//
-		// Assign the new one...
-		m_resource = std::make_tuple(std::move(resource...));
-		return *this;
+		resource = std::make_tuple(std::move(newresource)...);
 	}
-
-	//
-	// functor - run the clean-up early and release, synonym for .invoke()
-	void operator()(invoke_it how = invoke_it::once)
-	{
-		invoke(how);
-	}
-
 	// get - for cases where cast operator is undesirable (e.g. as a ... parameter)
 	template<size_t n = 0>
-	auto const & get() const noexcept
-	{
-		return std::get<n>(m_resource);
+	auto const & get() const noexcept {
+		return std::get<n>(resource);
 	}
-
-	template<size_t n = 0>
-	auto & get() noexcept
-	{
-		return std::get<n>(m_resource);
-	}
-
 	//
 	// cast operator
-	// provide that for the single/first value case (typical usage)
-	operator typename select_first::first_type_or_void<R...>::type() const noexcept
-	{
-		return std::get<0>(m_resource);
+	// provide that for the single/first value case
+	operator  select_first::first_type_or_void_t<R...>() const noexcept {
+		return get();
 	}
 
 	// ?? are the following operators useful?
 	// operator-> for accessing members on pointer types
-	typename std::add_const<
-	    typename select_first::first_type_or_void<R...>::type>::type
-	operator->() const
-	{
-		return std::get<0>(m_resource);
-	}
 
-	typename select_first::first_type_or_void<R...>::type
-	operator->()
-	{
-		return std::get<0>(m_resource);
+	std::add_lvalue_reference_t<
+		std::remove_pointer_t<
+			select_first::first_type_or_void_t<R...>>>
+	operator->() const {
+		return std::get<0>(resource);
 	}
 
 	//
 	// operator* for dereferencing pointer types
-	typename std::add_const<
-	    typename std::add_lvalue_reference<
-	        typename std::remove_pointer<
-	            typename select_first::first_type_or_void
-                       <R...>::type>::type>::type>::type
-	operator*() const
-	{
-		return *std::get<0>(m_resource);		// If applicable
-	}
 
-	typename std::add_lvalue_reference<
-	    typename std::remove_pointer<
-	        typename select_first::first_type_or_void<R...>::type>::type>::type
-	operator*()
-	{
-		return *std::get<0>(m_resource);		// If applicable
+	std::add_lvalue_reference_t<
+		std::remove_pointer_t<
+			select_first::first_type_or_void_t<R...>>>
+	// auto const \& should be better... but clang crashes
+	operator*() const {
+		return *get();		// If applicable
 	}
-
-	//
-	// operator\& for getting the address of the resource - not const!
-	typename select_first::first_type_or_void<R...>::type*
-	operator&()
-	{
-		return &std::get<0>(m_resource);
+	const DELETER& get_deleter() const noexcept {
+		return deleter;
 	}
-
-	// I doubt the non-const version is useful, since you can't/don't want to change the function object
-	DELETER& get_deleter()
-	{
-		return m_deleter;
-	}
-
-	const DELETER& get_deleter() const
-	{
-		return m_deleter;
-	}
-
-	//
-	// invoke() can be called directly, and will be called by the destructor...
-	scoped_resource& invoke(invoke_it const strategy = invoke_it::once)
-	{
-		if(m_bExecute)
-		{
-			//
-			// Invoke the deleter, passing the specified arguments, if any...
-			apply_ns::apply(m_deleter, m_resource);
+	void invoke(invoke_it const strategy = invoke_it::once) noexcept {
+		if (execute_on_destruction) {
+			apply_ns::apply(deleter, resource);
 		}
-		m_bExecute = strategy==invoke_it::again;
-		return *this;
+		execute_on_destruction = strategy==invoke_it::again;
 	}
 };
 
-//
-// Generator functions...
-// First one is used when there is no invalid value to compare against
-// to prevent execution of the deleter on scope exit / invoke()
 template<typename DELETER, typename ... R>
-auto make_scoped_resource(DELETER t, R ... r)
-{
-	return scoped_resource<DELETER, R...>(t, r...);
+	auto make_scoped_resource(DELETER t, R ... r) {
+	return scoped_resource<DELETER, R...>(std::move(t), std::move(r)...);
+}
+// the following convenience factory is intended for a single resource only, i.e. file descriptor
+template<typename DELETER, typename RES>
+auto make_scoped_resource_checked(DELETER t, RES r, RES invalid) {
+	auto shouldrun=(r != invalid);
+	return scoped_resource<DELETER, RES>(std::move(t), std::move(r), shouldrun);
 }
 
-//
-// The second one allows for a check against an invalid resource
-// value (e.g. file desc == -1, or hHandle == INVALID_HANDLE_VALUE, etc.)
-// which on match prevents the deleter function from being invoked on
-// scope exit / invoke()...
-template<typename DELETER, typename RES>
-auto make_scoped_resource_checked(DELETER t, RES r, RES invalid)
-{
-	return scoped_resource<DELETER, RES>(t, r, (r != invalid));
-}
 
 #endif /* SCOPED_RESOURCE_H_ */
 \end{codeblock}
