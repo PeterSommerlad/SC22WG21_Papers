@@ -11,9 +11,9 @@
 \usepackage{underscore}   % remove special status of '_' in ordinary text
 \usepackage{xspace}
 \pagestyle{myheadings}
-\markboth{D3830 2013-12-09}{D3830 2013-12-09}
+\markboth{N3830 2013-12-09}{N3830 2013-12-09}
 
-\title{D3830 - Scoped Resource - Generic RAII Wrapper for the Standard Library}
+\title{N3830 - Scoped Resource - Generic RAII Wrapper for the Standard Library}
 \author{Peter Sommerlad and Andrew L. Sandoval}
 \date{2013-12-23}                                           % Activate to display a given date or no date
 \input{macros}
@@ -22,7 +22,7 @@
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: &  D3830 (update of N3677)\\\hline
+Document Number: &  N3830 (update of N3677)\\\hline
 Date: & 2013-12-23 \\\hline
 Project: & Programming Language C++\\\hline 
 \end{tabular}
@@ -33,14 +33,15 @@ Project: & Programming Language C++\\\hline
 \end{itemize}
 
 \chapter{Introduction}
-The Standard Template Library provides RAII classes for managing pointer types, such as \tcode{std::unique_ptr} and \tcode{std::shared_ptr}.  This proposal seeks to add a new generic RAII class which ties zero or more resources to a clean-up/completion routine which is bound by scope, ensuring execution at scope exit (as the object is destroyed) unless released or executed early.
+The Standard Template Library provides RAII classes for managing pointer types, such as \tcode{std::unique_ptr} and \tcode{std::shared_ptr}.  This proposal seeks to add a new generic RAII class which ties zero or more resources to a clean-up/completion routine which is bound by scope, ensuring execution at scope exit (as the object is destroyed) unless released or executed early or returned by moving its value.
 
 \chapter{Acknowledgements}
 \begin{itemize}
-\item This proposal would not have been possible without the impressive work of Peter Sommerlad who produced the sample implementation during the Fall 2013 committee meetings in Chicago.  Peter took what Andrew Sandoval produced for N3677 and demonstrated the possibility of using C++14 features to make a single, general purpose RAII wrapper capable of fullfilling all of the needs presented by the original 4 classes (from N3677) with none of the compromises.
+\item This proposal would not have been possible without the impressive work of Peter Sommerlad who produced the sample implementation during the Fall 2013 committee meetings in Chicago.  Peter took what Andrew Sandoval produced for N3677 and demonstrated the possibility of using C++14 features to make a single, general purpose RAII wrapper capable of fulfilling all of the needs presented by the original 4 classes (from N3677) with none of the compromises.
 \item Gratitude is also owed to members of the LEWG participating in the Fall 2013 (Chicago) meeting for their support, encouragement, and suggestions that have led to this proposal.
 \item Special thanks and recognition goes to OpenSpan, Inc. (http://www.openspan.com) for supporting the production of this proposal, and for sponsoring Andrew L. Sandoval's first proposal (N3677) and the trip to Chicago for the Fall 2013 LEWG meeting.
 \item This proposal refers to N3829 for the implementation of \tcode{std::apply()}. It should be voted in after N3829, because its description relies on the existence of \tcode{apply()} in the standard library. However, it can also be applied independently with appropriate changes to the specification.
+\item Thanks also to members of the mailing lists who gave feedback. Especially Zhihao Yuan, and Ville Voutilainen.
 \end{itemize}
 
 \chapter{Motivation and Scope}
@@ -88,7 +89,7 @@ void CoercedExample()
 	// Read some data using the handle
 	std::array<char, 1024> arr = { };
 	DWORD dwRead = 0;
-	ReadFile(hFile.get(),	// Must use hFile.get()
+	ReadFile(hFile.get(),	// Must use std::unique_ptr::get()
 		&arr[0], 
 		static_cast<DWORD>(arr.size()), 
 		&dwRead);
@@ -242,9 +243,9 @@ N3677 has a more complete list of other prior implementations.
 
 \section{Open Issues to be Discussed}
 \begin{itemize}
-\item Should \tcode{scoped_resource} be move-able like \tcode{unique_ptr} ?
-\item Should there be a companion class for sharing the resource \tcode{shared_resource} ? 
-\item Is the set of provided overloaded operators really useful ? Which could be removed without harm ? Is there something missing ?
+\item Should \tcode{scoped_resource} be move-able like \tcode{unique_ptr} and even be named \tcode{unique_resource} ?
+\item Should there be a companion class for sharing the resource \tcode{shared_resource} ?  (Peter thinks no. Ville thinks it could be provided later anyway.)
+\item Is the set of provided overloaded operators really useful ? Which could be removed without harm ? Is there something missing ? There is doubt if the pointer special handling and conversion operator are really required. However, the original proposal by Andrew provided that functionality to enable use of the wrapper where the wrapped resource would be used.
 \item Is scoped_resource lightweight enough, or should the mechanics for early-release and re-assignment be omitted ?
 \end{itemize}
 
@@ -253,14 +254,29 @@ N3677 has a more complete list of other prior implementations.
 \section{Header}
 In section [utilities.general] add an extra row to table 44 
 %%TODO clearer specification 
-\begin{codeblock}
+\begin{table}[htdp]
+\caption{Table 44 - General utilities library summary}
+\begin{center}
+\begin{tabular}{|c|c|}
+\hline
+Subclause & Header\\
+\hline
+20.nn Scoped Resource & \tcode{<scoped_resource>}\\
+\hline
+\end{tabular}
+\end{center}
+\label{utilities}
+\end{table}%
+
+
+\begin{comment}
 Table 44 - General utilities library summary
 ---------------------------------------------
 |Subclause             |  Header(s)         |
 ---------------------------------------------
 |20.14 Scoped Resource | <scoped_resource>  |
 ---------------------------------------------
-\end{codeblock}
+\end{comment}
 
 \section{Additional section}
 Add a new section to chapter 20 introducing the contents of the header \tcode{scoped_resource}.
@@ -455,7 +471,7 @@ resource=make_tuple(move(newresource)...);
 
 
 
-\chapter{Example Implementation}
+\chapter{Appendix: Example Implementation}
 \begin{codeblock}
 // Copyright Peter Sommerlad and Andrew L. Sandoval 2012 - 2013.
 // Distributed under the Boost Software License, Version 1.0.
