@@ -1,0 +1,70 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}                % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}                   % ... or a4paper or a5paper or ... 
+%\geometry{landscape}                % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    % Activate to begin paragraphs with an empty line rather than an indent
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{DXXXX 2014-02-13}{DXXXXX 2014-02-13}
+%%TODO
+% namespace std { inline namespace literals { inline namespace chrono_literals, string_literals, complex_literals
+% put b on the side
+% complex: if, i, il optional i_l
+
+\title{On the Future of std::future and a Future concept and Data-flow Programming}
+\author{Hartmut Kaiser, Thomas Heller, Peter Sommerlad}
+\date{2014-02-13}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: & DXXXX \\\hline
+Date: & 2014-02-13 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+\chapter{History}
+\section{Discussion on c++std-parallel mailing list}
+
+In 2013 there have been several discussions raised by papers \textbf{(find numbers)} that asked for extending \tcode{std::future} API with a member function \tcode{futre::then()} that allows to specify a function that will run after the future object becomes ready. The invocation of .then() would then return a future wrapping the original future object, etc. 
+
+Peter strongly objected to the abstraction of future gain "fat" by giving it more than the semantic of a \emph{"ticket for a value or exception to be obtained later"}. While a concrete implementation such as std::future in the world of C++11 requires some hooking to a synchronization mechanism, the abstraction should be agnostic about where the value it eventually receives comes from. His colleague Luc Bläser also supports his opinion and provides examples how chaining of tasks could be achieved with existing C++11 mechanisms.
+
+Others seem to have the perspective that a \tcode{std::future} actually is about synchronization and thus chaining execution of code with respect to the event of a \tcode{std::future} instance becoming ready is the way to provide an attractive style of "continuation-based" programming \textbf{(check terminology)}.
+
+
+
+
+
+\chapter{Introduction}
+\section{}
+\section{Open Issues to be Discussed}
+
+\section{Acknowledgements}
+Acknowledgements go to 
+%more
+
+\chapter{Proposed Library Additions}
+%%%%%%%%%%% C++ EDITOR %%%%% 
+%
+%Add the following declaration in [tuple.general] in the synopsis under the group \emph{element access}:
+%
+%\begin{codeblock}
+%template <typename F, typename Tuple>
+%decltype(auto) apply(F&& f, Tuple&& t);
+%\end{codeblock}
+
+%%%%%%%%%%% C++ EDITOR %%%%% 
+
+
+
+%%%%
+%%%%%
+
+\end{document}   
