@@ -1,0 +1,720 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}	% See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}	% ... or a4paper or a5paper or ... 
+%\geometry{landscape}	% Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}	% Activate to begin paragraphs with an empty line rather than an indent
+
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{D3949 2013-12-09}{D3949 2013-12-09}
+
+\title{D3949 - Scoped Resource - Generic RAII Wrapper for the Standard Library}
+\author{Peter Sommerlad and Andrew L. Sandoval}
+\date{2014-02-28}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: D3949 &   (update of N3830, N3677)\\\hline
+Date: & 2014-02-28 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+
+\chapter{Changes from N3830}
+\begin{itemize}
+\item rename to \tcode{unique_resource_t} and factory to \tcode{unique_resource}, resp. \tcode{unique_resource_checked}
+\item provide scope guard functionality through type \tcode{scope_guard_t} and \tcode{scope_guard} factory
+\item remove multiple-argument case in favor of simpler interface, lambda can deal with complicated release APIs requiring multiple arguments.
+\item make function/functor position the last argument of the factories for lambda-friendliness.
+
+\end{itemize}
+\chapter{Changes from N3677}
+\begin{itemize}
+\item Replace all 4 proposed classes with a single class covering all use cases, using variadic templates, as determined in the Fall 2013 LEWG meeting.
+\item The conscious decision was made to name the factory functions without "make", because they actually do not allocate any resources, like \tcode{std::make_unique} or \tcode{std::make_shared} do
+\end{itemize}
+
+\chapter{Introduction}
+The Standard Template Library provides RAII classes for managing pointer types, such as \tcode{std::unique_ptr} and \tcode{std::shared_ptr}.  This proposal seeks to add a two generic RAII wrappers classes which tie zero or one resource to a clean-up/completion routine which is bound by scope, ensuring execution at scope exit (as the object is destroyed) unless released early or in the case of a single resource: executed early or returned by moving its value.
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item This proposal incorporates what Andrej Alexandrescu described as scope_guard long ago and explained again at C++ Now 2012 (%\url{
+%https://onedrive.live.com/view.aspx?resid=F1B8FF18A2AEC5C5!1158&app=WordPdf&wdo=2&authkey=!APo6bfP5sJ8EmH4}
+).
+\item This proposal would not have been possible without the impressive work of Peter Sommerlad who produced the sample implementation during the Fall 2013 committee meetings in Chicago.  Peter took what Andrew Sandoval produced for N3677 and demonstrated the possibility of using C++14 features to make a single, general purpose RAII wrapper capable of fulfilling all of the needs presented by the original 4 classes (from N3677) with none of the compromises.
+\item Gratitude is also owed to members of the LEWG participating in the February 2014 (Issaquah) and Fall 2013 (Chicago) meeting for their support, encouragement, and suggestions that have led to this proposal.
+\item Special thanks and recognition goes to OpenSpan, Inc. (http://www.openspan.com) for supporting the production of this proposal, and for sponsoring Andrew L. Sandoval's first proposal (N3677) and the trip to Chicago for the Fall 2013 LEWG meeting.
+\item Thanks also to members of the mailing lists who gave feedback. Especially Zhihao Yuan, and Ville Voutilainen.
+\end{itemize}
+
+\chapter{Motivation and Scope}
+The quality of C++ code can often be improved through the use of "smart" container objects.  For example, using \tcode{std::unique_ptr} or \tcode{std::shared_ptr} to manage pointers can prevent common mistakes that lead to memory leaks, as well as the less common leaks that occur when exceptions unwind.  The latter case is especially difficult to diagnose and debug and is a commonly made mistake -- especially on systems where unexpected events (such as access violations) in third party libraries may cause deep unwinding that a developer did not expect.  (One example would be on Microsoft Windows with Structured Exception Handling and libraries like MFC that issue callbacks to user-defined code wrapped in a \tcode{try/catch(...)} block.  The developer is usually unaware that their code is wrapped with an exception handler that depending on compile-time options will quietly unwind their code, masking any exceptions that occur.)
+
+While \tcode{std::unique_ptr} can be tweaked by using a custom deleter type to almost a perfect handler for resources, it is awkward to use for handle types that are not pointers and for the use case of a scope guard. As a smart pointer  \tcode{std::unique_ptr} can be used syntactically like a pointer, but requires the use of \tcode{get()} to pass the underlying pointer value to legacy APIs.
+
+This proposal introduces a new RAII "smart" resource container called \tcode{unique_resource_t} which can bind a resource to "clean-up" code regardless of type or the number of arguments required by the "clean-up" function.
+
+\section {Without Coercion}
+Existing smart pointer types can often be coerced into providing the needed functionality.  For example, \tcode{std::unique_ptr} could be coerced into invoking a function used to close an opaque handle type.  For example, given the following system APIs, \tcode{std::unique_ptr} can be used to ensure the file handle is not leaked on scope exit:
+
+\begin{codeblock}
+typedef void *HANDLE;        // System defined opaque handle type
+typedef unsigned long DWORD;
+#define INVALID_HANDLE_VALUE reinterpret_cast<HANDLE>(-1)	
+// Can't help this, that's from the OS
+
+// System defined APIs
+void CloseHandle(HANDLE hObject);
+
+HANDLE CreateFile(const char *pszFileName, 
+	DWORD dwDesiredAccess, 
+	DWORD dwShareMode, 
+	DWORD dwCreationDisposition, 
+	DWORD dwFlagsAndAttributes, 
+	HANDLE hTemplateFile);
+
+bool ReadFile(HANDLE hFile, 
+	void *pBuffer, 
+	DWORD nNumberOfBytesToRead, 
+	DWORD*pNumberOfBytesRead);
+
+// Using std::unique_ptr to ensure file handle is closed on scope-exit:
+void CoercedExample()
+{
+	// Initialize hFile ensure it will be "closed" (regardless of value) on scope-exit
+	std::unique_ptr<void, decltype(&CloseHandle)> hFile(
+		CreateFile("test.tmp", 
+			FILE_ALL_ACCESS, 
+			FILE_SHARE_READ, 
+			OPEN_EXISTING, 
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr), 
+		CloseHandle);
+
+	// Read some data using the handle
+	std::array<char, 1024> arr = { };
+	DWORD dwRead = 0;
+	ReadFile(hFile.get(),	// Must use std::unique_ptr::get()
+		&arr[0], 
+		static_cast<DWORD>(arr.size()), 
+		&dwRead);
+}
+\end{codeblock}
+
+While this works, there are a few problems with coercing \tcode{std::unique_ptr} into handling the resource in this manner:
+\begin{itemize}
+\item The type used by the \tcode{std::unique_ptr} does not match the type of the resource.  \tcode{void} is not a \tcode{HANDLE}.  (Thus the word coercion is used to describe it.)
+\item There is no convenient way to check the value returned by \tcode{CreateFile} and assigned to the \tcode{std::unique_ptr<void>} to prevent calling \tcode{CloseHandle} when an invalid handle value is returned.  \tcode{std::unique_ptr} will check for a null pointer, but the \tcode{CreateFile} API may return another pre-defined value to signal an error.
+\item Because hFile does not have a cast operator that converts the contained "pointer" to a \tcode{HANDLE}, the \tcode{get()} method must be used when invoking other system APIs needing the underlying \tcode{HANDLE}.
+\end{itemize}
+
+Each of these problems is solved by \tcode{unique_resource} as shown in the following example:
+
+\begin{codeblock}
+void ScopedResourceExample1()
+{
+	// Initialize hFile ensure it will be "closed" (regardless of value) on scope-exit
+	auto hFile = std::unique_resource_checked(
+		CreateFile("test.tmp", 
+			FILE_ALL_ACCESS, 
+			FILE_SHARE_READ, 
+			OPEN_EXISTING, 
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr),           // The resource
+		INVALID_HANDLE_VALUE,   // Don't call CloseHandle if it failed!
+		CloseHandle);           // Clean-up API, lambda-friendly position
+
+	// Read some data using the handle
+	std::array<char, 1024> arr = { };
+	DWORD dwRead = 0;
+	// cast operator makes it seamless to use with other APIs needing a HANDLE
+	ReadFile(hFile,
+		&arr[0], 
+		static_cast<DWORD>(arr.size()), 
+		&dwRead);
+}
+\end{codeblock}
+
+\subsection{Non-Pointer Handle Types}
+While \tcode{std::unique_ptr} can deal with the above pointer handle type, as well as \tcode{<cstdio>}'s \tcode{FILE *}, it is non-intuitive to use with handle's like \tcode{<fcntl.h>}'s and \tcode{<unistd.h>}'s \tcode{int} file handles. See the following code examples on using \tcode{unique_resource} with \tcode{int} and \tcode{FILE *} handle types.
+
+\begin{codeblock}
+void demontrate_unique_resource_with_POSIX_IO(){
+	const char* const filename = "hello.txt";
+	{
+		auto file = unique_resource_checked(::open(filename,O_CREAT|O_RDWR),
+				 -1,&::close);
+		::write(file,"Hello World!\n",12u);
+		ASSERT(file.get()!= -1);
+	}
+	std::ifstream input { filename };
+	std::string line;
+	getline(input,line);
+	ASSERT_EQUAL("Hello World!",line);
+	getline(input,line);
+	ASSERT(input.eof());
+	{
+		auto file = unique_resource_checked(::open("nonexistingfile.txt", O_RDONLY),
+				-1, &::close);
+		ASSERT_EQUAL(-1,file.get());
+	}
+
+}
+\end{codeblock}
+\begin{codeblock}
+void demontrate_unique_resource_with_POSIX_IO(){
+	const char* const filename = "hello1.txt";
+	{
+		auto file = unique_resource_checked(
+				::open(filename,O_CREAT|O_RDWR),
+				 -1,&::close);
+		::write(file,"Hello World!\n",12u);
+		ASSERT(file.get()!= -1);
+	}
+	{
+		std::ifstream input { filename };
+		std::string line;
+		getline(input, line);
+		ASSERT_EQUAL("Hello World!", line);
+		getline(input, line);
+		ASSERT(input.eof());
+	}
+	::unlink(filename);
+	{
+		auto file = unique_resource_checked(
+				::open("nonexistingfile.txt", O_RDONLY),
+				-1,
+				&::close);
+		ASSERT_EQUAL(-1,file.get());
+	}
+}
+\end{codeblock}
+
+\section{Multiple Parameters}
+This feature was abandoned due to feedback by LEWG in Issaquah. A lambda as deleter can have the same effect without complicating \tcode{unique_resource_t}.
+
+\section{Lambdas, etc.}
+It is also possible to use lambdas instead of a function pointer to initialize a \tcode{unique_resource}.  The following is a very simple and otherwise useless example:
+
+\begin{codeblock}
+void TalkToTheWorld(std::ostream& out, std::string const farewell="Uff Wiederluege...")
+{
+	// Always say goodbye before returning,
+	// but if given a non-empty farewell message use it...
+	auto goodbye = scope_guard([&out]() ->void
+	{
+		out << "Goodbye world..." << std::endl;
+	});
+	auto altgoodbye = scope_guard([&out,farewell]() ->void
+	{
+		out << farewell << std::endl;
+	});
+
+
+	if(farewell.empty())
+	{
+		altgoodbye.release();		// Don't use farewell!
+	}
+	else
+	{
+		goodbye.release();	// Don't use the alternate
+	}
+}
+\end{codeblock}
+\begin{codeblock}
+
+void testTalkToTheWorld(){
+	std::ostringstream out;
+	TalkToTheWorld(out,"");
+	ASSERT_EQUAL("Goodbye world...\n",out.str());
+	out.str("");
+	TalkToTheWorld(out);
+	ASSERT_EQUAL("Uff Wiederluege...\n",out.str());
+}
+\end{codeblock}
+The example also shows that a scope guard can be released early (that is the clean-up function is not called).
+
+\section{Other Functionality}
+In addition to the basic features shown above, \tcode{unique_resource_t} also provides various operators (cast, \tcode{->}, \tcode{()}, \tcode{*}, and accessor methods (\tcode{get}, \tcode{get_deleter}).  The most complicated of these is the \tcode{invoke()} member function which allows the "clean-up" function to be executed early, just as it would be at scope exit.  This function takes a parameter indicating whether or not the function should again be executed at scope exit.  The \tcode{reset(R\&\& resource)} member function that allows the resource value to be reset.
+
+As already shown in the examples, the expected method of construction is to use one of the two generator functions:
+\begin{itemize}
+\item \tcode{unique_resource(resources,deleter)} - non-checking instance, allows multiple parameters.
+\item \tcode{unique_resource_checked(resource, invalid_value,deleter)} - checked instance, allowing a resource which is validated to inhibit the call to the deleter function if invalid.
+\end{itemize}
+
+\section{What's not included}
+\tcode{unique_resource} does not do reference counting like \tcode{shared_ptr} does.  Though there is very likely a need for a class similar to \tcode{unique_resource} that includes reference counting it is beyond the scope of this proposal.
+
+One other limitation with \tcode{unique_resource} is that while the resources themselves may be \tcode{reset()}, the "deleter" or "clean-up" function/lambda can not be altered, because they are part of the type.  Generally there should be no need to reset the deleter, and especially with lambdas type matching would be difficult or impossible.
+
+\chapter{Impact on the Standard}
+This proposal is a pure library extension. Two new headers, \tcode{<scope_guard>} and \tcode{<unique_resource>} are proposed, but it does not require changes to any standard classes or functions. It does not require any changes in the core language, and it has been implemented in standard C++ conforming to C++14. Depending on the timing of the acceptance of this proposal, it might go into library fundamentals TS under the namespace std::experimental or directly in the working paper of the standard, once it is open again for future additions.
+
+\chapter{Design Decisions}
+\section{General Principles}
+The following general principles are formulated for \tcode{unique_resource_t}, and are valid for \tcode{scope_guard_t} correspondingly.
+\begin{itemize}
+\item Simplicity - Using \tcode{unique_resource_t} should be nearly as simple as using an unwrapped type.  The generator functions, cast operator, and accessors all enable this.
+\item Transparency - It should be obvious from a glance what each instance of a \tcode{unique_resource_t} object does.  By binding the resource to it's clean-up routine, the declaration of \tcode{unique_resource_t} makes its intention clear.
+\item Resource Conservation and Lifetime Management - Using \tcode{unique_resource_t} makes it possible to "allocate it and forget about it" in the sense that deallocation is always accounted for after the \tcode{unique_resource_t} has been initialized.
+\item Exception Safety - Exception unwinding is one of the primary reasons that \tcode{unique_resource_t} is needed.  Nevertheless the goal is to introduce a new container that will not throw during construction of the \tcode{unique_resource_t} itself. However, there are no intentions to provide safeguards for piecemeal construction of resource and deleter. If either fails, no unique_resource_t will be created, because the factory function unique_resource will not be called. It is not recommended to use \tcode{unique_resource()} factory with resource construction, functors or lambda capture types where creation, copying or moving might throw.
+\item Flexibility - \tcode{unique_resource} is designed to be flexible, allowing the use of lambdas or existing functions for clean-up of resources. 
+\end{itemize}
+
+\section{Prior Implementations}
+Please see N3677 from the May 2013 mailing (or http://www.andrewlsandoval.com/scope_exit/) for the previously proposed solution and implementation.  Discussion of N3677 in the (Chicago) Fall 2013 LEWG meeting led to the creation of \tcode{unique_resource} with the general agreement that such an implementation would be vastly superior to N3677 and would find favor with the LEWG.  Professor Sommerlad produced the implementation backing this proposal during the days following that discussion.
+
+N3677 has a more complete list of other prior implementations.
+
+N3830 provided an alternative approach to allow an arbitrary number of resources which was abandoned due to LEWG feedback 
+
+\section{Open Issues to be Discussed}
+\begin{itemize}
+\item Should there be a companion class for sharing the resource \tcode{shared_resource} ?  (Peter thinks no. Ville thinks it could be provided later anyway.)
+\item Should the proposed scope guard mechanism and unique resource go into (a) different header(s)?
+\item Should \tcode{~scope_guard_t()} and \tcode{unique_resource::invoke()} guard against deleter functions that throw with \tcode{try{ deleter(); }catch(...){}} (as now) or not?
+\item Does \tcode{scope_guard_t} need to be move-assignable? Peter doesn't think so.
+\end{itemize}
+
+
+\chapter{Technical Specifications}
+The following formulation is based on inclusion to the draft of the C++ standard. However, if it is decided to go into the Library Fundamentals TS, the position of the texts and the namespaces will have to be adapted accordingly, i.e., instead of namespace \tcode{std::} we suppose namespace \tcode{std::experimental::}.
+
+\section{Header}
+In section [utilities.general] add two extra rows to table 44 
+%%TODO clearer specification 
+\begin{table}[htdp]
+\caption{Table 44 - General utilities library summary}
+\begin{center}
+\begin{tabular}{|c|c|}
+\hline
+Subclause & Header\\
+\hline
+20.nn Scope Guard & \tcode{<scope_guard>}\\
+\hline
+20.nn+1 Unique Resource Wrapper & \tcode{<unique_resource>}\\
+\hline
+\end{tabular}
+\end{center}
+\label{utilities}
+\end{table}%
+
+\section{Additional sections}
+Add a two new sections to chapter 20 introducing the contents of the headers \tcode{<scope_guard>} and \tcode{<unique_resource>}.
+
+%\rSec1[utilities.scope_guard]{Scope Guard}
+\section{Scope Guard [utilities.scope_guard]}
+This subclause contains infrastructure for a generic scope guard.
+\synopsis{Header \tcode{<scope_guard>} synopsis}
+
+\pnum
+The header  \tcode{<scope_guard>} defines the class template \tcode{scope_guard_t} and the function template \tcode{scope_guard()} to create its instances.
+
+\begin{codeblock}
+namespace std {
+template <typename D>
+struct scope_guard_t {
+    // construction
+    explicit
+	scope_guard_t(D &&f) noexcept;
+	// clean up
+	~scope_guard_t();
+	// early release
+	void release() noexcept { shouldRun=false;}
+	// move 
+	scope_guard_t(scope_guard_t  &&rhs) noexcept;
+
+private:
+	scope_guard_t(scope_guard_t const &)=delete;
+	void operator=(scope_guard_t const &)=delete;
+	scope_guard_t& operator=(scope_guard_t &&)=delete;
+	D deleter;
+	bool shouldRun; // exposition only
+};
+// factory function
+template <typename D>
+scope_guard_t<D> scope_guard(D && deleter){
+	return scope_guard_t<D>{std::move(deleter)}; 
+}
+
+} // namespace std
+\end{codeblock}
+
+\pnum
+\enternote
+\tcode{scope_guard_t} is meant to be a universal scope guard to call its deleter function on scope exit.
+\exitnote
+
+%\rSec2[scope_guard.scope_guard_t]{Class Template \tcode{scope_guard_t}}
+\subsection {Class Template \tcode{scope_guard_t} [scope_guard.scope_guard_t]}
+\begin{itemdecl}
+explicit
+scope_guard_t(D &&f) noexcept;
+\end{itemdecl}
+
+\requires \tcode{f} is a parameter-less \tcode{noexcept} function (object).
+
+\pnum
+\effects constructs a scope_guard_t object that will call \tcode{f()} on its destruction if not \tcode{release()}ed prior to that.
+
+\begin{itemdecl}
+~scope_guard_t();
+\end{itemdecl}
+
+\pnum
+\effects calls \tcode{deleter()} unless \tcode{release()} was called.
+
+\begin{itemdecl}
+void release() noexcept;
+\end{itemdecl}
+
+\pnum
+\effects \tcode{shouldRun=false;}
+
+\begin{itemdecl}
+scope_guard_t(scope_guard_t  &&rhs) noexcept;
+\end{itemdecl}
+
+\pnum
+\effects Move constructs \tcode{deleter} from \tcode{rhs.deleter}. \tcode{shouldRun=rhs.shouldRun;}\tcode{rhs.release();}
+
+
+%%%--------- unique_resource
+
+%\rSec1[utilities.unique_resource]{Unique Resource Wrapper}
+\section{Unique Resource Wrapper [utilities.unique_resource]}
+This subclause contains infrastructure for a generic RAII resource wrapper.
+
+
+\synopsis{Header \tcode{<unique_resource>} synopsis}
+
+\pnum
+The header  \tcode{<unique_resource>} defines the class template \tcode{unique_resource_t}, the enumeration \tcode{invoke_it} and function templates \tcode{unique_resource()} and \tcode{unique_resource_checked()} to create its instances.
+
+\begin{codeblock}
+namespace std {
+enum class invoke_it { once, again };
+
+template<typename R,typename DELETER>
+class unique_resource_t {
+	R resource;
+	DELETER deleter; 
+	bool execute_on_destruction; // exposition only
+	unique_resource_t& operator=(unique_resource_t const &)=delete;
+	unique_resource_t(unique_resource_t const &)=delete; 
+public:
+	// construction
+	explicit
+	unique_resource_t(R && resource, DELETER && deleter, bool shouldrun=true) noexcept;
+	// move
+	unique_resource_t(unique_resource_t &&other) noexcept;
+	unique_resource_t& operator=(unique_resource_t  &&other) noexcept ;
+    // resource release
+	~unique_resource_t() ;
+	void invoke(invoke_it const strategy = invoke_it::once) noexcept ;
+	R const & release() noexcept;
+	void reset(R && newresource) noexcept ;
+	// resource access
+	R const & get() const noexcept ;
+	operator  R const &() const noexcept ;
+	R operator->() const noexcept ;
+ 	@\seebelow@ operator*() const;
+	// deleter access
+	const DELETER &	get_deleter() const noexcept;
+};
+
+//factories
+template<typename RES,typename DELETER>
+unique_resource_t<RES,DELETER>
+unique_resource( RES && r,DELETER t) {
+	return unique_resource_t<RES,DELETER>(std::move(r), std::move(t),true);
+}
+
+template<typename RES,typename DELETER>
+unique_resource_t<RES,DELETER>
+unique_resource_checked(RES r, RES invalid, DELETER t ) {
+	bool shouldrun=(r != invalid);
+	return unique_resource_t<RES,DELETER>(std::move(r), std::move(t), shouldrun);
+}
+} // namespace std
+\end{codeblock}
+
+\pnum
+\enternote
+\tcode{unique_resource_t} is meant to be a universal RAII wrapper for resource handles provided by an operating system or platform.
+Typically, such resource handles come with a factory function and a release function and are of trivial type.
+The release function together with the result of the factory function is used to create a scoped_resource variable, that on destruction will call the release function. Access to the underlying resource handle is achieved through a set of convenience functions or type conversion.
+\exitnote
+
+%\rSec2[unique_resource.unique_resource_t]{Class Template \tcode{unique_resource_t}}
+\subsection {Class Template \tcode{unique_resource_t} [unique_resource.unique_resource_t]}
+\begin{itemdecl}
+explicit
+unique_resource_t(R && resource, DELETER && deleter, bool shouldrun=true) noexcept;
+\end{itemdecl}
+
+\pnum
+\requires \tcode{deleter} is a function (object) taking \tcode{resource} as argument.
+
+\pnum
+\effects construct a unique_resource_t that will call \tcode{deleter(resource)} on its destruction if \tcode{shouldrun} is true.
+
+\begin{itemdecl}
+unique_resource_t(unique_resource_t &&other) noexcept;
+\end{itemdecl}
+
+\pnum
+\effects move construct a \tcode{unique_resource_t} by moving \tcode{other}'s members then calls\tcode{other.release()}.
+
+\begin{itemdecl}
+unique_resource_t& operator=(unique_resource_t  &&other) noexcept ;
+\end{itemdecl}
+
+\pnum
+\effects \tcode{this->invoke();} Moves all members from \tcode{other} then calls \tcode{other.release()}.
+
+\begin{itemdecl}
+~unique_resource_t() ;
+\end{itemdecl}
+
+\pnum
+\effects \tcode{this->invoke();}
+
+\begin{itemdecl}
+void invoke(invoke_it const strategy = invoke_it::once) noexcept;
+\end{itemdecl}
+
+\pnum
+\effects 
+\begin{codeblock}
+if (execute_on_destruction) try {
+	this->get_deleter()(resource);
+} catch(...){}
+execute_on_destruction=(strategy==invoke_it::again);
+\end{codeblock}
+
+\begin{itemdecl}
+R const & release() noexcept;
+\end{itemdecl}
+
+\pnum
+\effects \tcode{execute_on_destruction=false;}
+
+\pnum
+\returns \tcode{resource}
+
+\begin{itemdecl}
+void reset(R && newresource) noexcept ;
+\end{itemdecl}
+
+\pnum
+\effects 
+\begin{codeblock}
+this->invoke(invoke_it::again); 
+resource=std::move(newresource);
+\end{codeblock}
+
+\pnum
+\enternote This function takes the role of an assignment of a new resource.
+\exitnote
+
+\begin{itemdecl}
+R const & get() const noexcept ;
+operator  R const &() const noexcept ;
+R operator->() const noexcept ;
+\end{itemdecl}
+
+\pnum
+\requires \tcode{operator->} is only available if \\
+\tcode{is_pointer<R>::value \&\& (is_class<R>::value || is_union<R>::value)} is \tcode{true}. 
+
+\pnum
+\returns \tcode{resource}.
+
+\begin{itemdecl}
+@\seebelow@  operator*() const noexcept;
+\end{itemdecl}
+
+\pnum
+\requires This function is only available if \tcode{is_pointer<R>::value} is \tcode{true}. 
+
+\pnum
+\returns \tcode{*this->get()}. 
+\\Return type is \tcode{std::add_lvalue_reference_t<std::remove_pointer_t<R>>}
+
+
+\begin{itemdecl}
+const DELETER & get_deleter() const noexcept;
+\end{itemdecl}
+
+\pnum
+\returns \tcode{deleter}
+
+
+
+\chapter{Appendix: Example Implementations}
+\section{Scope Guard}
+\begin{codeblock}
+#ifndef SCOPE_GUARD_H_
+#define SCOPE_GUARD_H_
+
+// modeled slightly after Andrescu's talk and article(s)
+
+namespace std{
+namespace experimental{
+
+template <typename D>
+struct scope_guard_t {
+	explicit
+	scope_guard_t(D &&f) noexcept
+	:deleter(std::move(f))
+	,shouldRun{true}{}
+	~scope_guard_t(){
+		if (shouldRun)
+			try{
+				deleter();
+			}catch(...){}
+	}
+	void release() noexcept { shouldRun=false;}
+	scope_guard_t(scope_guard_t  &&rhs) noexcept
+	:deleter(std::move(rhs.deleter))
+	,shouldRun{rhs.shouldRun}{
+		rhs.release();
+	}
+
+private:
+	scope_guard_t(scope_guard_t const &)=delete;
+	void operator=(scope_guard_t const &)=delete;
+	scope_guard_t& operator=(scope_guard_t &&)=delete;
+	D deleter;
+	bool shouldRun; // exposition only
+};
+
+// usage: auto guard=scope_guard([]{ std::cout << "done.";});
+template <typename D>
+scope_guard_t<D> scope_guard(D && deleter){
+	return scope_guard_t<D>(std::move(deleter)); // fails with curlies
+}
+
+}
+}
+
+#endif /* SCOPE_GUARD_H_ */
+
+
+\end{codeblock}
+
+
+\section{Unique Resource}
+\begin{codeblock}
+#ifndef UNIQUE_RESOURCE_H_
+#define UNIQUE_RESOURCE_H_
+
+namespace std{
+namespace experimental{
+enum class invoke_it { once, again };
+
+template<typename R,typename DELETER>
+class unique_resource_t {
+	R resource;
+	DELETER deleter; // deleter must be void(R) noexcept compatible
+	bool execute_on_destruction; // exposition only
+	unique_resource_t& operator=(unique_resource_t const &)=delete;
+	unique_resource_t(unique_resource_t const &)=delete; // no copies!
+public:
+	// construction
+	explicit
+	unique_resource_t(R && resource, DELETER && deleter, bool shouldrun=true) noexcept
+		:  resource(std::move(resource))
+		,  deleter(std::move(deleter))
+		, execute_on_destruction{shouldrun}{}
+	// move
+	unique_resource_t(unique_resource_t &&other) noexcept
+	:resource(std::move(other.resource))
+	,deleter(std::move(other.deleter))
+	,execute_on_destruction{other.execute_on_destruction}{
+		other.release();
+	}
+	unique_resource_t& operator=(unique_resource_t  &&other) noexcept {
+		this->invoke(invoke_it::once);
+		deleter=std::move(other.deleter);
+		resource=std::move(other.resource);
+		execute_on_destruction=other.execute_on_destruction;
+		other.release();
+		return *this;
+	}
+    // resource release
+	~unique_resource_t() {
+		this->invoke(invoke_it::once);
+	}
+	void invoke(invoke_it const strategy = invoke_it::once) noexcept {
+		if (execute_on_destruction) {
+			try {
+				this->get_deleter()(resource);
+			} catch(...){}
+		}
+		execute_on_destruction = strategy==invoke_it::again;
+	}
+	R const & release() noexcept{
+		execute_on_destruction = false;
+		return this->get();
+	}
+	void reset(R && newresource) noexcept {
+		invoke(invoke_it::again);
+		resource = std::move(newresource);
+	}
+
+	// resource access
+	R const & get() const noexcept {
+		return resource;
+	}
+	operator  R const &() const noexcept {
+		return resource;
+	}
+	R operator->() const noexcept {
+		return resource;
+	}
+	std::add_lvalue_reference_t<
+		std::remove_pointer_t<R>>
+	operator*() const {
+		return * resource;
+	}
+
+	// deleter access
+	const DELETER &
+	get_deleter() const noexcept {
+		return deleter;
+	}
+};
+
+//factories
+template<typename RES,typename DELETER>
+unique_resource_t<RES,DELETER>
+unique_resource( RES && r,DELETER t) {
+	return unique_resource_t<RES,DELETER>(std::move(r), std::move(t),true);
+}
+
+template<typename RES,typename DELETER>
+unique_resource_t<RES,DELETER>
+unique_resource_checked(RES r, RES invalid, DELETER t ) {
+	auto shouldrun=(r != invalid);
+	return unique_resource_t<RES,DELETER>(std::move(r), std::move(t), shouldrun);
+}
+
+}}
+#endif /* UNIQUE_RESOURCE_H_ */
+
+\end{codeblock}
+
+
+\end{document}
+
