@@ -337,7 +337,7 @@ public:
 // factory functions
 template<typename DELETER, typename ... R>
 	auto make_scoped_resource(DELETER t, R ... r) {
-	return scoped_resource<DELETER, R...>(std::move(t), std::move(r)...);
+	return scoped_resource<DELETER, R...>(std::move(t), std::move®...,true);
 }
 
 template<typename DELETER, typename RES>
@@ -452,15 +452,25 @@ resource=make_tuple(move(newresource)...);
 
 \begin{itemdecl}
 	@\seebelow@  operator*() const noexcept;
-	@\seebelow@  operator->() const noexcept;
 \end{itemdecl}
 
 \pnum
-\requires These functions are only available if \tcode{is_pointer<tuple_element_t<0,tuple<R...>>>::value} is \tcode{true}. The second one only applies if the return type is a class or union type.
+\requires This functions are only available if \tcode{is_pointer<tuple_element_t<0,tuple<R...>>>::value} is \tcode{true}. 
 
 \pnum
 \returns \tcode{*get<0>(resource)}
 \\Return type is \tcode{decltype(*get<0>(resource))}. 
+
+\begin{itemdecl}
+	@\seebelow@  operator->() const noexcept;
+\end{itemdecl}
+
+\pnum
+\requires These functions are only available if \tcode{is_pointer<tuple_element_t<0,tuple<R...>>>::value} is \tcode{true} and one only applies if the underlying type is a class or union type.
+
+\pnum
+\returns \tcode{get<0>(resource)}
+\\Return type is \tcode{decltype(get<0>(resource))}. 
 
 \begin{itemdecl}
 	const DELETER & get_deleter() const noexcept;
