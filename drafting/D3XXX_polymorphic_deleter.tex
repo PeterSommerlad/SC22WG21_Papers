@@ -46,7 +46,7 @@ Something on shared_ptr vs. unique_ptr
 
 While \tcode{std::unique_ptr} can be tweaked by using a custom deleter type to a handler for polymorphic types, it is awkward to use as such, because such a custom deleter is missing from the standard library. API's would need to provide such a handler and different libraries will definitely have different such implementations. In addition to a standardized alias template for unique_ptr with a different deleter, a corresponding factory function for polymorphic types, remembering the created object type in the deleter is required.
 
-This proposal introduces \tcode{unique_poly_ptr<T>} as a template alias for \tcode{uniqe_ptr<T,polymorphic_deleter<T>>} and \tcode{make_unique_poly<T>(...)} as a factory function for it. The polymorphic_deleter is not specified as such, to enable implementors creative and more efficient implementations, i.e., storing the deleter object in the allocated memory instead of the handle object, like shared_ptr implementations can do, when allocated with make_shared.
+This proposal introduces \tcode{unique_poly_ptr<T>} as a template alias for \tcode{uniqe_ptr<T,polymorphic_delete>} and \tcode{make_unique_poly<T>(...)} as a factory function for it. The polymorphic_deleter is not specified as such, to enable implementors creative and more efficient implementations, i.e., storing the deleter object in the allocated memory instead of the handle object, like shared_ptr implementations can do, when allocated with make_shared.
 
 \chapter{Impact on the Standard}
 This proposal is a pure library extension to header <memory> or its corresponding header for an upcoming library TS.  It does not require any changes in the core language, and it has been implemented in standard C++ conforming to C++14. Depending on the timing of the acceptance of this proposal, it might go into the library fundamentals TS under the namespace std::experimental, a follow up library TS or directly in the working paper of the standard, once it is open again for future additions.
@@ -118,6 +118,28 @@ public:
 };
 }
 \end{codeblock}
+
+
+In section [unique.ptr] append a subsection [unique.ptr.poly] for the unique pointers for polymorphic types.
+
+%\rSec1[unique.ptr.poly]{\tcode{unique_ptr} for polymorphic types}
+\section{\tcode{unique_ptr} for polymorphic types [unique.ptr.poly]}
+\pnum
+This subclause contains infrastructure for a creating unique pointers for polymorphic types without the need to define a base class virtual destructor.\\
+
+\begin{itemdecl}
+template<typename T, typename... Args>
+unique_poly_ptr<T> make_unique_poly(Args&&... args);
+
+\end{itemdecl}
+
+\pnum
+\returns \tcode{unique_ptr<T, polymorphic_delete>(new T(forward<Args>(args)...), static_cast<T*>(nullptr))}.
+
+\pnum
+\enternote
+A \tcode{unique_poly_ptr<Derived>} created with make_unique_poly can be assigned safely to a \tcode{unique_poly_ptr<Base>}, even when Base doesn't have a virtual destructor. This allows for example to have an efficient container with \tcode{uniqe_poly_ptr<Base>} without the overhead of \tcode{shared_ptr<Base>}.
+\exitnote
 
 
 \chapter{Appendix: Example Implementations}
