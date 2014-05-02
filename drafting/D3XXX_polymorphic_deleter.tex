@@ -1,0 +1,129 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}	% See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}	% ... or a4paper or a5paper or ... 
+%\geometry{landscape}	% Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}	% Activate to begin paragraphs with an empty line rather than an indent
+
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{D3XX 2014-05-28}{D3XXX 2014-05-28}
+
+\title{D3XXX - Polymorphic Deleter for Unique Pointers}
+\author{Marco Arena and Peter Sommerlad}
+\date{2014-05-28}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: & D3XXX \\\hline
+Date: & 2014-05-28 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+
+\chapter{Introduction}
+
+Something on Peter Sommerlad's \emph{Rule of Zero}...
+
+Something on deleted copy/move operations when a destructor is defined. Makes writing polymorphic base classes tricky, even when copying is not really useful of such. But will prohibit easy implementation of Template Method design pattern, where subclasses only need to fill in some algorithm steps with member functions and no data.
+
+Something on shared_ptr vs. unique_ptr
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item We need to thank Marco Arena for writing a blog article on how to enable Peter Sommerlad's \emph{Rule of Zero} for unique_ptr. \footnote{{http://marcoarena.wordpress.com/2014/04/12/ponder-the-use-of-unique_ptr-to-enforce-the-rule-of-zero/}}
+%\item Gratitude is also owed to members of the LEWG participating in the February 2014 (Issaquah) and Fall 2013 (Chicago) meeting for their support, encouragement, and suggestions that have led to this proposal.
+\item Thanks also to members of the mailing lists who gave feedback. 
+\end{itemize}
+
+\chapter{Motivation and Scope}
+
+While \tcode{std::unique_ptr} can be tweaked by using a custom deleter type to a handler for polymorphic types, it is awkward to use as such, because such a custom deleter is missing from the standard library. API's would need to provide such a handler and different libraries will definitely have different such implementations. In addition to a standardized alias template for unique_ptr with a different deleter, a corresponding factory function for polymorphic types, remembering the created object type in the deleter is required.
+
+This proposal introduces \tcode{unique_poly_ptr<T>} as a template alias for \tcode{uniqe_ptr<T,polymorphic_deleter<T>>} and \tcode{make_unique_poly<T>(...)} as a factory function for it. The polymorphic_deleter is not specified as such, to enable implementors creative and more efficient implementations, i.e., storing the deleter object in the allocated memory instead of the handle object, like shared_ptr implementations can do, when allocated with make_shared.
+
+\chapter{Impact on the Standard}
+This proposal is a pure library extension to header <memory> or its corresponding header for an upcoming library TS.  It does not require any changes in the core language, and it has been implemented in standard C++ conforming to C++14. Depending on the timing of the acceptance of this proposal, it might go into the library fundamentals TS under the namespace std::experimental, a follow up library TS or directly in the working paper of the standard, once it is open again for future additions.
+
+\chapter{Design Decisions}
+
+\section{Open Issues to be Discussed}
+\begin{itemize}
+\item Are the names chosen appropriate. Potential alternative candidates are: unique_object, unique_polymorphic_ptr, unique_object_ptr
+\item Is it useful or even desirable to have array support for unique_poly_ptr. Peter doesn't think so, but we might need to specify this limitation explicitly.
+\end{itemize}
+
+
+\chapter{Technical Specifications}
+The following formulation is based on inclusion to the draft of the C++ standard. However, if it is decided to go into the Library Fundamentals TS, the position of the texts and the namespaces will have to be adapted accordingly, i.e., instead of namespace \tcode{std::} we suppose namespace \tcode{std::experimental::}.
+
+\section{Changes to [unique.ptr] }
+In section [unique.ptr] add the following to the \tcode{uniqe_ptr} synopsis in corresponding places.
+
+\begin{codeblock}
+namespace std{
+
+struct polymorphic_delete;
+
+template<typename T>
+unique_poly_ptr=unique_ptr<T,polymorphic_delete>;
+
+template<typename T, typename... Args>
+unique_poly_ptr<T> make_unique_poly(Args&&... args);
+
+}
+\end{codeblock}
+
+In section [unique.ptr.dltr] add a subsection [unique.ptr.dltr.poly] for polymorphic_delete.
+
+%\rSec1[unique.ptr.dltr.poly]{\tcode{polymorphic_delete}}
+\section{\tcode{polymorphic_delete} [unique.ptr.dltr.poly]}
+\pnum
+This subclause contains infrastructure for a polymorphic deleter.\\
+
+\pnum
+\enternote
+\tcode{polymorphic_delete} is meant to be a deleter for safe conversion of \tcode{unique_ptr<Derived}> to \tcode{unique_ptr<Base>} even when the Base class doesn't define a virtual destructor.
+\exitnote
+
+\begin{codeblock}
+namespace std{
+
+class polymorphic_delete{
+   using del_t = void(*)(void*); // exposition only
+   del_t del_; // exposition only
+ 
+   template <typename T>
+   static void delete_it(void *p) // exposition only
+   {
+      delete static_cast<T*>(p);
+   }
+public:
+   template<typename T>
+   polymorphic_delete(T*) noexcept
+     : del_(&delete_it<T>)
+   {}
+ 
+   void operator()(void* ptr) const
+   {
+     (*del_)(ptr);
+   }
+
+};
+}
+\end{codeblock}
+
+
+\chapter{Appendix: Example Implementations}
+\section{TBD}
+\begin{codeblock}
+\end{codeblock}
+
+\end{document}
+
