@@ -1,0 +1,282 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}	% See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}	% ... or a4paper or a5paper or ... 
+%\geometry{landscape}	% Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}	% Activate to begin paragraphs with an empty line rather than an indent
+
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{N3974 2014-05-28}{N3974 2014-05-28}
+
+\title{N3974 - Polymorphic Deleter for Unique Pointers}
+\author{Marco Arena, Davide di Gennaro and Peter Sommerlad}
+\date{2014-05-28}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: & N3974 \\\hline
+Date: & 2014-05-28 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+
+\chapter{Introduction and Motivation}
+
+Special member functions, i.e., move/copy constructors and assignment operators will not/no longer be compiler provided if a destructor is defined. However, currently all text books and compiler warnings propose to define a virtual destructor when one defined a polymorphic base class with other virtual functions. Some IDEs even automatically generate class frames consisting only of a default constructor and a virtual destructor. 
+
+In C++98 the \emph{"Rule of Three"} was the best practice to get consistent behavior from a class that either required a destructor or a copy constructor or copy assignment. Beginning with C++11 move semantics complicated the situation. Peter Sommerlad therefore promotes a \emph{Rule of Zero} that tells "normal" classes to be written in a way that neither a destructor nor a copy or move operation needs to be user-defined. That means, classes need to be written in a way that compiler-provided defaults just work\texttrademark .
+
+However, with heap-allocated polymorphic types in C++11 code this means one needs to use \tcode{shared_ptr<Base>} and \tcode{make_shared<Derived>} to avoid the need to define a virtual destructor for \tcode{Base}. There is no standard deleter for unique_ptr that will allow to safely use \tcode{unique_ptr<Base>} if Base doesn't define a virtual destructor. Such a mis-use is not even detectable easily.
+
+This proposal tries to ease the burden for programmers of heap allocated polymorphic classes and gives them the option to use unique_ptr with a standard provided deleter classes that either check correct provisioning of a virtual destructor in the base class or provide a slight overhead infrastructure for save deletes (1 extra function pointer). 
+
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item We need to thank Marco Arena for writing a blog article on how to enable Peter Sommerlad's \emph{Rule of Zero} for unique_ptr. 
+\footnote{{http://marcoarena.wordpress.com/2014/04/12/ponder-the-use-of-unique_ptr-to-enforce-the-rule-of-zero/}}
+%\item Gratitude is also owed to members of the LEWG participating in the February 2014 (Issaquah) and Fall 2013 (Chicago) meeting for their support, encouragement, and suggestions that have led to this proposal.
+\item Thanks for Davide di Gennaro for proposing the deleter with safeguard against missing virtual destructors in bases.
+\item Thanks also to members of the mailing lists who gave feedback. 
+\end{itemize}
+
+\chapter{Scope}
+
+While \tcode{std::unique_ptr} can be tweaked by using a custom deleter type to a handler for polymorphic types, it is awkward to use as such, because such a custom deleter is missing from the standard library. API's would need to provide such a handler and different libraries will definitely have different such implementations. In addition to a standardized alias template for unique_ptr with a different deleter, a corresponding factory function for polymorphic types, remembering the created object type in the deleter is required.
+
+For promoting the \emph{Rule of Zero}, this proposal introduces \tcode{unique_poly_ptr<T>} as a template alias for \tcode{uniqe_ptr<T,polymorphic_delete>} and \tcode{make_unique_poly<T>(...)} as a factory function for it. The polymorphic_delete deleter is not specified in detail, to enable implementors creative and more efficient implementations, i.e., storing the deleter object in the allocated memory instead of the handle object, like shared_ptr implementations can do, when allocated with make_shared. However, this only moves the memory overhead of 1 extra pointer from the handle object to heap memory.
+
+For more classic code with Base classes with a virtual destructor, this proposal introduces safe_delete deleter, that is limiting a u\tcode{nique_ptr<Base,safe_delete<Base>>} move of a \tcode{unique_ptr<Derived,safe_delete<Derived>>} if \tcode{Base} has a virtual destructor.
+
+\chapter{Impact on the Standard}
+This proposal is a pure library extension to header <memory> or its corresponding header for an upcoming library TS.  It does not require any changes in the core language, and it has been implemented in standard C++ conforming to C++14. Depending on the timing of the acceptance of this proposal, it might go into the library fundamentals TS under the namespace std::experimental, a follow up library TS or directly in the working paper of the standard, once it is open again for future additions.
+
+\chapter{Design Decisions}
+
+\section{Open Issues to be Discussed}
+\begin{itemize}
+\item Are the names chosen appropriate. Potential alternative candidates are: unique_object, unique_polymorphic_ptr, unique_object_ptr
+\item Is it useful or even desirable to have array support for unique_poly_ptr. Peter doesn't think so, but we might need to specify this limitation explicitly.
+\end{itemize}
+
+
+\chapter{Technical Specifications}
+The following formulation is based on inclusion to the draft of the C++ standard. However, if it is decided to go into the Library Fundamentals TS, the position of the texts and the namespaces will have to be adapted accordingly, i.e., instead of namespace \tcode{std::} we suppose namespace \tcode{std::experimental::}.
+
+\section{Changes to [unique.ptr] }
+In section [unique.ptr] add the following to the \tcode{uniqe_ptr} synopsis in corresponding places.
+
+\begin{codeblock}
+namespace std{
+
+struct polymorphic_delete;
+
+template<typename T>
+unique_poly_ptr=unique_ptr<T,polymorphic_delete>;
+
+template<typename T, typename... Args>
+unique_poly_ptr<T> make_unique_poly(Args&&... args);
+
+template <class T>
+struct  safe_polymorphic_delete;
+
+template<typename T>
+using unique_safe_ptr=std::unique_ptr<T,safe_polymorphic_delete<T>>;
+
+template<typename T,typename ...ARGS>
+unique_safe_ptr<T> make_unique_safe(ARGS&&...args);
+
+}
+\end{codeblock}
+
+In section [unique.ptr.dltr] add a subsection [unique.ptr.dltr.poly] for polymorphic_delete.
+
+%\rSec1[unique.ptr.dltr.poly]{\tcode{polymorphic_delete}}
+\section{\tcode{polymorphic_delete} [unique.ptr.dltr.poly]}
+\pnum
+This subclause contains infrastructure for a polymorphic deleter.\\
+
+\pnum
+\enternote
+\tcode{polymorphic_delete} is meant to be a deleter for safe conversion of \tcode{unique_ptr<Derived}> to \tcode{unique_ptr<Base>} even when the Base class doesn't define a virtual destructor. It will incur one function pointer overhead.
+\exitnote
+
+\begin{codeblock}
+namespace std{
+
+struct polymorphic_delete {
+	void (*del)(void *) noexcept; // exposition only
+	template<typename T>
+	polymorphic_delete(T *) 
+	: del { [](void *p) noexcept {
+			        delete static_cast<T*>(p);} } // exposition only
+	{}
+	void operator()(void *p) const noexcept
+	{del(p);}
+};
+}
+\end{codeblock}
+
+
+In section [unique.ptr] append a subsection [unique.ptr.poly] for the unique pointers for polymorphic types.
+
+%\rSec1[unique.ptr.poly]{\tcode{unique_ptr} for polymorphic types}
+\section{\tcode{unique_ptr} for polymorphic types [unique.ptr.poly]}
+\pnum
+This subclause contains infrastructure for a creating unique pointers for polymorphic types without the need to define a base class virtual destructor.\\
+
+\begin{itemdecl}
+template<typename T, typename... Args>
+unique_poly_ptr<T> make_unique_poly(Args&&... args);
+
+\end{itemdecl}
+
+\pnum
+\effects works like make_unique but will store a deleter function that deletes a T*.
+\\
+\pnum
+\returns \tcode{unique_ptr<T, polymorphic_delete>(new T(forward<Args>(args)...), static_cast<T*>(nullptr))}.
+\\
+
+\pnum
+\enternote
+A \tcode{unique_poly_ptr<Derived>} created with make_unique_poly can be assigned safely to a \tcode{unique_poly_ptr<Base>}, even when Base doesn't have a virtual destructor. This allows for example to have an efficient container with \tcode{uniqe_poly_ptr<Base>} without the overhead of \tcode{shared_ptr<Base>}.
+\exitnote
+
+
+%%%% safe_polymorphic_delete etc.
+In section [unique.ptr.dltr] add a subsection [unique.ptr.dltr.safe] for safe_polymorphic_delete.
+\\
+
+%\rSec1[unique.ptr.dltr.safe]{\tcode{safe_polymorphic_delete}}
+\section{\tcode{safe_polymorphic_delete} [unique.ptr.dltr.safe]}
+\pnum
+This subclause contains infrastructure for a deleter for polymorphic types that ensures a base class defines a virtual destructor.\\
+
+\pnum
+\enternote
+\tcode{safe_polymorphic_delete} is meant to be a deleter for safe conversion of \tcode{unique_ptr<Derived}> to \tcode{unique_ptr<Base>}. Such a conversion will not compile, if \tcode{Base} does not have a virtual destructor.
+\exitnote
+
+\begin{codeblock}
+namespace std{
+template <class T>
+struct  safe_polymorphic_delete {
+    constexpr safe_polymorphic_delete() noexcept = default;
+    template <class U>
+         safe_polymorphic_delete(
+              const safe_polymorphic_delete<U>&
+             ,typename std::enable_if_t<
+             	 std::is_same<U,T>{}()||
+             	 (std::is_convertible<U*, T*>{}()
+             	  &&  std::has_virtual_destructor<T>{}()
+            	  )>* = 0
+          ) noexcept {}
+     void operator() (T* __ptr) const noexcept
+     { delete __ptr; }
+};
+}
+\end{codeblock}
+
+
+\begin{itemdecl}
+template <class U>
+safe_polymorphic_delete(const safe_polymorphic_delete<U>&) noexcept 
+\end{itemdecl}
+\pnum
+\effects This constructor is only available, when either \tcode{T} and \tcode{U} are the same or \tcode{U*} is convertible to \tcode{T*} and \tcode{T} provides a virtual destructor.
+\\
+\pnum
+\enternote
+That constructor will be applied by unique_ptr's move-construction/assignment operations and thus prohibits such a move, when the base class doesn't provide a virtual destructor.
+\exitnote
+
+
+In section [unique.ptr] append a subsection [unique.ptr.safe] for the safe unique pointers for polymorphic types.
+\\
+
+%\rSec1[unique.ptr.safe]{Safe \tcode{unique_ptr} for polymorphic types}
+\section{Safe \tcode{unique_ptr} for polymorphic types [unique.ptr.safe]}
+\pnum
+This subclause contains infrastructure for a creating unique pointers for polymorphic types that only work if a base class provides a virtual destructor.\\
+
+\begin{itemdecl}
+template<typename T,typename ...ARGS>
+unique_safe_ptr<T> make_unique_safe(ARGS&&...args);
+\end{itemdecl}
+
+\pnum
+\effects works like make_unique but will keep safe_polymorphic_deleter<T>. 
+\\
+
+\pnum
+\returns \tcode{unique_ptr<T, safe_polymorphic_delete<T>>(new T(forward<Args>(args)...))}.
+\\
+
+\pnum
+\enternote
+A \tcode{unique_safe_ptr<Derived>} created with make_unique_safe can only be assigned to a \tcode{unique_safe_ptr<Base>} when Base has a virtual destructor. There is no run-time overhead.
+\exitnote
+
+
+
+\chapter{Appendix: Example Implementations}
+%\section{TBD}
+Note the polymorphic_delete implementation uses a naive approach making the unique_ptr bigger, twice as big. An more sophisticated implementation can follow make_shared and keep the deleter function pointer on the heap with the allocated object.
+
+\begin{codeblock}
+struct polymorphic_delete {
+	void (*del)(void *)noexcept; // exposition only
+	template<typename T>
+	polymorphic_delete(T *) :
+			del { [](void *p) noexcept {delete static_cast<T*>(p);} } {
+	}
+	void operator()(void *p) const
+	{del(p);}
+};
+template<typename T>
+using unique_poly_ptr=std::unique_ptr<T,polymorphic_delete>;
+template <typename T, typename ...ARGS>
+unique_poly_ptr<T> make_unique_poly(ARGS&&...args){
+	return 
+	  unique_poly_ptr<T>{new T(std::forward<ARGS>(args)...)
+	    ,static_cast<T*>(nullptr)};
+}
+//borrowed from libc++ default_delete:
+template <class T>
+struct  safe_polymorphic_delete
+{
+    constexpr safe_polymorphic_delete() noexcept = default;
+    template <class U>
+         safe_polymorphic_delete(const safe_polymorphic_delete<U>&
+             , std::enable_if_t<
+             	 std::is_same<U,T>{}()||
+             	 (std::is_convertible<U*, T*>{}()
+             	  &&  std::has_virtual_destructor<T>{}()
+            	  )>* = 0
+             	  ) noexcept {}
+     void operator() (T* __ptr) const noexcept
+        {
+            static_assert(sizeof(T) > 0, "safe_delete can not delete incomplete type");
+            static_assert(!std::is_void<T>::value, "safe_delete can not delete incomplete type");
+            delete __ptr;
+        }
+};
+template<typename T>
+using unique_safe_ptr=std::unique_ptr<T,safe_polymorphic_delete<T>>;
+template<typename T,typename ...ARGS>
+unique_safe_ptr<T> make_unique_safe(ARGS&&...args){
+	return unique_safe_ptr<T>{new T(std::forward<ARGS>(args)...)};
+}
+
+\end{codeblock}
+
+\end{document}
+
