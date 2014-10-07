@@ -1,0 +1,671 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<!-- saved from url=(0071)file:///Users/sop/Documents/C++WG21/SC22WG21_Papers/drafting/D4069.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+
+
+
+<style type="text/css">
+
+body {
+  color: #000000;
+  background-color: #FFFFFF;
+}
+
+del {
+  text-decoration: line-through;
+  color: #8B0040;
+}
+ins {
+  text-decoration: underline;
+  color: #005100;
+}
+
+p.example {
+  margin: 2em;
+}
+pre.example {
+  margin: 2em;
+}
+div.example {
+  margin: 2em;
+}
+
+code.extract {
+  background-color: #F5F6A2;
+}
+pre.extract {
+  margin: 2em;
+  background-color: #F5F6A2;
+  border: 1px solid #E1E28E;
+}
+
+p.function {
+}
+
+p.attribute {
+  text-indent: 3em;
+}
+
+blockquote.std {
+  color: #000000;
+  background-color: #F1F1F1;
+  border: 1px solid #D1D1D1;
+  padding: 0.5em;
+}
+
+blockquote.stddel {
+  text-decoration: line-through;
+  color: #000000;
+  background-color: #FFEBFF;
+  border: 1px solid #ECD7EC;
+  padding: 0.5em;
+}
+
+blockquote.stdins {
+  text-decoration: underline;
+  color: #000000;
+  background-color: #C8FFC8;
+  border: 1px solid #B3EBB3;
+  padding: 0.5em;
+}
+
+table {
+  border: 1px solid black;
+  border-spacing: 0px;
+  margin-left: auto;
+  margin-right: auto;
+}
+th {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.2em;
+  border: none;
+}
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.2em;
+  border: none;
+}
+
+</style>
+
+<title>C++ Ostream Buffers</title>
+</head>
+<body>
+<h1>C++ Ostream Buffers</h1>
+
+<p>
+ISO/IEC JTC1 SC22 WG21 N4069 - 2014-06-18
+</p>
+
+<p>
+Lawrence Crowl, Lawrence@Crowl.org<br>
+Peter Sommerlad, Peter.Sommerlad@hsr.ch
+</p>
+
+<p>
+<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#Introduction">Introduction</a><br>
+<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#Solution">Solution</a><br>
+<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#Design">Design</a><br>
+<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#Wording">Wording</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#string.stream.overview">27.8.1 Overview [string.stream.overview]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#ostream.buffer">27.8.8 Class template <code>basic_ostream_buffer</code> [ostream.buffer]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#ostream.buffer.ctor">27.8.8.1 Constructor [ostream.buffer.ctor]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#ostream.buffer.dtor">27.8.8.2 Destructor [ostream.buffer.dtor]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#ostream.buffer.mfun">27.8.8.2 Member Functions [ostream.buffer.mfun]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#ostream.noteflush.stringbuf">27.8.9 Class template <code>noteflush_stringbuf</code> [ostream.noteflush.stringbuf]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#ostream.noteflush.stringbuf.mfun">27.8.9.1 Member Functions [ostream.noteflush.stringbuf.mfun]</a><br>
+<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#Revisions">Revisions</a><br>
+<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#References">References</a><br>
+</p>
+
+
+<h2><a name="Introduction">Introduction</a></h2>
+
+<p>
+At present,
+stream output operations guarantee that they will not produce race conditions,
+but do not guarantee that the effect will be sensible.
+Some form of external synchronization is required.
+Unfortunately, without a standard mechanism for synchronizing,
+independently developed software will be unable to synchronize.
+</p>
+
+<p>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3535.html">
+N3535 C++ Stream Mutexes</a>
+proposed a standard mechanism for finding and sharing a mutex on streams.
+At the Spring 2013 standards meeting,
+the Concurrency Study Group requested a change
+away from a full mutex definition
+to a definition that also enabled buffering.
+</p>
+
+<p>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3678.html">
+N3678 C++ Stream Guards</a>
+proposed a standard mechanism for batching operations on a stream.
+That batching may be implemented as mutexees, as buffering,
+or some combination of both.
+It was the response to the Concurrency Study Group.
+A draft of that paper was reviewed in the Library Working Group,
+who found too many open issues on what was reasonably exposed
+to the 'buffering' part.
+</p>
+
+<p>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3665.html">
+N3665 Uninterleaved Sring Output Streaming</a>
+proposed making streaming of strings of length less than <code>BUFSIZ</code>
+appear uninterleaved in the output.
+It was a "minimal" functionality change to the existing standard
+to address the problem.
+The full Committee chose not to adopt that minimal solution.
+</p>
+
+<p>
+The general consensus in the July 2013 meeting of the Concurrency Study Group
+was that buffering should be explicit.
+<p>
+N3978 proposed such an explicit buffering. This updated paper fixes some of the issues raised by SG1 and Daniel Krügler.
+</p></p>
+
+
+<h2><a name="Solution">Solution</a></h2>
+
+<p>
+We propose a <code>basic_ostream_buffer</code>,
+that provides 
+buffering output operations for a wrapped stream.
+The <code>basic_ostream_buffer</code>,
+will atomically transfer the contents
+of the internal stream buffer <code>noteflush_stringbuf</code> to an <code>ostream</code>
+on destruction of the <code>basic_ostream_buffer</code>.
+</p>
+
+<p>
+The transfer on destruction
+simplifies the code and
+ensures at least some output in the presence of an exception.
+</p>
+
+<p>
+The intent is that the <code>basic_ostream_buffer</code>
+is an automatic-duration variable
+with a relatively small scope
+which constructs the text to appear uninterleaved.
+For example,
+</p>
+<pre class="example">....
+<code>{
+  std::ostream_buffer bout(std::cout);
+  bout &lt;&lt; "Hello, " &lt;&lt; "World!" &lt;&lt; std::endl;
+}</code>
+....
+</pre>
+
+<h2><a name="Design">Design</a></h2>
+
+<p>
+We follow typical stream conventions
+of <code>basic_</code> prefixes and typedefs.
+</p>
+
+<p>
+The constructors for <code>ostream_buffer</code>
+take non-const references
+to either a <code>basic_ostream</code>
+or a <code>basic_ostream_buffer</code>.
+This non-const reference indicates that
+the destruction of the buffer
+may write to the stream associated with the argument.
+</p>
+
+<p>
+The constructors for <code>ostream_buffer</code>
+from another <code>ostream_buffer</code>
+is not a copy constructor,
+but an attachment too the argument buffer.
+This approach enables nested
+passing an <code>ostream_buffer</code>
+to a function expecting an <code>ostream</code>,
+which then in turn uses an <code>ostream_buffer</code>
+on that <code>ostream</code>
+</p>
+
+<p>
+The wording below
+permits implementation of <code>basic_ostream_buffer</code>
+with either a <code>stream_mutex</code>
+from
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3535.html">
+N3535</a>
+or with implementations suitable for
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3665.html">
+N3665</a>,
+e.g. with Posix file locks
+<a href="file:///Users/sop/Library/Containers/com.apple.mail/Data/Library/Mail%20Downloads/9C1303C8-3634-413F-B196-24A58CDC5A42/n3978r1.html#PSL">[PSL]</a>
+</p>
+
+
+<h2><a name="Wording">Wording</a></h2>
+
+<p>
+This wording is relative to N3691.
+</p>
+
+
+<h3><a name="string.stream.overview">27.8.1 Overview [string.stream.overview]</a></h3>
+
+<p>
+Edit within paragraph 1 as follows.
+</p>
+
+<blockquote class="std">
+<p>
+The header <code>&lt;sstream&gt;</code>
+defines four class templates and eight types
+that associate stream buffers with objects
+of class <code>basic_string</code>, as described in 21.3.
+<ins>
+It also defines a class template <code>basic_ostream_buffer</code>
+to buffer output and pass the buffered content
+into an <code>ostream</code>
+on destruction or explicit request by calling <code>clear_for_reuse()</code>
+in one consecutive sequence.
+</ins>
+</p></blockquote>
+
+<p>
+Edit within the synopsis as follows.
+</p>
+
+<blockquote class="std">
+<pre><code>
+  template &lt;class charT, class traits = char_traits&lt;charT&gt;,
+        class Allocator = allocator&lt;charT&gt; &gt;
+    class basic_stringstream;
+  typedef basic_stringstream&lt;char&gt; stringstream;
+  typedef basic_stringstream&lt;wchar_t&gt; wstringstream;
+
+<ins>  template &lt;class charT,
+            class traits = char_traits&lt;charT&gt;,
+            class Allocator = allocator&lt;charT&gt; &gt;
+    class basic_ostream_buffer;
+  typedef basic_ostream_buffer&lt;char&gt; ostream_buffer;
+  typedef basic_ostream_buffer&lt;wchar_t&gt; wostream_buffer;</ins>
+
+<ins>  template &lt;class charT,
+            class traits = char_traits&lt;charT&gt;,
+            class Allocator = allocator&lt;charT&gt; &gt;
+    class noteflush_stringbuf;
+  typedef basic_ostream_buffer&lt;char&gt; ostream_buffer;
+  typedef basic_ostream_buffer&lt;wchar_t&gt; wostream_buffer;</ins>
+
+</code></pre>
+</blockquote>
+
+
+<h3><a name="ostream.buffer">27.8.8 Class template <code>basic_ostream_buffer</code> [ostream.buffer]</a></h3>
+
+<p>
+Add a new section.
+</p>
+
+<blockquote class="stdins">
+<pre><code>template &lt;class charT,
+          class traits = std::char_traits&lt;charT&gt;,
+          class Allocator = std::allocator&lt;charT&gt; &gt;
+class basic_ostream_buffer
+  : public std::basic_ostream&lt;charT,traits,Allocator&gt;
+{
+public:
+  typedef charT                          char_type;
+  typedef traits                         traits_type;
+  typedef typename traits_type::int_type int_type;
+  typedef typename traits_type::pos_type pos_type;
+  typedef typename traits_type::off_type off_type;
+  typedef Allocator                      allocator_type;
+
+  basic_ostream_buffer(basic_ostream_buffer &amp;osb);
+  explicit basic_ostream_buffer(std::basic_ostream&lt;charT,traits&gt; &amp;os);
+  ~basic_ostream_buffer();
+  void clear_for_reuse();
+  noteflush_stringbuf<charT,traits,Allocator> *rdbuf() const;
+private:
+  std::basic_ostream&lt;chart,traits&gt;&amp; out; // exposition only
+};
+</code></pre>
+
+<p>
+The class template <code>basic_ostream_buffer</code>
+supports buffering into a <code>noteflush_stringbuf</code>
+and then
+indivisibly transfering the contents of the <code>noteflush_stringbuf</code>
+to a <code>basic_ostream</code>.
+</p>
+
+<p>
+[<i>Example:</i>
+</p>
+<pre class="example">....
+<code>{
+  std::ostream_buffer bout(std::cout);
+  bout &lt;&lt; "Hello, " &lt;&lt; "World!" &lt;&lt; std::endl;
+}</code>
+....
+</pre>
+<p>
+—<i>end example</i>]
+</p>
+<p>
+[<i>Note:</i>
+If the underlying stream can throw exceptions, use <code>clear_for_reuse()</code> to catch those, otherwise an exception of the underlying stream may <code>terminate()</code> your program.
+—<i>end note</i>]</p>
+</blockquote>
+
+
+<h3><a name="ostream.buffer.ctor">27.8.8.1 Constructor [ostream.buffer.ctor]</a></h3>
+
+<p>
+Add a new section.
+</p>
+
+<blockquote class="stdins">
+
+<dl>
+
+<dt><code>basic_ostream_buffer(basic_ostream_buffer &amp;osb);</code></dt>
+<dd>
+
+<p><i>Effects:</i>
+Stores a reference to the <code>basic_ostream</code>
+that is the base class of <code>basic_ostream_buffer</code>,
+and which will latter be the output stream.
+Constructs a <code>noteflush_stringbuf</code>.
+May construct a mutex.
+</p>
+<p>[<i>Note:</i>
+This overload exists to allow wrapping a <code>basic_ostream_buffer</code> again with a <code>basic_ostream_buffer</code>.
+<i>end note.</i>]
+</p>
+</dd><dt><code>basic_ostream_buffer(std::basic_ostream&lt;charT,traits&gt; &amp;os);</code></dt>
+<dd>
+
+<p><i>Effects:</i>
+Stores a reference to the <code>basic_ostream</code>,
+which will latter be the output stream.
+Constructs a <code>noteflush_stringbuf</code>.
+May construct a mutex.
+</p>
+
+</dd>
+</dl>
+
+</blockquote>
+
+
+<h3><a name="ostream.buffer.dtor">27.8.8.2 Destructor [ostream.buffer.dtor]</a></h3>
+
+<p>
+Add a new section.
+</p>
+
+<blockquote class="stdins">
+
+<dl>
+
+<dt><code>~basic_ostream_buffer() noexcept;</code></dt>
+<dd>
+
+<p><i>Effects:</i>
+<code>clear_for_reuse()</code>. 
+May destroy a lock.
+</p>
+
+<p><i>Synchronization:</i>
+May or may not acquire a mutex
+while transfering characters.
+</p>
+
+</dd>
+</dl>
+
+</blockquote>
+
+
+<h3><a name="ostream.buffer.mfun">27.8.8.3 Member Functions [ostream.buffer.mfun]</a></h3>
+
+<p>
+Add a new section.
+</p>
+
+<blockquote class="stdins">
+
+<dl>
+
+<dt><code>void clear_for_reuse();</code></dt>
+<dd>
+
+<p><i>Effects:</i>
+Transfers the contents of the <code>noteflush_stringbuf</code>
+to the stream specified in the constructor
+as an indivisible uninterleaved sequence of characters,
+with respect to all other uses of <code>basic_ostream_buffer</code>
+on that stream.
+If and only if a flush was requested on the <code>noteflush_stringbuf</code>,
+the stream will be flushed.
+</p>
+
+<p><i>Postcondition:</i>
+<code>!rdbuf()-&gt;flushed() &amp;&amp; rdbuf()-&gt;str().empty()</code>.
+</p>
+<p><i>Synchronization:</i>
+May or may not acquire a mutex
+while transfering characters.
+</p>
+
+</dd>
+</dl>
+
+</blockquote>
+
+
+<h3><a name="ostream.noteflush.stringbuf">27.8.9 Class template <code>noteflush_stringbuf</code> [ostream.noteflush.stringbuf]</a></h3>
+
+<p>
+Add a new section.
+</p>
+
+<blockquote class="stdins">
+
+<pre><code>template &lt;class charT, class traits, class Allocator&gt;
+class noteflush_stringbuf
+  : public std::basic_stringbuf&lt;charT,traits,Allocator&gt;
+{
+    bool needs_flush_=false; // exposition only
+  public:
+    using std::basic_stringbuf&lt;charT, traits, Allocator&gt;::basic_stringbuf;
+  protected:
+    bool flushed() const noexcept { return needs_flush_;} // exposition only
+    virtual int sync();
+};
+</code></pre>
+<!--
+    void clear();
+-->
+<p>
+The class template <code>noteflush_stringbuf</code>
+behaves as a <code>basic_stringbuf</code>
+except that flushes of the stream using it, which incur in calling the 
+<code>sync()</code> member function are noted instead of a no-op.
+</p>
+
+</blockquote>
+
+
+<h3><a name="ostream.noteflush.stringbuf.mfun">27.8.9.1 Member Functions [ostream.noteflush.stringbuf.mfun]</a></h3>
+
+<p>
+Add a new section.
+</p>
+
+<blockquote class="stdins">
+
+<dl>
+<!---
+<dt><code>void clear();</code></dt>
+<dd>
+
+<p><i>Effects:</i>
+Empties the buffer of its character contents.
+Erases any noted flush.
+Equivalent to a default constructor.
+</p>
+<p><i>Postcondition:</i>
+<code>!flushed()</code>.
+</p>
+-->
+</dd><dt><code>int sync() noexcept;</code></dt>
+<dd>
+
+<p><i>Effects:</i>
+Notes the occurence of a flush within the object.
+</p>
+<p><i>Postcondition:</i>
+<code>flushed()</code>.
+</p>
+
+<p><i>Returns:</i>
+<code>0</code>.
+</p>
+
+</dd>
+
+</dl>
+
+</blockquote>
+
+
+
+<h2><a name="Revisions">Revisions</a></h2>
+
+ISO/IEC JTC1 SC22 WG21 N4069 - 2014-06-18
+
+<p>
+This paper revises
+<a href="http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2014/n3978.html">
+N3978 C++ Ostream Buffers</a>
+</p>
+
+<ul>
+
+<li><p>
+Added a Design section.
+</p></li>
+
+<li><p>
+Clarify the reference capturing behavior
+of the <code>ostream_buffer</code> constructors.
+</p></li>
+
+<li><p>
+Added noexcept and const as appropriate to members.
+</p></li>
+
+<li><p>
+Added note on throwing wrapped streams.
+</p></li>
+
+<li><p>
+Change the
+<code>noteflush_stringbuf</code>
+public member variable
+<code>needsflush</code>
+to a public member query function <code>flushed</code>.
+</p></li>
+
+<li><p>
+Removed the public member function <code>noteflush_stringbuf::clear</code>.
+</p></li>
+
+<li><p>
+Minor synopsis formatting changes.
+</p></li>
+
+<li><p>
+Incorporated feedback from SG1 and Dietmar K&uuml;hl in specific in Rapperswil.
+</p></li>
+</ul>
+
+<p>
+<a href="http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2014/n3978.html">
+N3978</a> revised
+<a href="http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2013/n3892.html">
+N3892 C++ Ostream Buffers</a>
+</p>
+
+<ul>
+
+<li><p>
+Flush the ostream if and only if the <code>ostream_buffer</code> was flushed.
+</p></li>
+
+<li><p>
+Add the <code>clear_for_reuse</code> function.
+</p></li>
+
+<li><p>
+Change the design from inheriting from <code>basic_ostream</code>
+to using a <code>noteflush_stringbuf</code>,
+which is a slightly modified <code>basic_stringbuf</code>.
+The modification is to note the flush rather than act upon it.
+</p></li>
+
+</ul>
+
+<p>
+<a href="http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2013/n3892.html">
+N3892</a> revised
+<a href="http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2013/n3750.html">
+N3750 C++ Ostream Buffers</a>
+</p>
+
+<ul>
+
+<li><p>
+Change name to <code>basic_ostream_buffer</code>
+and add the usual typedefs.
+</p></li>
+
+<li><p>
+Change interface to inherit from <code>basic_ostringstream</code>
+rather than provide access to a member of that type.
+</p></li>
+
+<li><p>
+Add a Revisions section.
+</p></li>
+
+</ul>
+
+
+<h2><a name="References">References</a></h2>
+
+<dl>
+
+<dt><a name="PSL">[PSL]</a></dt>
+<dd>
+<cite>The Open Group Base Specifications Issue 6,
+IEEE Std 1003.1, 2004 Edition</cite>,
+functions, flockfile,
+<a href="http://pubs.opengroup.org/onlinepubs/009695399/functions/flockfile.html">
+http://pubs.opengroup.org/onlinepubs/009695399/functions/flockfile.html</a>
+</dd>
+
+</dl>
+
+
+
+</body></html>
