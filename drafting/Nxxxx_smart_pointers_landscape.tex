@@ -1,0 +1,132 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}	% See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}	% ... or a4paper or a5paper or ... 
+%\geometry{landscape}	% Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}	% Activate to begin paragraphs with an empty line rather than an indent
+
+
+\usepackage[final] 
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{Nxxxx 2014-10-10}{Nxxxx 2014-10-10}
+
+\title{Nxxxx - How many smart pointer types could exist?}
+\author{Peter Sommerlad}
+\date{2014-10-10}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: Nxxxx &  \\\hline
+Date: & 2014-10-010 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+
+%\chapter{History}
+\chapter{Introduction}
+This paper tries to map the landscape of possible and useful smart pointer classes to foster discussion which parts of the map should be provided by the standard library in addition to the existing shared_ptr, weak_ptr and unique_ptr classes. My goal is to limit the usage of plain pointers in C++ user-level (as opposed to library) code to avoid the inherent ambiguities present when a plain pointer variable or parameter is present in such code. In the same sense also plain arrays should be banned, at least when the degenerate to pointers in passing as parameters.
+
+The reason for this is, that multiple different smart pointers have been proposed in the past to better document pointer usage or provide additional functionality, but none of them seem to have passed the hurdle of the committee (N3515-N3740-N3840, N3339, N3974. I guess, one of the reasons, was that either of them was looked at individually and either its use case or its specification wasn't up to the committee's liking, or the authors went on to other more important issues than updating a only mildly acknowledged paper (my pure speculation).
+
+Some currently proposed or already accepted classes also fall in the realm of the solution space, such as optional<T>, std::string, std::array, string_view, array_view, or using plain references or values of a type.
+
+This paper is not about "rich" smart pointers as have been proposed by N3340. Also what is not addressed are the atomicity of smart pointers as given in N4058.
+
+
+\chapter{Acknowledgements}
+
+\chapter{Motivation and Scope}
+\section{Dimensions of Smart Pointer Services}
+Most of the dimensions are yes/no binary decisions, but for some it makes sense to consider multiple exclusive options. I use the terms pointer and pointee to denote the handle and the object, even  if the handle type is not a (smart) pointer, such as an lvalue reference.
+
+I will consider the following primary dimensions that drive the design. Note that plain pointers are used in today's code for almost all of these options (except shared, if correct and cloning):
+\begin{itemize}
+\item assignability of pointer, rebinding (no for references)
+\item pointer can be empty (nullptr) (no for references)
+\item ownership of pointee/resource: none, unique, shared 
+\item single pointee vs. array, array of pointees means iteration
+\item polymorphic pointee (none, to base class, generic)
+\item polymorphic copy-ability of pointee (clone_ptr)
+\end{itemize}
+A naive view would give us 144 possible design locations and almost as many possible smart pointer like classes. Fortunately, not all make sense and many of the design locations are already handled by existing library and language features, but still an enormous amount of possible specific combinations of requirements remain. To make the design space smaller, I stop considering references as an possible solution and only consider the design where a pointer can actually be rebound and be empty or equal to nullptr, leaving 36 combinations.
+
+The following dimensions are more-or-less derived from the designs of the primary dimensions.
+\begin{itemize}
+\item copy-ability of pointer (shallow copy) vs move-ability
+\item type erasure for cleanup and other special functionality, such as copying, 
+\item pointer can be kept in standard container
+\item single allocation optimization for type erasure and 
+\end{itemize}
+
+\begin{table}[htdp]
+\caption{default}
+\begin{center}
+\begin{tabular}{|c|c|c|c|p{4cm}|p{4cm}|p{4cm}}
+own  & [n]  & poly & clone & solution & alt & comment\\
+\hline\hline
+no & no & no & no & \tcode{exempt_ptr<T> }& T * & \\
+no & no & no & yes & \tcode{exempt_ptr<T> }& T* & T copyable\\
+no & no & bas & no & \tcode{exempt_ptr<T>} & T * &  base with virtual members\\
+no & no & bas & yes & non_owning_clone_ptr ? & \tcode{clone_ptr<T>} &  or base virtual clone \\
+no & no & gen & no & ? & & useful? non-owning variant/any \\
+no & no & gen & yes & non_owning_clone_ptr? & void * & non-owning variant/any ? \\
+no & yes & no & no & \tcode{array_view<T>} & T * & \\
+no & yes & no & yes & \tcode{array_view<T>} & T* & T copyable\\
+no & yes & bas & no &  & T** & array of pointers?\\
+no & yes & bas & yes &  & T** & with base virtual clone \\
+no & yes & gen & no & ? & & useful? array of non-owning variant/any \\
+no & yes & gen & yes &  & void * & non-owning variant/any ? \\
+\hline
+un & no & no & no & \tcode{unique_ptr<T>}& \tcode{optional<T>} & \\
+un & no & no & yes & \tcode{unique_ptr<T>}& \tcode{optional<T>} & T copyable\\
+un & no & bas & no & \tcode{unique_ptr<T>} & T * &  base with virtual dtor\\
+un & no & bas & yes & \tcode{clone_ptr<T>} &  & base virtual clone and dtor\\
+un & no & gen & no & \tcode{variant<>} & \tcode{any} & \\
+un & no & gen & yes & \tcode{variant<>} & \tcode{any} & active type copyable \\
+un & yes & no & no & \tcode{unique_ptr<T[]>} & T * & \\
+un & yes & no & yes & \tcode{unique_ptr<T[]>} & T* & T copyable\\
+un & yes & bas & no & \tcode{vector<unique_ptr<T>>} & T** & array of pointers\\
+un & yes & bas & yes & \tcode{vector<unique_ptr<T>>} & \tcode{vector<clone_ptr<T>>} & with base virtual clone \\
+\hline
+sh & yes & gen & no & ? & & useful ?  \\
+sh & yes & gen & yes & ? & & useful ? \\
+sh & no & no & no & \tcode{shared_ptr<T>}& \tcode{optional<T>} & \\
+sh & no & no & yes & \tcode{shared_ptr<T>}& \tcode{optional<T>} & T copyable\\
+sh & no & bas & no & \tcode{shared_ptr<T>} & T * &  base with virtual dtor\\
+sh & no & bas & yes & \tcode{clone_ptr<T>} &  & base virtual clone and dtor\\
+sh & no & gen & no & \tcode{variant<>} & \tcode{any} & \\
+sh & no & gen & yes & \tcode{variant<>} & \tcode{any} & active type copyable \\
+sh & yes & no & no & \tcode{shared_ptr<T[]>} & T * & \\
+sh & yes & no & yes & \tcode{shared_ptr<T[]>} & T* & T copyable\\
+sh & yes & bas & no & \tcode{vector<shared_ptr<T>>} & T** & array of pointers\\
+sh & yes & bas & yes & \tcode{vector<shared_ptr<T>>} & \tcode{vector<clone_ptr<T>>} & with base virtual clone \\
+sh & yes & gen & no & ? & & useful ?  \\
+sh & yes & gen & yes & ? & & useful ? \\
+\end{tabular}
+\end{center}
+\label{default}
+\end{table}%
+
+
+\chapter{Impact on the Standard}
+
+\chapter{Design Decisions}
+\section{General Principles}
+
+\section{Prior Implementations}
+
+\section{Open Issues to be Discussed}
+\begin{itemize}
+\item Should we make the regular constructors private and friend the factory functions only?
+\item Should we provide a factory for type-erasing the deleter/exit_function using std::function?
+\end{itemize}
+
+
+\chapter{Technical Specifications}
+\end{document}
+

@@ -11,26 +11,26 @@
 \usepackage{underscore}   % remove special status of '_' in ordinary text
 \usepackage{xspace}
 \pagestyle{myheadings}
-\markboth{N4xxx 2014-06-28}{N4xxx 2014-06-28}
+\markboth{N4189 2014-10-08}{N4189 2014-10-08}
 
-\title{N4xxx - Scoped Resource - Generic RAII Wrapper for the Standard Library}
+\title{N4189 - Generic Scope Guard and RAII Wrapper for the Standard Library}
 \author{Peter Sommerlad and Andrew L. Sandoval}
-\date{2014-06-28}                                           % Activate to display a given date or no date
+\date{2014-10-08}                                           % Activate to display a given date or no date
 \input{macros}
 \setsecnumdepth{subsection}
 
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: N4xxx &   (update of N3949, N3830, N3677)\\\hline
-Date: & 2014-06-28 \\\hline
+Document Number: N4189 &   (update of N3949, N3830, N3677)\\\hline
+Date: & 2014-10-08 \\\hline
 Project: & Programming Language C++\\\hline 
 \end{tabular}
 
 \chapter{History}
 \section{Changes from N3949}
 \begin{itemize}
-\item renamed \tcode{scope_exit} to \tcode{scope_exit} and the factory to \tcode{make_scope_exit}. Reason for make_ is to teach users to save the result in a local variable instead of just have a temporary that gets destroyed immediately. Similarly for unique resources, \tcode{unique_resource}, \tcode{make_unique_resource} and \tcode{make_unique_resource_checked}.
+\item renamed \tcode{scope_guard} to \tcode{scope_exit} and the factory to \tcode{make_scope_exit}. Reason for make_ is to teach users to save the result in a local variable instead of just have a temporary that gets destroyed immediately. Similarly for unique resources, \tcode{unique_resource}, \tcode{make_unique_resource} and \tcode{make_unique_resource_checked}.
 \item renamed editorially \tcode{scope_exit::deleter} to \tcode{scope_exit::exit_function}.
 \item changed the factories to use forwarding for the \tcode{deleter}/\tcode{exit_function} but not deduce a reference.
 \item get rid of \tcode{invoke}'s parameter and rename it to \tcode{reset()} and provide a \tcode{noexcept} specification for it.
@@ -40,7 +40,7 @@ Project: & Programming Language C++\\\hline
 \section{Changes from N3830}
 \begin{itemize}
 \item rename to \tcode{unique_resource_t} and factory to \tcode{unique_resource}, resp. \tcode{unique_resource_checked}
-\item provide scope guard functionality through type \tcode{scope_exit} and \tcode{scope_guard} factory
+\item provide scope guard functionality through type \tcode{scope_guard_t} and \tcode{scope_guard} factory
 \item remove multiple-argument case in favor of simpler interface, lambda can deal with complicated release APIs requiring multiple arguments.
 \item make function/functor position the last argument of the factories for lambda-friendliness.
 
@@ -134,7 +134,7 @@ Each of these problems is solved by \tcode{unique_resource} as shown in the foll
 void ScopedResourceExample1()
 {
 	// Initialize hFile ensure it will be "closed" (regardless of value) on scope-exit
-	auto hFile = std::unique_resource_checked(
+	auto hFile = std::make_unique_resource_checked(
 		CreateFile("test.tmp", 
 			FILE_ALL_ACCESS, 
 			FILE_SHARE_READ, 
@@ -159,57 +159,59 @@ void ScopedResourceExample1()
 While \tcode{std::unique_ptr} can deal with the above pointer handle type, as well as \tcode{<cstdio>}'s \tcode{FILE *}, it is non-intuitive to use with handle's like \tcode{<fcntl.h>}'s and \tcode{<unistd.h>}'s \tcode{int} file handles. See the following code examples on using \tcode{unique_resource} with \tcode{int} and \tcode{FILE *} handle types.
 
 \begin{codeblock}
-void demontrate_unique_resource_with_POSIX_IO(){
-	const char* const filename = "hello.txt";
+void demonstrate_unique_resource_with_stdio() {
+	const std::string filename = "hello.txt";
 	{
-		auto file = unique_resource_checked(::open(filename,O_CREAT|O_RDWR),
-				 -1,&::close);
-		::write(file,"Hello World!\n",12u);
-		ASSERT(file.get()!= -1);
-	}
-	std::ifstream input { filename };
-	std::string line;
-	getline(input,line);
-	ASSERT_EQUAL("Hello World!",line);
-	getline(input,line);
-	ASSERT(input.eof());
-	{
-		auto file = unique_resource_checked(::open("nonexistingfile.txt", O_RDONLY),
-				-1, &::close);
-		ASSERT_EQUAL(-1,file.get());
-	}
-
-}
-\end{codeblock}
-\begin{codeblock}
-void demontrate_unique_resource_with_POSIX_IO(){
-	const char* const filename = "hello1.txt";
-	{
-		auto file = unique_resource_checked(
-				::open(filename,O_CREAT|O_RDWR),
-				 -1,&::close);
-		::write(file,"Hello World!\n",12u);
-		ASSERT(file.get()!= -1);
+		auto file=make_unique_resource(::fopen(filename.c_str(),"w"),&::fclose);
+		::fputs("Hello World!\n", file);
+		ASSERT(file.get()!= NULL);
 	}
 	{
-		std::ifstream input { filename };
-		std::string line;
+		std::ifstream input { filename.c_str() };
+		std::string line { };
 		getline(input, line);
 		ASSERT_EQUAL("Hello World!", line);
 		getline(input, line);
 		ASSERT(input.eof());
 	}
-	::unlink(filename);
+	::unlink(filename.c_str());
 	{
-		auto file = unique_resource_checked(
-				::open("nonexistingfile.txt", O_RDONLY),
-				-1,
-				&::close);
-		ASSERT_EQUAL(-1,file.get());
+		auto file = make_unique_resource_checked(::fopen("nonexistingfile.txt", "r"), 
+		            (FILE*) NULL, &::fclose);
+		ASSERT_EQUAL((FILE*)NULL, file.get());
 	}
+
 }
 \end{codeblock}
 
+\newpage
+\begin{codeblock}
+void demontrate_unique_resource_with_POSIX_IO() {
+	const std::string filename = "./hello1.txt";
+	{
+		auto file=make_unique_resource(::open(filename.c_str(),
+                     O_CREAT|O_RDWR|O_TRUNC,0666), &::close);
+		
+		::write(file, "Hello World!\n", 12u);
+		ASSERT(file.get() != -1);
+	}
+	{
+		std::ifstream input { filename.c_str() };
+		std::string line { };
+		getline(input, line);
+		ASSERT_EQUAL("Hello World!", line);
+		getline(input, line);
+		ASSERT(input.eof());
+	}
+	::unlink(filename.c_str());
+	{
+		auto file = make_unique_resource_checked(::open("nonexistingfile.txt", 
+                       O_RDONLY), -1, &::close);
+		ASSERT_EQUAL(-1, file.get());
+	}
+
+}\end{codeblock}
+\newpage
 \section{Multiple Parameters}
 This feature was abandoned due to feedback by LEWG in Issaquah. A lambda as deleter can have the same effect without complicating \tcode{unique_resource}.
 
@@ -221,11 +223,11 @@ void TalkToTheWorld(std::ostream& out, std::string const farewell="Uff Wiederlue
 {
 	// Always say goodbye before returning,
 	// but if given a non-empty farewell message use it...
-	auto goodbye = scope_guard([&out]() ->void
+	auto goodbye = make_scope_exit([&out]() ->void
 	{
 		out << "Goodbye world..." << std::endl;
 	});
-	auto altgoodbye = scope_guard([&out,farewell]() ->void
+	auto altgoodbye = make_scope_exit([&out,farewell]() ->void
 	{
 		out << farewell << std::endl;
 	});
@@ -289,12 +291,18 @@ N3677 has a more complete list of other prior implementations.
 
 N3830 provided an alternative approach to allow an arbitrary number of resources which was abandoned due to LEWG feedback 
 
-\section{Open Issues to be Discussed}
+The following issues have been discussed by LEWG already:
 \begin{itemize}
 \item \textit{Should there be a companion class for sharing the resource \tcode{shared_resource} ?  (Peter thinks no. Ville thinks it could be provided later anyway.) } LEWG: NO.
 \item \textit{Should \tcode{~scope_exit()} and \tcode{unique_resource::invoke()} guard against deleter functions that throw with \tcode{try{ deleter(); }catch(...){}} (as now) or not?} LEWG: NO, but provide noexcept in detail.
 \item \textit{Does \tcode{scope_exit} need to be move-assignable? } LEWG: NO.
+\end{itemize}
+
+
+\section{Open Issues to be Discussed}
+\begin{itemize}
 \item Should we make the regular constructors private and friend the factory functions only?
+\item Should we provide a factory for type-erasing the deleter/exit_function using std::function?
 \end{itemize}
 
 
@@ -311,7 +319,7 @@ In section [utilities.general] add two extra rows to table 44
 \hline
 Subclause & Header\\
 \hline
-20.nn Scope Guard & \tcode{<scope_guard>}\\
+20.nn Scope Guard Support & \tcode{<scope_exit>}\\
 \hline
 20.nn+1 Unique Resource Wrapper & \tcode{<unique_resource>}\\
 \hline
@@ -324,39 +332,47 @@ Subclause & Header\\
 Add a two new sections to chapter 20 introducing the contents of the headers \tcode{<scope_exit>} and \tcode{<unique_resource>}.
 
 %\rSec1[utilities.scope_exit]{Scope Guard}
-\section{Scope Guard [utilities.scope_exit]}
+\section{Scope Guard Support [utilities.scope_exit]}
 This subclause contains infrastructure for a generic scope guard.\\
 \\
 \synopsis{Header \tcode{<scope_exit>} synopsis}
 
 \pnum
-The header  \tcode{<scope_exit>} defines the class template \tcode{scope_exit} and the function template \tcode{scope_exit()} to create its instances.
+The header  \tcode{<scope_exit>} defines the class template \tcode{scope_exit} and the function template \tcode{make_scope_exit()} to create its instances.
 
 \begin{codeblock}
 namespace std {
-template <typename D>
+template <typename EF>
 struct scope_exit {
-    // construction
-    explicit
-	scope_exit(D &&f) noexcept;
-	// clean up
-	~scope_exit();
-	// early release
-	void release() noexcept { execute_on_destruction=false;}
-	// move 
-	scope_exit(scope_exit  &&rhs) noexcept;
+	// construction
+	explicit
+	scope_exit(EF &&f) noexcept
+	:exit_function(std::move(f))
+	,execute_on_destruction{true}{}
+	// move
+	scope_exit(scope_exit  &&rhs) noexcept
+	:exit_function(std::move(rhs.exit_function))
+	,execute_on_destruction{rhs.execute_on_destruction}{
+		rhs.release();
+	}
+	// release
+	~scope_exit() noexcept(noexcept(this->exit_function())){
+		if (execute_on_destruction)
+				this->exit_function();
+	}
+	void release() noexcept { this->execute_on_destruction=false;}
 
 private:
 	scope_exit(scope_exit const &)=delete;
 	void operator=(scope_exit const &)=delete;
 	scope_exit& operator=(scope_exit &&)=delete;
-	D deleter; // exposition only
+	EF exit_function;
 	bool execute_on_destruction; // exposition only
 };
 // factory function
-template <typename D>
-scope_exit<D> make_scope_exit(D && deleter) noexcept {
-	return scope_exit<D>{std::move(deleter)}; 
+template <typename EF>
+auto make_scope_exit(EF &&exit_function) noexcept {
+	return scope_exit<std::remove_reference_t<EF>>(std::forward<EF>(exit_function));
 }
 
 } // namespace std
@@ -371,27 +387,27 @@ scope_exit<D> make_scope_exit(D && deleter) noexcept {
 \subsection {Class Template \tcode{scope_exit} [scope_exit.scope_exit]}
 
 \pnum
-\requires \tcode{D} shall be a MoveConstructible function object type or reference to such, 
-the expression \tcode{deleter()} shall be valid
-and shall not throw an exception. %% thanks to Daniel
-Move construction of \tcode{D} shall not throw an exception.
+\requires \tcode{EF} shall be a MoveConstructible function object type or reference to such, 
+the expression \tcode{exit_function()} shall be valid.
+%and shall not throw an exception. %% thanks to Daniel %% removed again
+Move construction of \tcode{EF} shall not throw an exception.
 
 
 \begin{itemdecl}
 explicit
-scope_exit(D &&deleter) noexcept;
+scope_exit(EF &&exit_function) noexcept;
 \end{itemdecl}
 
 
 \pnum
-\effects constructs a scope_exit object that will call \tcode{deleter()} on its destruction if not \tcode{release()}ed prior to that. \tcode{execute_on_destruction} is set to \tcode{true}.
+\effects constructs a scope_exit object that will call \tcode{exit_function()} on its destruction if not \tcode{release()}ed prior to that. \tcode{execute_on_destruction} is set to \tcode{true}.
 
 \begin{itemdecl}
 ~scope_exit();
 \end{itemdecl}
 
 \pnum
-\effects If and only if \tcode{execute_on_destruction} is \tcode{true}, calls \tcode{deleter()}.
+\effects If and only if \tcode{execute_on_destruction} is \tcode{true}, calls \tcode{exit_function()}.
 
 
 \begin{itemdecl}
@@ -406,18 +422,18 @@ scope_exit(scope_exit  &&rhs) noexcept;
 \end{itemdecl}
 
 \pnum
-\effects Move constructs \tcode{deleter} from \tcode{rhs.deleter}. \tcode{execute_on_destruction=rhs.execute_on_destruction;}\tcode{rhs.release();}
+\effects Move constructs \tcode{exit_function} from \tcode{rhs.exit_function}. \tcode{execute_on_destruction=rhs.execute_on_destruction;}\tcode{rhs.release();}
 
 %\rSec2[scope_exit.make_scope_exit]{Factory Function \tcode{make_scope_exit}}
 \subsection {Factory Function \tcode{make_scope_exit} [scope_exit.make_scope_exit]}
 
 \begin{itemdecl}
-template <typename D>
-scope_exit<D> make_scope_exit(D && deleter) noexcept;
+template <typename EF>
+scope_exit<remove_reference_t<EF>> make_scope_exit(EF && exit_function) noexcept;
 \end{itemdecl}
 
 \pnum
-\returns \tcode{scope_exit<D>(std::move(deleter))}
+\returns \tcode{scope_exit<std::remove_reference_t<EF>>(std::forward<EF>(exit_function))}
 
 
 
@@ -435,7 +451,6 @@ The header  \tcode{<unique_resource>} defines the class template \tcode{unique_r
 
 \begin{codeblock}
 namespace std {
-enum class invoke_it { once, again };
 
 template<typename R,typename D>
 class unique_resource {
@@ -453,10 +468,10 @@ public:
 	unique_resource& operator=(unique_resource  &&other) noexcept ;
 	
     	// resource release
-	~unique_resource() ;
-	void invoke(invoke_it const strategy = invoke_it::once) noexcept ;
-	R&& release() noexcept;
-	void reset(R && newresource) noexcept ;
+	~unique_resource() noexcept(noexcept(this->reset()));
+	void reset() noexcept(noexcept(this->get_deleter()(resource)));
+	void reset(R && newresource) noexcept(noexcept(this->reset())) ;
+	R const & release() noexcept;
 	// resource access
 	R const & get() const noexcept ;
 	operator  R const &() const noexcept ;
@@ -464,16 +479,15 @@ public:
  	@\seebelow@ operator*() const;
 	// deleter access
 	const D &	get_deleter() const noexcept;
-	D &	get_deleter() noexcept;
 };
 
 //factories
 template<typename R,typename D>
-unique_resource<R,D>
-make_unique_resource( R && r,D t) noexcept;
+unique_resource<R,remove_reference_t<D>>
+make_unique_resource( R && r,D &&d) noexcept;
 template<typename R,typename D>
 unique_resource<R,D>
-make_unique_resource_checked(R r, R invalid, D t ) noexcept;
+make_unique_resource_checked(R r, R invalid, D d) noexcept;
 
 } // namespace std
 \end{codeblock}
@@ -491,8 +505,8 @@ The deleter function together with the result of the factory function is used to
 \pnum
 \requires  \tcode{D} and \tcode{R} shall be a MoveConstructible and MoveAssignable.
 \tcode{D} shall be a function object type or reference to such. 
-The expression \tcode{deleter(resource)} shall be valid
-and shall not throw an exception.  %% thanks to Daniel
+The expression \tcode{deleter(resource)} shall be valid.
+%and shall not throw an exception.  %% thanks to Daniel
 Move construction and move assignment of \tcode{D} and \tcode{R} shall not throw an exception.
 
 
@@ -516,37 +530,27 @@ unique_resource& operator=(unique_resource  &&other) noexcept ;
 \end{itemdecl}
 
 \pnum
-\effects \tcode{this->invoke();} Move-assigns members from \tcode{other} then calls \tcode{other.release()}.
+\effects \tcode{this->reset();} Move-assigns members from \tcode{other} then calls \tcode{other.release()}.
 
 \begin{itemdecl}
 ~unique_resource() ;
 \end{itemdecl}
 
 \pnum
-\effects \tcode{this->invoke();}
+\effects \tcode{this->reset();}
 
 \begin{itemdecl}
-void invoke(invoke_it const strategy = invoke_it::once) noexcept;
+void reset() noexcept(noexcept(this->get_deleter()(resource)));
 \end{itemdecl}
 
 \pnum
 \effects 
 \begin{codeblock}
-if (execute_on_destruction) try {
+if (execute_on_destruction)  {
+    this->execute_on_destruction = false;
 	this->get_deleter()(resource);
-} catch(...){}
-execute_on_destruction=(strategy==invoke_it::again);
+}
 \end{codeblock}
-
-\begin{itemdecl}
-R&& release() noexcept;
-\end{itemdecl}
-
-\pnum
-\effects \tcode{execute_on_destruction=false;}
-
-\pnum
-\returns \tcode{resource}
 
 \begin{itemdecl}
 void reset(R && newresource) noexcept ;
@@ -555,13 +559,25 @@ void reset(R && newresource) noexcept ;
 \pnum
 \effects 
 \begin{codeblock}
-this->invoke(invoke_it::again); 
-resource=std::move(newresource);
+this->reset(); 
+this->resource=std::move(newresource);
+this->execute_on_destruction = true;
 \end{codeblock}
 
 \pnum
 \enternote This function takes the role of an assignment of a new resource.
 \exitnote
+
+\begin{itemdecl}
+R const & release() noexcept;
+\end{itemdecl}
+
+\pnum
+\effects \tcode{execute_on_destruction=false;}
+
+\pnum
+\returns \tcode{resource}
+
 
 \begin{itemdecl}
 R const & get() const noexcept ;
@@ -571,7 +587,7 @@ R operator->() const noexcept ;
 
 \pnum
 \requires \tcode{operator->} is only available if \\
-\tcode{is_pointer<R>::value \&\& (is_class<R>::value || is_union<R>::value)} is \tcode{true}. 
+\tcode{is_pointer<R>::value \&\& }\\\tcode{(is_class<remove_pointer_t<R>>::value || }\tcode{is_union<remove_pointer_t<R>>::value)} is \tcode{true}. 
 
 \pnum
 \returns \tcode{resource}.
@@ -599,79 +615,77 @@ const DELETER & get_deleter() const noexcept;
 \subsection {Factories for \tcode{unique_resource} [unique_resource.unique_resource]}
 \begin{itemdecl}
 template<typename R,typename D>
-unique_resource<R,D>
-make_unique_resource( R && r,D t) noexcept ;
+unique_resource<R,remove_reference_t<D>>
+make_unique_resource( R && r,D &&d) noexcept;
 \end{itemdecl}
 
 \pnum
-\returns \tcode{unique_resource<R,D>(std::move(r), std::move(t),true);}
+\returns \tcode{unique_resource<R,remove_reference_t<D>>(std::move(r),}\\
+\tcode{			std::forward<remove_reference_t<D>>(d),true)}
 
 
 \begin{itemdecl}
 template<typename R,typename D>
 unique_resource<R,D>
-make_unique_resource_checked(R r, R invalid, D t ) noexcept;
+make_unique_resource_checked(R r, R invalid, D d ) noexcept;
 \end{itemdecl}
 
 \pnum
 \requires \tcode{R} is EqualityComparable
 
 \pnum
-\returns \tcode{unique_resource<R,D>(std::move(r), std::move(t), not bool(r==invalid);}
+\returns \tcode{unique_resource<R,D>(std::move(r), std::move(d), not bool(r==invalid))}
 
 
 
 \chapter{Appendix: Example Implementations}
-\section{Scope Guard}
+\section{Scope Guard Helper}
 \begin{codeblock}
-#ifndef SCOPE_GUARD_H_
-#define SCOPE_GUARD_H_
+#ifndef SCOPE_EXIT_H_
+#define SCOPE_EXIT_H_
 
 // modeled slightly after Andrescu's talk and article(s)
 
 namespace std{
 namespace experimental{
 
-template <typename D>
+template <typename EF>
 struct scope_exit {
 	// construction
 	explicit
-	scope_exit(D &&f) noexcept
-	:deleter(std::move(f))
+	scope_exit(EF &&f) noexcept
+	:exit_function(std::move(f))
 	,execute_on_destruction{true}{}
 	// move
 	scope_exit(scope_exit  &&rhs) noexcept
-	:deleter(std::move(rhs.deleter))
+	:exit_function(std::move(rhs.exit_function))
 	,execute_on_destruction{rhs.execute_on_destruction}{
 		rhs.release();
 	}
 	// release
-	~scope_exit(){
+	~scope_exit() noexcept(noexcept(this->exit_function())){
 		if (execute_on_destruction)
-			try{
-				deleter();
-			}catch(...){}
+				this->exit_function();
 	}
-	void release() noexcept { execute_on_destruction=false;}
+	void release() noexcept { this->execute_on_destruction=false;}
 
 private:
 	scope_exit(scope_exit const &)=delete;
 	void operator=(scope_exit const &)=delete;
 	scope_exit& operator=(scope_exit &&)=delete;
-	D deleter;
+	EF exit_function;
 	bool execute_on_destruction; // exposition only
 };
 
-// usage: auto guard=scope_guard([]{ std::cout << "done...";});
-template <typename D>
-scope_exit<D> scope_guard(D && deleter) noexcept {
-	return scope_exit<D>(std::move(deleter)); // fails with curlies
+template <typename EF>
+auto make_scope_exit(EF &&exit_function) noexcept {
+	return scope_exit<std::remove_reference_t<EF>>(std::forward<EF>(exit_function));
 }
 
 }
 }
 
-#endif /* SCOPE_GUARD_H_ */
+#endif /* SCOPE_EXIT_H_ */
 \end{codeblock}
 
 
@@ -682,10 +696,9 @@ scope_exit<D> scope_guard(D && deleter) noexcept {
 
 namespace std{
 namespace experimental{
-enum class invoke_it { once, again };
 
 template<typename R,typename D>
-class unique_resource {
+class unique_resource{
 	R resource;
 	D deleter;
 	bool execute_on_destruction; // exposition only
@@ -705,74 +718,79 @@ public:
 	,execute_on_destruction{other.execute_on_destruction}{
 		other.release();
 	}
-	unique_resource& operator=(unique_resource  &&other) noexcept {
-		this->invoke(invoke_it::once);
-		deleter=std::move(other.deleter);
-		resource=std::move(other.resource);
-		execute_on_destruction=other.execute_on_destruction;
+	unique_resource& 
+	operator=(unique_resource  &&other) noexcept(noexcept(this->reset())) {
+		this->reset();
+		this->deleter=std::move(other.deleter);
+		this->resource=std::move(other.resource);
+		this->execute_on_destruction=other.execute_on_destruction;
 		other.release();
 		return *this;
 	}
     // resource release
-	~unique_resource() {
-		this->invoke(invoke_it::once);
+	~unique_resource() noexcept(noexcept(this->reset())){
+		this->reset();
 	}
-	void invoke(invoke_it const strategy = invoke_it::once) noexcept {
+	void reset() noexcept(noexcept(this->get_deleter()(resource))) {
 		if (execute_on_destruction) {
-			try {
-				this->get_deleter()(resource);
-			} catch(...){}
+			this->execute_on_destruction = false;
+			this->get_deleter()(resource);
 		}
-		execute_on_destruction = strategy==invoke_it::again;
+	}
+	void reset(R && newresource) noexcept(noexcept(this->reset())) {
+		this->reset();
+		this->resource = std::move(newresource);
+		this->execute_on_destruction = true;
 	}
 	R const & release() noexcept{
-		execute_on_destruction = false;
+		this->execute_on_destruction = false;
 		return this->get();
-	}
-	void reset(R && newresource) noexcept {
-		invoke(invoke_it::again);
-		resource = std::move(newresource);
 	}
 
 	// resource access
 	R const & get() const noexcept {
-		return resource;
+		return this->resource;
 	}
 	operator  R const &() const noexcept {
-		return resource;
+		return this->resource;
 	}
-	R operator->() const noexcept {
-		return resource;
+	R
+	operator->() const noexcept {
+		return this->resource;
 	}
 	std::add_lvalue_reference_t<
 		std::remove_pointer_t<R>>
 	operator*() const {
-		return * resource;
+		return * this->resource;
 	}
 
 	// deleter access
 	const D &
 	get_deleter() const noexcept {
-		return deleter;
+		return this->deleter;
 	}
 };
 
 //factories
 template<typename R,typename D>
-unique_resource<R,D>
-unique_resource( R && r,D t) noexcept {
-	return unique_resource<R,D>(std::move(r), std::move(t),true);
+auto
+make_unique_resource( R && r,D &&d) noexcept {
+	return unique_resource<R,std::remove_reference_t<D>>(
+			std::move(r)
+			,std::forward<std::remove_reference_t<D>>(d)
+			,true);
 }
 
 template<typename R,typename D>
-unique_resource<R,D>
-unique_resource_checked(R r, R invalid, D t ) noexcept {
-	bool shouldrun = (r != invalid);
-	return unique_resource<R,D>(std::move(r), std::move(t), shouldrun);
+auto
+make_unique_resource_checked(R r, R invalid, D d ) noexcept {
+	bool shouldrun = not bool(r == invalid);
+	return unique_resource<R,D>(std::move(r), std::move(d), shouldrun);
 }
 
-}}
 
+
+}}
 #endif /* UNIQUE_RESOURCE_H_ */
 \end{codeblock}
 
@@ -782,170 +800,208 @@ unique_resource_checked(R r, R invalid, D t ) noexcept {
 #include "ide_listener.h"
 #include "xml_listener.h"
 #include "cute_runner.h"
-#include "scope_guard.h"
-#include "unique_resource.h"
-#include <fstream>
-#include <cstdio>
-#include <fcntl.h>
+#include "scoped_resource.h"
+
+#include <iostream>
 #include <unistd.h>
+#include <memory>
 
-
-using std::experimental::unique_resource;
-using std::experimental::unique_resource_checked;
-using std::experimental::scope_guard;
 void thisIsATest() {
-	std::ostringstream out;
-	{
-		auto guard=scope_guard([&]{ out << "done\n";});
-	}
-	ASSERT_EQUAL("done\n",out.str());
-}
-
-void testDismissedGuard() {
-	std::ostringstream out;
-	{
-		auto guard=scope_guard([&]{ out << "done1\n";});
-		auto guard2dismiss=scope_guard([&]{ out << "done2\n";});
-		guard2dismiss.release();
-	}
-	ASSERT_EQUAL("done1\n",out.str());
-}
-void testThrowDoesntCrashIt(){
-	std::ostringstream out;
-	{
-		auto guard=scope_guard([&]{ out << "done\n";});
-		auto guard1=scope_guard([]{ throw 42;});
-	}
-	ASSERT_EQUAL("done\n",out.str());
-
-}
-void testUniqueResourceSimple(){
 	using namespace std;
-	std::ostringstream out;
+	string const msg { " deleted resource\n" };
+	auto res = make_scoped_resource([msg] {cout << msg<< flush;});
+	auto file = make_scoped_resource(
+			[msg](int i) {write(i,msg.data(),msg.size());}, 2);
+	auto duo = make_scoped_resource(
+			[msg](int j, double d) {cout << j <<", "<< d << msg<< flush;}, 42,
+			3.14);
+	cout << "handle: " << file.get() << "\n";
+	cout << "handle again casted:" << static_cast<int>(file) << endl;
 
-	std::string const msg { " deleted resource\n" };
-	{
-	auto res = unique_resource(msg,[&out](string msg) {out << msg<< flush;});
-	}
-	ASSERT_EQUAL(msg,out.str());
+	ASSERTM("start writing tests", true);
 }
-
-void test_unique_resource_semantics_reset() {
+void test_scoped_function_semantics() {
 	std::ostringstream out { };
 	{
-		auto cleanup = unique_resource(1,[&out](int i) {out << "cleaned " << i;});
-		cleanup.reset(2);
+		auto cleanup = make_scoped_resource([&out] {out << "cleaned";});
+	}
+	ASSERT_EQUAL("cleaned", out.str());
+}
+void test_scoped_function_semantics_invoke_false_release() {
+	std::ostringstream out { };
+	{
+		auto cleanup = make_scoped_resource([&out] {out << "cleaned";});
+		cleanup.invoke(invoke_it::again);
+		cleanup.invoke(invoke_it::again);
+		cleanup.release();
+	}
+	ASSERT_EQUAL("cleanedcleaned", out.str());
+}
+void test_scoped_function_semantics_invoke_twice_only_does_once() {
+	std::ostringstream out { };
+	{
+		auto cleanup = make_scoped_resource([&out] {out << "cleaned";});
+		cleanup.invoke();
+		cleanup.invoke();
+	}
+	ASSERT_EQUAL("cleaned", out.str());
+}
+void test_scoped_function_semantics_release_does_nothing() {
+	std::ostringstream out { };
+	{
+		auto cleanup = make_scoped_resource([&out] {out << "cleaned";});
+		cleanup.release();
+	}
+	ASSERT_EQUAL("", out.str());
+}
+void test_scoped_resource_semantics() {
+	std::ostringstream out { };
+	{
+		auto cleanup = make_scoped_resource(
+				[&out](int i) {out << "cleaned " << i;}, 1);
+	}
+	ASSERT_EQUAL("cleaned 1", out.str());
+}
+void test_scoped_resource_semantics_reset() {
+	std::ostringstream out { };
+	{
+		auto cleanup = make_scoped_resource(
+				[&out](int i,int j) {out << "cleaned " << i;}, 1, 2);
+		cleanup.reset(2, 1);
 	}
 	ASSERT_EQUAL("cleaned 1cleaned 2", out.str());
 }
-
-void demonstrate_unique_resource_with_stdio(){
-	const char* const filename = "hello.txt";
+void test_scoped_resource_semantics_reset_move() {
+	std::ostringstream out { };
 	{
-		auto file = unique_resource_checked(
-				::fopen(filename, "w"),
-				(FILE*) NULL, &::fclose);
-		::fputs("Hello World!\n",file);
-		ASSERT(file.get()!= NULL);
+		auto cleanup = make_scoped_resource(
+				[&out](auto const &) {out << "cleaned ";},
+				std::make_unique<int>(42));
+		cleanup.reset(nullptr);
 	}
+	ASSERT_EQUAL("cleaned cleaned ", out.str());
+}
+void test_scoped_resource_semantics_release() {
+	std::ostringstream out { };
 	{
-		std::ifstream input { filename };
-		std::string line;
-		getline(input, line);
-		ASSERT_EQUAL("Hello World!", line);
-		getline(input, line);
-		ASSERT(input.eof());
+		auto cleanup = make_scoped_resource(
+				[&out](int i) {out << "cleaned " << i;}, 5);
+		ASSERT_EQUAL(5, cleanup.release());
 	}
-	::unlink(filename);
-	{
-		auto file = unique_resource_checked(
-				::fopen("nonexistingfile.txt", "r"),
-				(FILE*) NULL, &::fclose);
-		ASSERT_EQUAL((FILE*)NULL,file.get());
-	}
-
+	ASSERT_EQUAL("", out.str());
 }
 
-void demontrate_unique_resource_with_POSIX_IO(){
-	const char* const filename = "hello1.txt";
+void test_scope_resource_with_two_values() {
+	std::ostringstream out { };
 	{
-		auto file = unique_resource_checked(
-				::open(filename,O_CREAT|O_RDWR,0644),
-				 -1,&::close);
-		::write(file,"Hello World!\n",12u);
-		ASSERT(file.get()!= -1);
+		auto cleanup = make_scoped_resource([&out](int i, double d) {
+			out << "cleaned " << i << ", "<<d;
+		}, 42, 3.14);
+		ASSERT_EQUAL(3.14, cleanup.get<1>());
+		cleanup.reset(1, cleanup.get<1>());
+		ASSERT_EQUAL(1, cleanup.get());
 	}
-	{
-		std::ifstream input { filename };
-		std::string line;
-		getline(input, line);
-		ASSERT_EQUAL("Hello World!", line);
-		getline(input, line);
-		ASSERT(input.eof());
-	}
-	::unlink(filename);
-	{
-		auto file = unique_resource_checked(
-				::open("nonexistingfile.txt", O_RDONLY),
-				-1,
-				&::close);
-		ASSERT_EQUAL(-1,file.get());
-	}
+	ASSERT_EQUAL("cleaned 42, 3.14cleaned 1, 3.14", out.str());
 
 }
-void TalkToTheWorld(std::ostream& out, std::string const farewell="Uff Wiederluege...")
-{
-	// Always say goodbye before returning,
-	// but if given a non-empty farewell message use it...
-	auto goodbye = scope_guard([&out]() ->void
+void test_scoped_resource_with_pointer() {
+	std::ostringstream out { };
 	{
-		out << "Goodbye world..." << std::endl;
-	});
-	auto altgoodbye = scope_guard([&out,farewell]() ->void
-	{
-		out << farewell << std::endl;
-	});
-
-
-	if(farewell.empty())
-	{
-		altgoodbye.release();		// Don't use farewell!
+		using namespace std::literals;
+		auto cleanup = make_scoped_resource(
+				[&out](char const *s) {out << "cleaned " << s;},
+				static_cast<char const * const >("hello"));
+		ASSERT_EQUAL('h', *cleanup);
 	}
-	else
-	{
-		goodbye.release();	// Don't use the alternate
-	}
+	ASSERT_EQUAL("cleaned hello", out.str());
 }
 
-void testTalkToTheWorld(){
-	std::ostringstream out;
-	TalkToTheWorld(out,"");
-	ASSERT_EQUAL("Goodbye world...\n",out.str());
-	out.str("");
-	TalkToTheWorld(out);
-	ASSERT_EQUAL("Uff Wiederluege...\n",out.str());
+void test_scoped_resource_address_of() {
+	std::ostringstream out { };
+	{
+		int j { 4 };
+		auto cleanup = make_scoped_resource(
+				[&out](int &i) {out << "cleaned " << i;}, j);
+		ASSERT_EQUAL(j, *&cleanup);
+	}
+	ASSERT_EQUAL("cleaned 4", out.str());
 }
 
-void runAllTests(int argc, char const *argv[]){
+void test_scoped_resource_with_failure_value() {
+	std::ostringstream out { };
+	{
+		auto cleanup = make_scoped_resource_checked(
+				[&out](int i) {out << "cleaned " << i;}, -1, -1);
+		ASSERT_EQUAL(-1, cleanup.release());
+	}
+	ASSERT_EQUAL("", out.str());
+}
+void test_scoped_resource_move_enable() {
+	std::ostringstream out { };
+	{
+		auto cleanup = make_scoped_resource(
+				[&out](int i) {out << "cleaned " << i;}, -1);
+		auto cleanup2 = std::move(cleanup);
+		cleanup2.release();
+		cleanup2.reset(42);
+	}
+	ASSERT_EQUAL("cleaned 42", out.str());
+}
+
+auto pass_scoped_resource(std::ostream &out) {
+	auto cleanup = make_scoped_resource(
+			[&out](std::unique_ptr<int>const& i) {out << "cleaned " << *i;},
+			std::unique_ptr<int>(new int { 42 }));
+	return cleanup;
+}
+
+void test_scoped_resource_can_be_moved() {
+	std::ostringstream out { };
+	{
+		auto cleanup = pass_scoped_resource(out);
+		ASSERT_EQUAL(42, *cleanup.get());
+	}
+	ASSERT_EQUAL("cleaned 42", out.str());
+}
+
+void thrower() noexcept(false){
+	throw 42;
+}
+
+void test_scoped_resource_noexcept_deleter(){
+//		auto cleanup = make_scoped_resource(thrower);
+// will terminate if run....
+}
+
+void runAllTests(int argc, char const *argv[]) {
 	cute::suite s;
 	//TODO add your test here
 	s.push_back(CUTE(thisIsATest));
-	s.push_back(CUTE(testDismissedGuard));
-	s.push_back(CUTE(testThrowDoesntCrashIt));
-	s.push_back(CUTE(testUniqueResourceSimple));
-	s.push_back(CUTE(test_unique_resource_semantics_reset));
-	s.push_back(CUTE(demonstrate_unique_resource_with_stdio));
-	s.push_back(CUTE(demontrate_unique_resource_with_POSIX_IO));
-	s.push_back(CUTE(testTalkToTheWorld));
-	cute::xml_file_opener xmlfile(argc,argv);
-	cute::xml_listener<cute::ide_listener<> >  lis(xmlfile.out);
-	cute::makeRunner(lis,argc,argv)(s, "AllTests");
+	s.push_back(CUTE(test_scoped_function_semantics));
+	s.push_back(CUTE(test_scoped_function_semantics_invoke_false_release));
+	s.push_back(CUTE(test_scoped_function_semantics_invoke_twice_only_does_once));
+	s.push_back(CUTE(test_scoped_function_semantics_release_does_nothing));
+	s.push_back(CUTE(test_scoped_resource_semantics_reset));
+	s.push_back(CUTE(test_scoped_resource_semantics));
+	s.push_back(CUTE(test_scope_resource_with_two_values));
+	s.push_back(CUTE(test_scoped_resource_with_pointer));
+	s.push_back(CUTE(test_scoped_resource_semantics_release));
+	s.push_back(CUTE(test_scoped_resource_address_of));
+	s.push_back(CUTE(test_scoped_resource_with_failure_value));
+	s.push_back(CUTE(test_scoped_resource_move_enable));
+	s.push_back(CUTE(test_scoped_resource_can_be_moved));
+	s.push_back(CUTE(test_scoped_resource_semantics_reset_move));
+	s.push_back(CUTE(test_scoped_resource_noexcept_deleter));
+	cute::xml_file_opener xmlfile(argc, argv);
+	cute::xml_listener<cute::ide_listener<> > lis(xmlfile.out);
+	cute::makeRunner(lis, argc, argv)(s, "AllTests");
 }
 
-int main(int argc, char const *argv[]){
-    runAllTests(argc,argv);
-    return 0;
+int main(int argc, char const *argv[]) {
+	runAllTests(argc, argv);
+	return 0;
 }
+
 \end{codeblock}
 
 \end{document}
