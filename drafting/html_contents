@@ -1,0 +1,28 @@
+#!/bin/sh
+
+if test $# -lt 1
+then
+	echo "usage: $0 <depth in [2-6]> [<file>...]" 1>&2
+	exit 1
+fi
+
+case $1 in
+[2-6])
+	depth=$1
+	shift
+	;;
+*)
+	echo "usage: $0 <depth in [2-6]> [<file>...]" 1>&2
+	exit 1
+esac
+
+sed -e '
+	/<h[2-'$depth']>/ ! d
+	s|name="|href="#|
+	s|</h[2-6]>|<br>|
+	s|<h2>||
+	s|<h3>|\&nbsp;\&nbsp;\&nbsp;\&nbsp;|
+	s|<h4>|\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;|
+	s|<h5>|\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;|
+	s|<h6>|\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;|
+' $*
