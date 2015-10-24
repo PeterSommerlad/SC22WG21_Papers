@@ -1,0 +1,841 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}  % Activate to begin paragraphs with an empty line rather than an indent
+
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+\markboth{P0052R1 2015-10-23}{P0052 2015-10-23}
+
+\title{P0052R1 - Generic Scope Guard and RAII Wrapper for the Standard Library}
+\author{Peter Sommerlad and Andrew L. Sandoval}
+\date{2015-10-23}                                           % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: D0052R1 &   (update of N4189, N3949, N3830, N3677)\\\hline
+Date: & 2015-10-23 \\\hline
+Project: & Programming Language C++\\\hline 
+\end{tabular}
+
+\chapter{History}
+
+\section{Changes from P0052R0}
+In Kona LWG gave a lot of feedback and especially expressed the desire to simplify the constructors and specification by only allowing \emph{nothrow-copyable} \tcode{RESOURCE} and \tcode{DELETER} types. If a reference is required, because they aren't, users are encouraged to use \tcode{std::ref} wrapper instead.
+\begin{itemize}
+\item Simplified constructor specifications by restricting on nothrow copyable types. Facility is intended for simple types anyway. It also avoids the problem of using a type-erased \tcode{std::function} object as the deleter, because it could throw on copy.
+\item Add some motivation again, to ease review and provide reason for specific API issues.
+\item Make "Alexandrescu's" "declarative" scope exit variation employing \tcode{uncaught_exceptions()} counter optional factories to chose or not.
+\item propose to make it available for standalone implementations and add the header \tcode{<scope>} to corresponding tables.
+\item editorial adjustments
+\end{itemize}
+
+\section{Changes from N4189}
+\begin{itemize}
+\item Attempt to address LWG specification issues from Cologne (only learned about those in the week before the deadline from Ville, so not all might be covered).
+\begin{itemize}
+\item specify that the exit function must be either no-throw copy-constructible, or no-throw move-constructible, or held by reference. Stole the wording and implementation from unique_ptr's deleter ctors.
+\item put both classes in single header \tcode{<scope>}
+\item specify factory functions for Alexandrescu's 3 scope exit cases for \tcode{scope_exit}. Deliberately did't provide similar things for \tcode{unique_resource}.
+\end{itemize}
+\item remove lengthy motivation and example code, to make paper easier digestible.
+\item Corrections based on committee feedback in Urbana and Cologne.
+\end{itemize}
+
+%TODO AM: I want to see a proper synopsis with summary, and separate class definition.
+%TODO DK: Have we discussed why make_scoped does remove_reference but not cv?
+%TODO: single header or merge with <utility>
+%DK: re make_scope_exit function: Wondering why there's remove_reference instead of decay. Means you can't construct scope_exit from a function, and means function object member may be cv-qualified, which can affect overload resolution. Is this designed?
+%TODO AM: We rarely put the function definition in the class definition. Rampant use of unqualified noexcept when wrapping unknown type seems totally bogus. For make_scoped_exit, deduced return type doesn't play nicely with SFINAE and other such things. We discussed this in Urbana.
+%TODO DK: Agree on the last point, but for unconditional noexcept, there's a documented requirement that move construction shall not throw an exception. So this seems to be by design.
+%TODO noexcept - moving - non-throwing
+% TODO Alexandrescu: UncaughtExceptionCount... ScopeGuardForNewExeption(slide photo!)
+% github.com/facebook/folly
+% github.com/panaseleus/stack_unwinding
+
+\section{Changes from N3949}
+\begin{itemize}
+\item renamed \tcode{scope_guard} to \tcode{scope_exit} and the factory to \tcode{make_scope_exit}. Reason for make_ is to teach users to save the result in a local variable instead of just have a temporary that gets destroyed immediately. Similarly for unique resources, \tcode{unique_resource}, \tcode{make_unique_resource} and \tcode{make_unique_resource_checked}.
+\item renamed editorially \tcode{scope_exit::deleter} to \tcode{scope_exit::exit_function}.
+\item changed the factories to use forwarding for the \tcode{deleter}/\tcode{exit_function} but not deduce a reference.
+\item get rid of \tcode{invoke}'s parameter and rename it to \tcode{reset()} and provide a \tcode{noexcept} specification for it.
+\end{itemize}
+
+
+\section{Changes from N3830}
+\begin{itemize}
+\item rename to \tcode{unique_resource_t} and factory to \tcode{unique_resource}, resp. \tcode{unique_resource_checked}
+\item provide scope guard functionality through type \tcode{scope_guard_t} and \tcode{scope_guard} factory
+\item remove multiple-argument case in favor of simpler interface, lambda can deal with complicated release APIs requiring multiple arguments.
+\item make function/functor position the last argument of the factories for lambda-friendliness.
+
+\end{itemize}
+
+\section{Changes from N3677}
+\begin{itemize}
+\item Replace all 4 proposed classes with a single class covering all use cases, using variadic templates, as determined in the Fall 2013 LEWG meeting.
+\item The conscious decision was made to name the factory functions without "make", because they actually do not allocate any resources, like \tcode{std::make_unique} or \tcode{std::make_shared} do
+\end{itemize}
+
+\chapter{Introduction}
+The Standard Template Library provides RAII (resource acquisition is initialization) classes for managing pointer types, such as \tcode{std::unique_ptr} and \tcode{std::shared_ptr}.  This proposal seeks to add a two generic RAII wrappers classes which tie zero or one resource to a clean-up/completion routine which is bound by scope, ensuring execution at scope exit (as the object is destroyed) unless released early or in the case of a single resource: executed early or returned by moving its value.
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item This proposal incorporates what Andrej Alexandrescu described as scope_guard long ago and explained again at C++ Now 2012 (%\url{
+%https://onedrive.live.com/view.aspx?resid=F1B8FF18A2AEC5C5!1158&app=WordPdf&wdo=2&authkey=!APo6bfP5sJ8EmH4}
+).
+\item This proposal would not have been possible without the impressive work of Peter Sommerlad who produced the sample implementation during the Fall 2013 committee meetings in Chicago.  Peter took what Andrew Sandoval produced for N3677 and demonstrated the possibility of using C++14 features to make a single, general purpose RAII wrapper capable of fulfilling all of the needs presented by the original 4 classes (from N3677) with none of the compromises.
+\item Gratitude is also owed to members of the LEWG participating in the Fall 2015(Kona),Fall 2014(Urbana), February 2014 (Issaquah) and Fall 2013 (Chicago) meeting for their support, encouragement, and suggestions that have led to this proposal.
+\item Special thanks and recognition goes to OpenSpan, Inc. (http://www.openspan.com) for supporting the production of this proposal, and for sponsoring Andrew L. Sandoval's first proposal (N3677) and the trip to Chicago for the Fall 2013 LEWG meeting. \emph{Note: this version abandons the over-generic version from N3830 and comes back to two classes with one or no resource to be managed.}
+\item Thanks also to members of the mailing lists who gave feedback. Especially Zhihao Yuan, and Ville Voutilainen.
+\item Special thanks to Daniel Kr\"ugler for his deliberate review of the draft version of this paper (D3949).
+\end{itemize}
+
+\chapter{Motivation}
+While \tcode{std::unique_ptr} can be (mis-)used to keep track of general handle types with a user-specified deleter it can become tedious and error prone. Further argumentation can be found in previous papers. Here are two examples using  \tcode{<cstdio>}'s \tcode{FILE *} and POSIX\tcode{<fcntl.h>}'s and \tcode{<unistd.h>}'s \tcode{int} file handles. See the following code examples on using \tcode{unique_resource} with \tcode{int} and \tcode{FILE *} handle types.
+
+Both examples motivate the use case of the automatic conversion to use the return value of the factory as if it was the handle. 
+
+\begin{codeblock}
+void demonstrate_unique_resource_with_stdio() {
+  const std::string filename = "hello.txt";
+  {
+    auto file=make_unique_resource(::fopen(filename.c_str(),"w"),&::fclose);
+    ::fputs("Hello World!\n", file);
+    ASSERT(file.get()!= NULL);
+  }
+  {
+    std::ifstream input { filename };
+    std::string line { };
+    getline(input, line);
+    ASSERT_EQUAL("Hello World!", line);
+    getline(input, line);
+    ASSERT(input.eof());
+  }
+  ::unlink(filename.c_str());
+  {
+    auto file = make_unique_resource_checked(::fopen("nonexistingfile.txt", "r"), 
+                (FILE*) NULL, &::fclose);
+    ASSERT_EQUAL((FILE*)NULL, file.get());
+  }
+
+}
+\end{codeblock}
+
+\newpage
+\begin{codeblock}
+void demontrate_unique_resource_with_POSIX_IO() {
+  const std::string filename = "./hello1.txt";
+  {
+    auto file=make_unique_resource(::open(filename.c_str(),
+                     O_CREAT|O_RDWR|O_TRUNC,0666), &::close);
+    
+    ::write(file, "Hello World!\n", 12u);
+    ASSERT(file.get() != -1);
+  }
+  {
+    std::ifstream input { filename };
+    std::string line { };
+    getline(input, line);
+    ASSERT_EQUAL("Hello World!", line);
+    getline(input, line);
+    ASSERT(input.eof());
+  }
+  ::unlink(filename.c_str());
+  {
+    auto file = make_unique_resource_checked(::open("nonexistingfile.txt", 
+                       O_RDONLY), -1, &::close);
+    ASSERT_EQUAL(-1, file.get());
+  }
+
+}\end{codeblock}
+
+We refer to Andrej Alexandrescu's well-known many presentations as a motivation for scope_exit. Here is a brief example on how to use the 3 proposed factories. One is mandatory, the others are optional but address Andrej's examples.
+
+\begin{codeblock}
+void demo_scope_exit_fail_success(){
+  std::ostringstream out{};
+  auto lam=[&]{out << "called ";};
+  try{
+    auto v=make_scope_exit([&]{out << "always ";});
+    auto w=make_scope_success([&]{out << "not ";}); // not called
+    auto x=make_scope_fail(lam); // called
+    throw 42;
+  }catch(...){
+    auto y=make_scope_fail([&]{out << "not ";}); // not called
+    auto z=make_scope_success([&]{out << "handled";}); // called
+  }
+  ASSERT_EQUAL("called always handled",out.str());
+}
+\end{codeblock}
+
+
+\chapter{Impact on the Standard}
+This proposal is a pure library extension. A new header, \tcode{<scope>} is proposed, but it does not require changes to any standard classes or functions. It does not require any changes in the core language, and it has been implemented in standard C++ conforming to C++14, resp. draft C++17. Depending on the timing of the acceptance of this proposal, it might go into library fundamentals TS under the namespace std::experimental or directly in the working paper of the standard, once it is open again for future additions.
+
+\chapter{Design Decisions}
+\section{General Principles}
+The following general principles are formulated for \tcode{unique_resource}, and are valid for \tcode{scope_exit} correspondingly.
+\begin{itemize}
+\item Simplicity - Using \tcode{unique_resource} should be nearly as simple as using an unwrapped type.  The generator functions, cast operator, and accessors all enable this.
+\item Transparency - It should be obvious from a glance what each instance of a \tcode{unique_resource} object does.  By binding the resource to it's clean-up routine, the declaration of \tcode{unique_resource} makes its intention clear.
+\item Resource Conservation and Lifetime Management - Using \tcode{unique_resource} makes it possible to "allocate it and forget about it" in the sense that deallocation is always accounted for after the \tcode{unique_resource} has been initialized.
+\item Exception Safety - Exception unwinding is one of the primary reasons that \tcode{unique_resource} is needed.  Nevertheless the goal is to introduce a new container that will not throw during construction of the \tcode{unique_resource} itself. However, there are no intentions to provide safeguards for piecemeal construction of resource and deleter. If either fails, no unique_resource will be created, because the factory function unique_resource will not be called. It is not possible to use \tcode{make_unique_resource()} factory with resource types, functors or lambda capture types as deleter objects where copying might throw.
+\item Flexibility - \tcode{unique_resource} is designed to be flexible, allowing the use of lambdas or existing functions for clean-up of resources. 
+\end{itemize}
+
+\section{Prior Implementations}
+Please see N3677 from the May 2013 mailing (or http://www.andrewlsandoval.com/scope_exit/) for the previously proposed solution and implementation.  Discussion of N3677 in the (Chicago) Fall 2013 LEWG meeting led to the creation of \tcode{unique_resource} and \tcode{scope_exit} with the general agreement that such an implementation would be vastly superior to N3677 and would find favor with the LEWG.  Professor Sommerlad produced the implementation backing this proposal during the days following that discussion.
+
+N3677 has a more complete list of other prior implementations.
+
+N3830 provided an alternative approach to allow an arbitrary number of resources which was abandoned due to LEWG feedback 
+
+The following issues have been discussed by LEWG already:
+\begin{itemize}
+\item \textit{Should there be a companion class for sharing the resource \tcode{shared_resource} ?  (Peter thinks no. Ville thinks it could be provided later anyway.) } LEWG: NO.
+\item \textit{Should \tcode{~scope_exit()} and \tcode{unique_resource::invoke()} guard against deleter functions that throw with \tcode{try{ deleter(); }catch(...){}} (as now) or not?} LEWG: NO, but provide noexcept in detail.
+\item \textit{Does \tcode{scope_exit} need to be move-assignable? } LEWG: NO.
+\end{itemize}
+
+The following issues have been recommended by LWG already:
+\begin{itemize}
+\item Make it a facility available for free-standing implementations in a new header \tcode{<scope>} (\tcode{<utility>} doesn't work, because it is not available for free-standing implementations)
+\end{itemize}
+
+
+\section{Open Issues to be Discussed by LEWG}
+\begin{itemize}
+\item Should we make the regular constructor of the scope_exit templates private and friend the factory function only? This could prohibit the use as class members, which might sneakily be used to create "destructor" functionality by not writing a destructor.
+\item Should we provide factories \tcode{make_scope_success(ef)} and \tcode{make_scope_fail(ef)} to enable Alexandrescu's three scope-exiting modes?
+\end{itemize}
+
+
+\chapter{Technical Specifications}
+The following formulation is based on inclusion to the draft of the C++ standard. However, if it is decided to go into the Library Fundamentals TS, the position of the texts and the namespaces will have to be adapted accordingly, i.e., instead of namespace \tcode{std::} we suppose namespace \tcode{std::experimental::}.
+
+\section{Header}
+In section 17.6.1.1 Library contents [contents] add an entry to table 14 for the new header \tcode{<scope>}.
+
+In section 17.6.1.3 Freestanding implementations [compliance] add an extra row to table 16 and 
+in section [utilities.general] add the same extra row to table 44 
+%%TODO clearer specification 
+\begin{table}[htb]
+\caption{table 16 and table 44}
+\begin{center}
+\begin{tabular}{|lcl|}
+\hline
+&Subclause & Header\\
+\hline
+20.nn &Scope Guard Support & \tcode{<scope>}\\
+\hline
+\end{tabular}
+\end{center}
+\label{utilities}
+\end{table}%
+
+\section{Additional sections}
+Add a a new section to chapter 20 introducing the contents of the header \tcode{<scope>}.
+
+%\rSec1[utilities.scope]{Scope Guard}
+\section{Scope guard support [scope]}
+This subclause contains infrastructure for a generic scope guard and RAII (resource acquisition is initialization) resource wrapper.\\
+\\
+\synopsis{Header \tcode{<scope>} synopsis}
+
+
+\begin{codeblock}
+namespace std {
+template <typename EF>
+class scope_exit;
+
+template <typename EF>
+scope_exit<EF> make_scope_exit(EF exit_function) noexcept;
+template <typename EF>
+scope_exit<@\seebelow@> make_scope_fail(EF exit_function) noexcept;
+template <typename EF>
+scope_exit<@\seebelow@> make_scope_success(EF exit_function) noexcept;
+
+template<typename R,typename D>
+class unique_resource;
+
+template<typename R,typename D>
+unique_resource<R, D>
+make_unique_resource( R  r, D d) noexcept;
+
+template<typename R,typename D, typename RI=R>
+unique_resource<R, D>
+make_unique_resource_checked(R r, RI invalid, D d) noexcept;
+
+}
+\end{codeblock}
+
+\pnum
+The header  \tcode{<scope>} defines the class templates \tcode{scope_exit} \tcode{unique_resource} 
+and the factory function templates \tcode{make_scope_exit()}, \tcode{make_scope_success()},
+\tcode{make_scope_fail()},
+\tcode{make_unique_resource()} and  \tcode{make_unique_resource_checked()} to create their instances. The usage of the RAII (resource acquisition is initialization) wrappers assumes that the resource type and the exit functions/deleter provided do not throw exceptions and that they are \tcode{nothrow_copy_constructible}.
+\enternote
+A user can use a \tcode{ref} wrapper in cases where the original types might not be copyable or might throw on copying to keep a reference of the corresponding lvalue.
+\exitnote 
+
+%\rSec2[scope.scope_exit]{Class Template \tcode{scope_exit}}
+\subsection {Class template \tcode{scope_exit} [scope.scope_exit]}
+
+\begin{codeblock}
+template <typename EF>
+class scope_exit {
+public:
+  explicit
+  scope_exit(EF f) noexcept;
+  scope_exit(scope_exit&& rhs) noexcept;
+  ~scope_exit() ;
+  void release() noexcept;
+
+  scope_exit(const scope_exit&)=delete;
+  scope_exit& operator=(const scope_exit&)=delete;
+  scope_exit& operator=(scope_exit&&)=delete;
+private:
+  EF exit_function;    // exposition only
+  bool execute_on_destruction_flag {true}; // exposition only
+};
+\end{codeblock}
+\pnum
+\enternote
+\tcode{scope_exit} is meant to be a universal scope guard to call its exit function on scope exit.
+\exitnote
+
+\pnum
+A client-supplied template argument
+\tcode{EF} shall be a function
+object type~(
+20.9
+%\ref{function.objects}
+) 
+for which, given
+a value \tcode{f} of type \tcode{EF} the expression
+\tcode{f()} is valid.
+
+\pnum
+\requires \tcode{EF} shall be a CopyConstructible (Table~21
+%\ref{copyconstructible}
+) function object type and copying shall not throw an exception. 
+The expression \tcode{exit_function()} shall be valid.
+%and shall not throw an exception. %% thanks to Daniel %% removed again
+
+\pnum
+If the exit function type \tcode{EF} shall satisfy
+the requirements of \tcode{Destructible} (Table~24
+%\ref{destructible}
+).
+
+\begin{itemdecl}
+explicit
+scope_exit(EF f) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects constructs a \tcode{scope_exit} object that will call \tcode{f()} on its destruction unless \tcode{release()} was called prior to that.
+\end{itemdescr}
+
+\begin{itemdecl}
+scope_exit(scope_exit&& rhs) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects As if
+\begin{codeblock}
+  exit_function = rhs.exit_function;
+  execute_on_destruction_flag = rhs.execute_on_destruction_flag;
+  rhs.release();
+\end{codeblock}
+%Move constructs \tcode{exit_function} from \tcode{rhs.exit_function}. Copies the release state from \tcode{rhs}, and sets \tcode{rhs.execute_on_destruction=false} to the released state, preventing it from invoking its copy of \tcode{exit_function}.
+\end{itemdescr}
+
+\begin{itemdecl}
+~scope_exit();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects 
+\begin{codeblock}
+  if(execute_on_destruction_flag)
+    exit_function();
+\end{codeblock}
+%Calls \tcode{exit_function()} unless \tcode{release()} was previously called.
+\end{itemdescr}
+
+\begin{itemdecl}
+void release() noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects \tcode{execute_on_destruction_flag=false}.
+%Prevents \tcode{exit_function()} from being called on destruction.
+\end{itemdescr}
+
+
+%\rSec2[scope.make_scope_exit]{\tcode{scope_exit} factory function }
+\subsection {\tcode{scope_exit} factory functions [scope.make_scope_exit]}
+\pnum
+The factory functions create \tcode{scope_exit} objects, that run \tcode{exit_function} at scope exit if not \tcode{release()}d under the following conditions:
+\begin{description}
+\item[make_scope_exit ] always, if scope is left
+\item[make_scope_fail ] if scope is left with an exception
+\item[make_scope_success ] if scope is left without any exception
+\end{description}
+\pnum
+\enternote
+These factory functions allow declarative control flow when used with lambdas as arguments if their return value is stored in a local variable. An exception thrown from \tcode{exit_function} when called from \tcode{scope_exit}'s destructor causes the program to \tcode{terminate()}.
+\exitnote
+
+\begin{itemdecl}
+template <typename EF>
+scope_exit<EF> make_scope_exit(EF exit_function) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+The factory function creates a \tcode{scope_exit} object, that runs \tcode{exit_function} at scope exit unless \tcode{release()} was called before.
+
+\end{itemdescr}
+
+\begin{itemdecl}
+template <typename EF>
+scope_exit<@\seebelow@> make_scope_fail(EF exit_function) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns As if
+\begin{codeblock}
+  make_scope_exit([=,ec=std::uncaught_exceptions()]
+    {
+      if (ec < uncaught_exceptions()) exit_function();
+    })
+\end{codeblock}
+\end{itemdescr}
+\begin{itemdecl}
+template <typename EF>
+scope_exit<@\seebelow@> make_scope_success(EF exit_function) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns As if
+\begin{codeblock}
+  make_scope_exit([=,ec=std::uncaught_exceptions()]
+    {
+      if (!(ec < uncaught_exceptions())) exit_function();
+    })
+\end{codeblock}
+
+\end{itemdescr}
+
+
+
+%%%--------- unique_resource
+
+%\rSec2[scope.unique_resource]{Unique Resource Wrapper}
+\subsection{Unique resource wrapper [scope.unique_resource]}
+
+%\rSec2[scope.unique_resource.class]{Class Template \tcode{unique_resource}}
+\subsection {Class template \tcode{unique_resource} [scope.unique_resource.class]}
+
+\begin{codeblock}
+template<typename R,typename D>
+class unique_resource {
+public:
+  unique_resource(R r, D d) noexcept;
+  unique_resource(unique_resource&& other) noexcept;
+  unique_resource& operator=(unique_resource&& other) noexcept;
+  unique_resource& operator=(unique_resource const &)=delete;
+  unique_resource(unique_resource const &)=delete; 
+  ~unique_resource();
+  void reset();
+  void reset(R r);
+  R release() noexcept;
+  R const & get() const noexcept;
+  operator R const &() const noexcept;
+  R operator->() const noexcept;
+  const D& get_deleter() const noexcept;
+private:
+  R resource; // exposition only
+  D deleter; // exposition only
+  bool execute_on_destruction; // exposition only
+};
+\end{codeblock}
+
+\pnum
+\enternote
+\tcode{unique_resource} is meant to be a universal RAII wrapper for resource handles provided by an operating system or platform.
+Typically, such resource handles are of trivial type and come with a factory function and a clean-up or deleter function that do not throw exceptions.
+The clean-up function together with the result of the factory function is used to create a \tcode{unique_resource} variable, that on destruction will call the clean-up function. Access to the underlying resource handle is achieved through a set of convenience functions or type conversion so that it can be used in place of the wrapped handle value.
+\exitnote
+
+
+\pnum 
+The template argument
+\tcode{D} shall be a CopyConstructible (Table~21
+%\ref{copyconstructible}
+) 
+function object type~(20.9
+%\ref{function.objects}
+), 
+for which, given
+a value \tcode{d} of type \tcode{D} and a value
+\tcode{r} of type \tcode{R}, the expression
+\tcode{d(r)} is valid and does not throw an exception,
+and copy construction of type D shall not throw an exception.
+
+\pnum
+\tcode{R} shall be a CopyConstructible and CopyAssignable.
+%and shall not throw an exception.  %% thanks to Daniel
+Copy construction and move assignment of \tcode{D} and \tcode{R} shall not throw an exception.
+
+\begin{itemdecl}
+unique_resource(R r, D d) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects constructs a \tcode{unique_resource} from \tcode{r} and \tcode{d}.
+
+\pnum
+\postconditions \tcode{get() == r}.
+\tcode{get_deleter()} returns a reference to the stored
+function object \tcode{d}.
+\end{itemdescr}
+
+\begin{itemdecl}
+unique_resource(unique_resource&& other) noexcept;
+\end{itemdecl}
+
+\pnum
+\effects move-constructs a \tcode{unique_resource} from \tcode{other}'s members then calls \tcode{other.release()}.
+
+\begin{itemdecl}
+unique_resource& operator=(unique_resource&& other) noexcept;
+\end{itemdecl}
+\pnum
+\effects As if
+\begin{codeblock}
+  reset();
+  resource = std::move(other.resource);
+  deleter = std::move(other.deleter);
+  execute_on_destruction = other.execute_on_destruction;
+  other.release();
+\end{codeblock}
+
+\begin{itemdecl}
+~unique_resource();
+\end{itemdecl}
+
+\pnum
+\effects \tcode{reset()}.
+
+\begin{itemdecl}
+void reset();
+\end{itemdecl}
+
+\pnum
+\effects As if
+\begin{codeblock}
+  if (execute_on_destruction) {
+    execute_on_destruction=false;
+    get_deleter()(resource);
+  }
+\end{codeblock}
+
+\begin{itemdecl}
+void reset(R r) ;
+\end{itemdecl}
+
+\pnum
+\effects As if
+\begin{codeblock}
+  reset();
+  resource = move(r);
+  execute_on_destruction = true;
+\end{codeblock}
+
+%Invokes the deleter function for resource if it was not previously released, e.g. \tcode{ this->reset(); }  Then moves newresource into the tracked resource member, e.g. \tcode{this->resource = std::move(newresource);}  Finally sets the object in the non-released state so that the deleter function will be invoked on destruction if \tcode{release()} is not called first.
+
+\pnum
+\enternote This function takes the role of an assignment of a new resource.
+\exitnote
+
+\pnum
+\enternote If calling the \tcode{get_deleter()(get())} might throw, use of one of the \tcode{reset()} member functions in a try-block can avoid termination if \tcode{unique_resource} is deleted during stack unwinding when another exception is thrown. Afterwards \tcode{release()} should be called on the \tcode{unique_resource} before it is destroyed.
+\exitnote
+
+\begin{itemdecl}
+R release() noexcept;
+\end{itemdecl}
+
+\pnum
+\effects \tcode{execute_on_destruction = false}.
+
+\pnum
+\returns \tcode{resource}
+
+\begin{itemdecl}
+const R& get() const noexcept ;
+operator const R&() const noexcept ;
+R operator->() const noexcept ;
+\end{itemdecl}
+
+\pnum
+\requires \tcode{operator->} is only available if \\
+\tcode{is_pointer<R>::value \&\& }\\\tcode{(is_class<remove_pointer_t<R>>::value || }\tcode{is_union<remove_pointer_t<R>>::value)} is \tcode{true}. 
+
+\pnum
+\returns \tcode{resource}.
+
+\begin{itemdecl}
+const DELETER & get_deleter() const noexcept;
+\end{itemdecl}
+
+\pnum
+\returns \tcode{deleter}
+
+%\rSec2[scope.unique_resource.make_unique_resource]{Factories \tcode{unique_resource}}
+\subsection {Factories for \tcode{unique_resource} [scope.unique_resource.make_unique_resource]}
+\begin{itemdecl}
+template<typename R,typename D>
+unique_resource<R,D>
+make_unique_resource( R r, D d) noexcept;
+\end{itemdecl}
+
+\pnum
+\returns \tcode{unique_resource<R,D>(r,d)}
+
+\begin{itemdecl}
+template<typename R,typename D, typename S=R>
+unique_resource<R,D>
+make_unique_resource_checked(R r, S invalid, D d ) noexcept;
+\end{itemdecl}
+
+\pnum
+\requires \tcode{R} and \tcode{S} shall be EqualityComparable with each other.
+
+\pnum
+\effects As if
+\begin{codeblock}
+  bool mustrelease = ! bool(r == invalid);
+  auto ur= unique_resource<R,D>(r, d);
+  if(mustrelease) ur.release();
+  return ur;
+\end{codeblock}
+
+\newpage
+\chapter{Appendix: Example Implementations}
+This implementation is incomplete and might not conform to the specification.
+
+\section{Scope Guard Helper}
+\begin{codeblock}
+#ifndef SCOPE_EXIT_H_
+#define SCOPE_EXIT_H_
+
+#include <exception>
+
+namespace std {
+namespace experimental {
+
+template<typename EF>
+struct scope_exit {
+  // construction
+  explicit scope_exit(EF f) noexcept
+  :exit_function {f}
+  {
+    static_assert(std::is_nothrow_copy_constructible<EF>{},
+      "must be copyable");
+  }
+  // move
+  scope_exit(scope_exit &&rhs) noexcept
+      :exit_function {rhs.exit_function}
+  ,execute_on_destruction_flag {rhs.execute_on_destruction_flag}
+  {
+    rhs.release();
+  }
+  // release
+  ~scope_exit()
+  {
+    if (execute_on_destruction_flag)
+      exit_function();
+  }
+  void release() noexcept {execute_on_destruction_flag=false;}
+
+  scope_exit(scope_exit const &)=delete;
+  scope_exit& operator=(scope_exit const &)=delete;
+  scope_exit& operator=(scope_exit &&)=delete;
+private:
+  EF exit_function; // exposition only
+  bool execute_on_destruction_flag {true}; // exposition only
+};
+\end{codeblock}
+\newpage
+\begin{codeblock}
+template<typename EF>
+auto make_scope_exit(EF exit_function) noexcept {
+  return scope_exit<EF>(exit_function);
+}
+template<typename EF>
+auto make_scope_fail(EF exit_function) noexcept {
+  return make_scope_exit(
+    [=,ec=std::uncaught_exceptions()]
+    { if (ec < uncaught_exceptions()) exit_function(); }
+    );
+}
+
+template<typename EF>
+auto make_scope_success(EF exit_function) noexcept {
+  return make_scope_exit(
+    [=,ec=std::uncaught_exceptions()]
+    { if (!(ec < uncaught_exceptions())) exit_function(); }
+    );
+}}}
+#endif /* SCOPE_EXIT_H_ */
+\end{codeblock}
+
+
+\section{Unique Resource}
+\begin{codeblock}
+#ifndef UNIQUE_RESOURCE_H_
+#define UNIQUE_RESOURCE_H_
+#include <type_traits>
+namespace std{
+namespace experimental{
+namespace __detail {
+template <typename D, typename R,typename=void>
+struct provide_operator_arrow_for_pointer_to_class_types{}; // R is non-pointer or pointer-to-non-class-type
+
+template <typename DERIVED, typename R>
+struct provide_operator_arrow_for_pointer_to_class_types<DERIVED, R,
+  typename std::enable_if<std::is_pointer<R>::value
+    && (
+        std::is_class<std::remove_pointer_t<R>>::value ||
+        std::is_union<std::remove_pointer_t<R>>::value )
+    >::type >
+{
+  R operator->() const {
+    return static_cast<const DERIVED*>(this)->get();
+  }
+};
+}
+\end{codeblock}
+\newpage
+\begin{codeblock}
+template<class R,class D>
+class unique_resource
+    :public
+     __detail::provide_operator_arrow_for_pointer_to_class_types<
+        unique_resource<R,D>,R> {
+  static_assert(std::is_nothrow_copy_constructible<R>{},
+    "RESOURCE type must not throw on copy");
+  static_assert(std::is_nothrow_copy_constructible<D>{},
+    "DELETER type must not throw on copy");
+public:
+  // construction
+  explicit
+  unique_resource(R r, D d) noexcept
+    :  resource{r}
+    ,  deleter{d}
+    { }
+
+  unique_resource(unique_resource &&other) noexcept
+  :resource(std::move(other.resource))
+  ,deleter(std::move(other.deleter))
+  ,execute_on_destruction{other.execute_on_destruction}
+  {
+    other.release();
+  }
+  unique_resource(unique_resource const &)=delete; // no copies!
+  unique_resource& operator=(unique_resource  &&other)
+    noexcept(noexcept(unique_resource::reset()))
+  {
+    reset();
+    deleter=std::move(other.deleter);
+    resource=std::move(other.resource);
+    execute_on_destruction=other.execute_on_destruction;
+    other.release();
+    return *this;
+  }
+  unique_resource& operator=(unique_resource const &)=delete;
+  ~unique_resource()
+  {
+    reset();
+  }
+\end{codeblock}
+\newpage
+\begin{codeblock}
+  void reset()
+  {
+    if (execute_on_destruction) {
+      execute_on_destruction = false;
+      get_deleter()(resource);
+    }
+  }
+  void reset(R r)
+  {
+    reset();
+    resource = r;
+    execute_on_destruction = true;
+  }
+  R release() noexcept{
+    execute_on_destruction = false;
+    return get();
+  }
+
+  R const & get() const noexcept {
+    return resource;
+  }
+  operator R const &() const noexcept {
+    return resource;
+  }
+
+  const D &
+  get_deleter() const noexcept {
+    return deleter;
+  }
+private:
+  R resource; // exposition only
+  D deleter;  // exposition only
+  bool execute_on_destruction = true; // exposition only
+};
+
+//factories
+template<class R,class D>
+auto
+make_unique_resource(R resource, D deleter) noexcept {
+  return unique_resource<R, D>(resource,deleter);
+}
+
+template<class R,class D, class S=R>
+auto
+make_unique_resource_checked(R r, S invalid, D d ) noexcept {
+  bool mustrelease = not bool(r == invalid);
+  auto ur= unique_resource<R,D>(r, d);
+  if(mustrelease) ur.release();
+  return ur;
+}
+}}
+#endif /* UNIQUE_RESOURCE_H_ */
+\end{codeblock}
+
+\end{document}
+
