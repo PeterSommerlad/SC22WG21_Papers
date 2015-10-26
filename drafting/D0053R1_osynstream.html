@@ -96,7 +96,7 @@ td {
 <h1>C++ Synchronized Buffered Ostream</h1>
 
 <p>
-ISO/IEC JTC1 SC22 WG21 P0053R1 - 2015-10-22
+ISO/IEC JTC1 SC22 WG21 P0053R1 - 2015-10-24
 </p>
 
 <p>
@@ -109,6 +109,7 @@ Nicolai Josuttis
 <a href="#Introduction">Introduction</a><br>
 <a href="#Solution">Solution</a><br>
 <a href="#Design">Design</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Feature">Feature Test</a><br>
 <a href="#Wording">Wording</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#contents">17.6.1 Library contents [contents]</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#input.output.general">27.1 General [input.output.general]</a><br>
@@ -253,6 +254,13 @@ e.g. with Posix file locks
 <a href="#PSL">[PSL]</a>
 </p>
 
+<h3><a name="Feature">Feature Test</a></h3>
+
+<p>
+No header called <code>&lt;syncstream&gt;</code> exists;
+testing for this header's existence is thus sufficient
+for testing existence of the feature.
+</p>
 
 <h2><a name="Wording">Wording</a></h2>
 
@@ -646,6 +654,12 @@ Notify that move construction and assignment is deleted.
 <li>
 <p>
 Moved class noteflush_streambuf into an implementation note.
+</p>
+</li>
+<li>
+<p>
+Add a design subsection that states that
+a header test is a sufficient feature test.
 </p>
 </li>
 </ul>
