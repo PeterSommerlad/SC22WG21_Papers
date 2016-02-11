@@ -11,32 +11,34 @@
 \usepackage{underscore}   % remove special status of '_' in ordinary text
 \usepackage{xspace}
 \pagestyle{myheadings}
-\markboth{P0052R1 2015-10-23}{P0052 2015-10-23}
+\markboth{P0052R1 2016-02-12}{P0052R1 2016-02-12}
 
 \title{P0052R1 - Generic Scope Guard and RAII Wrapper for the Standard Library}
 \author{Peter Sommerlad and Andrew L. Sandoval}
-\date{2015-10-23}                                           % Activate to display a given date or no date
+\date{2016-02-12}                                           % Activate to display a given date or no date
 \input{macros}
 \setsecnumdepth{subsection}
 
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: D0052R1 &   (update of N4189, N3949, N3830, N3677)\\\hline
-Date: & 2015-10-23 \\\hline
+Document Number: P0052R1 &   (update of N4189, N3949, N3830, N3677)\\\hline
+Date: & 2016-02-12 \\\hline
 Project: & Programming Language C++\\\hline 
 \end{tabular}
 
 \chapter{History}
 
 \section{Changes from P0052R0}
-In Kona LWG gave a lot of feedback and especially expressed the desire to simplify the constructors and specification by only allowing \emph{nothrow-copyable} \tcode{RESOURCE} and \tcode{DELETER} types. If a reference is required, because they aren't, users are encouraged to use \tcode{std::ref} wrapper instead.
+In Kona LWG gave a lot of feedback and especially expressed the desire to simplify the constructors and specification by only allowing \emph{nothrow-copyable} \tcode{RESOURCE} and \tcode{DELETER} types. If a reference is required, because they aren't, users are encouraged to pass a \tcode{std::ref/std::cref} wrapper to the factory function instead.
 \begin{itemize}
 \item Simplified constructor specifications by restricting on nothrow copyable types. Facility is intended for simple types anyway. It also avoids the problem of using a type-erased \tcode{std::function} object as the deleter, because it could throw on copy.
 \item Add some motivation again, to ease review and provide reason for specific API issues.
 \item Make "Alexandrescu's" "declarative" scope exit variation employing \tcode{uncaught_exceptions()} counter optional factories to chose or not.
 \item propose to make it available for standalone implementations and add the header \tcode{<scope>} to corresponding tables.
 \item editorial adjustments
+\item re-established \tcode{operator*} for \tcode{unique_resource}.
+\item overload of \tcode{make_unique_resource} to handle \tcode{reference_wrapper} for resources. No overload for reference-wrapped deleter functions is required, because \tcode{reference_wrapper} provides the call forwarding.
 \end{itemize}
 
 \section{Changes from N4189}
@@ -392,7 +394,7 @@ void release() noexcept;
 The factory functions create \tcode{scope_exit} objects that run \tcode{exit_function} at scope exit  under the following conditions unless \tcode{release()} was called on the returned object:
 \begin{description}
 \item[make_scope_exit ] always, if scope is exited
-\item[make_scope_fail ] if scope is exited an exception
+\item[make_scope_fail ] if scope is exited by throwing an exception
 \item[make_scope_success ] if scope is exited without any exception
 \end{description}
 \pnum
@@ -469,7 +471,8 @@ public:
   R const & get() const noexcept;
   operator R const &() const noexcept;
   R operator->() const noexcept;
-  const D& get_deleter() const noexcept;
+  @\seebelow@ operator*() const noexcept;
+  const D & get_deleter() const noexcept;
 private:
   R resource; // exposition only
   D deleter; // exposition only
@@ -605,9 +608,16 @@ R operator->() const noexcept ;
 \pnum
 \returns \tcode{resource}.
 
+\begin{itemdecl}
+@\seebelow@ operator*() const noexcept ;
+\end{itemdecl}
+
 \pnum
-\enternote If R is a pointer type, dereferencing is available through the type conversion operator.
-\exitnote
+\requires \tcode{operator*} is only available if \tcode{is_pointer<R>::value} is \tcode{true}.
+
+\pnum
+\returns \tcode{*resource}. \enternote The return type is equivalent to 
+\tcode{add_lvalue_reference_t<remove_pointer_t<R>>}. \exitnote
 
 
 \begin{itemdecl}
@@ -627,6 +637,19 @@ make_unique_resource( R r, D d) noexcept;
 
 \pnum
 \returns \tcode{unique_resource<R,D>(r,d)}
+
+\begin{itemdecl}
+template<typename R,typename D>
+unique_resource<R&,D>
+make_unique_resource( reference_wrapper<R> r, D d) noexcept;
+\end{itemdecl}
+
+\pnum
+\returns \tcode{unique_resource<R\&,D>(r.get(),d)}
+
+\pnum \enternote There is no need to overload on \tcode{reference_wrapper} for the deleter. \exitnote
+
+
 
 \begin{itemdecl}
 template<typename R,typename D, typename S=R>
@@ -657,66 +680,67 @@ This implementation is incomplete and might not conform to the specification.
 #define SCOPE_EXIT_H_
 
 #include <exception>
+#include <utility>
+// modeled slightly after Andrescu's talk and article(s)
 
 namespace std {
 namespace experimental {
 
 template<typename EF>
 struct scope_exit {
-  // construction
-  explicit scope_exit(EF f) noexcept
-  :exit_function {f}
-  {
-    static_assert(std::is_nothrow_copy_constructible<EF>{},
-      "must be copyable");
-  }
-  // move
-  scope_exit(scope_exit &&rhs) noexcept
-      :exit_function {rhs.exit_function}
-  ,execute_on_destruction {rhs.execute_on_destruction}
-  {
-    rhs.release();
-  }
-  // release
-  ~scope_exit()
-  {
-    if (execute_on_destruction)
-      exit_function();
-  }
-  void release() noexcept {execute_on_destruction=false;}
+	// construction
+	explicit scope_exit(EF f) noexcept
+	:exit_function {f}
+	{
+		static_assert(std::is_nothrow_copy_constructible<EF>{},"must be copyable");
+	}
+	// move ctor for factory
+	scope_exit(scope_exit &&rhs) noexcept
+			:exit_function {rhs.exit_function}
+	,execute_on_destruction_flag {rhs.execute_on_destruction_flag}
+	{
+		rhs.release();
+	}
+	// release
+	~scope_exit()
+	{
+		if (execute_on_destruction_flag)
+			exit_function();
+	}
+	void release() noexcept {execute_on_destruction_flag=false;}
 
-  scope_exit(scope_exit const &)=delete;
-  scope_exit& operator=(scope_exit const &)=delete;
-  scope_exit& operator=(scope_exit &&)=delete;
+	scope_exit(scope_exit const &)=delete;
+	scope_exit& operator=(scope_exit const &)=delete;
+	scope_exit& operator=(scope_exit &&)=delete;
 private:
-  EF exit_function; // exposition only
-  bool execute_on_destruction {true}; // exposition only
+	EF exit_function; // exposition only
+	bool execute_on_destruction_flag {true}; // exposition only
 };
 \end{codeblock}
 \newpage
 \begin{codeblock}
+
 template<typename EF>
 auto make_scope_exit(EF exit_function) noexcept {
-  return scope_exit<EF>(exit_function);
+	return scope_exit<EF>(exit_function);
 }
 template<typename EF>
 auto make_scope_fail(EF exit_function) noexcept {
-  return make_scope_exit(
-    [=,ec=std::uncaught_exceptions()]
-    { if (ec < uncaught_exceptions()) exit_function(); }
-    );
+	return make_scope_exit([=,ec=std::uncaught_exceptions()]()
+	          {if (ec < uncaught_exceptions()) exit_function();});
 }
 
 template<typename EF>
 auto make_scope_success(EF exit_function) noexcept {
-  return make_scope_exit(
-    [=,ec=std::uncaught_exceptions()]
-    { if (!(ec < uncaught_exceptions())) exit_function(); }
-    );
-}}}
+	return make_scope_exit([=,ec=std::uncaught_exceptions()]()
+	          {if (!(ec < uncaught_exceptions())) exit_function();});
+}
+
+}
+}
+
 #endif /* SCOPE_EXIT_H_ */
 \end{codeblock}
-
 
 \section{Unique Resource}
 \begin{codeblock}
@@ -731,114 +755,141 @@ struct provide_operator_arrow_for_pointer_to_class_types{}; // R is non-pointer 
 
 template <typename DERIVED, typename R>
 struct provide_operator_arrow_for_pointer_to_class_types<DERIVED, R,
-  typename std::enable_if<std::is_pointer<R>::value
-    && (
-        std::is_class<std::remove_pointer_t<R>>::value ||
-        std::is_union<std::remove_pointer_t<R>>::value )
-    >::type >
+	typename std::enable_if<std::is_pointer<R>::value
+		&& (
+				std::is_class<std::remove_pointer_t<R>>::value ||
+				std::is_union<std::remove_pointer_t<R>>::value )
+		>::type >
+
 {
-  R operator->() const {
-    return static_cast<const DERIVED*>(this)->get();
-  }
+	R operator->() const {
+		return static_cast<const DERIVED*>(this)->get();
+	}
 };
-}
 \end{codeblock}
 \newpage
 \begin{codeblock}
+template <typename D, typename R,typename=void>
+struct provide_operator_star_for_pointer_types{}; // R is non-pointer or pointer-to-non-class-type
+
+template <typename DERIVED, typename R>
+struct provide_operator_star_for_pointer_types<DERIVED, R,
+	 std::enable_if_t<std::is_pointer<R>::value,void*> >
+
+{
+	std::add_lvalue_reference_t<std::remove_pointer_t<R>>
+	operator*() const noexcept {
+		return * (static_cast<const DERIVED*>(this)->get());
+	}
+};
+
+} // namespace detail
+
 template<class R,class D>
 class unique_resource
-    :public
-     __detail::provide_operator_arrow_for_pointer_to_class_types<
-        unique_resource<R,D>,R> {
-  static_assert(std::is_nothrow_copy_constructible<R>{},
-    "RESOURCE type must not throw on copy");
-  static_assert(std::is_nothrow_copy_constructible<D>{},
-    "DELETER type must not throw on copy");
+		:public
+		 __detail::provide_operator_arrow_for_pointer_to_class_types<
+		 	 unique_resource<R,D>,R>
+		, __detail::provide_operator_star_for_pointer_types<unique_resource<R,D>,R>{
+	static_assert(std::is_nothrow_copy_constructible<R>{},"RESOURCE type must not throw on copy");
+	static_assert(std::is_nothrow_copy_constructible<D>{},"DELETER type must not throw on copy");
 public:
-  // construction
-  explicit
-  unique_resource(R r, D d) noexcept
-    :  resource{r}
-    ,  deleter{d}
-    { }
+	// construction
+	explicit
+	unique_resource(R r, D d) noexcept
+		:  resource{r}
+		,  deleter{d}
+	{
+	}
 
-  unique_resource(unique_resource &&other) noexcept
-  :resource(std::move(other.resource))
-  ,deleter(std::move(other.deleter))
-  ,execute_on_destruction{other.execute_on_destruction}
-  {
-    other.release();
-  }
-  unique_resource(unique_resource const &)=delete; // no copies!
-  unique_resource& operator=(unique_resource  &&other)
-    noexcept(noexcept(unique_resource::reset()))
-  {
-    reset();
-    deleter=std::move(other.deleter);
-    resource=std::move(other.resource);
-    execute_on_destruction=other.execute_on_destruction;
-    other.release();
-    return *this;
-  }
-  unique_resource& operator=(unique_resource const &)=delete;
-  ~unique_resource()
-  {
-    reset();
-  }
+	unique_resource(unique_resource &&other) noexcept
+	:resource(std::forward<R>(other.resource))
+	,deleter(std::move(other.deleter))
+	,execute_on_destruction{other.execute_on_destruction}
+	{
+		other.release();
+	}
+	unique_resource(unique_resource const &)=delete; // no copies!
 \end{codeblock}
 \newpage
 \begin{codeblock}
-  void reset()
-  {
-    if (execute_on_destruction) {
-      execute_on_destruction = false;
-      get_deleter()(resource);
-    }
-  }
-  void reset(R r)
-  {
-    reset();
-    resource = r;
-    execute_on_destruction = true;
-  }
-  R release() noexcept{
-    execute_on_destruction = false;
-    return get();
-  }
+	unique_resource& operator=(unique_resource  &&other)
+		noexcept(noexcept(unique_resource::reset()))
+	{
+		reset();
+		deleter=std::move(other.deleter);
+		resource=std::move(other.resource);
+		execute_on_destruction=other.execute_on_destruction;
+		other.release();
+		return *this;
+	}
+	unique_resource& operator=(unique_resource const &)=delete;
+	~unique_resource()
+	{
+		reset();
+	}
+	void reset()
+	{
+		if (execute_on_destruction) {
+			execute_on_destruction = false;
+			get_deleter()(resource);
+		}
+	}
+	void reset(R r)
+	{
+		reset();
+		resource = r;
+		execute_on_destruction = true;
+	}
+	R release() noexcept{
+		execute_on_destruction = false;
+		return get();
+	}
 
-  R const & get() const noexcept {
-    return resource;
-  }
-  operator R const &() const noexcept {
-    return resource;
-  }
+	R const & get() const noexcept {
+		return resource;
+	}
+	operator R const &() const noexcept {
+		return resource;
+	}
 
-  const D &
-  get_deleter() const noexcept {
-    return deleter;
-  }
+	const D &
+	get_deleter() const noexcept {
+		return deleter;
+	}
 private:
-  R resource; // exposition only
-  D deleter;  // exposition only
-  bool execute_on_destruction = true; // exposition only
+	R resource; // exposition only
+	D deleter;  // exposition only
+	bool execute_on_destruction = true; // exposition only
 };
+\end{codeblock}
+\newpage
+\begin{codeblock}
 
 //factories
 template<class R,class D>
 auto
 make_unique_resource(R resource, D deleter) noexcept {
-  return unique_resource<R, D>(resource,deleter);
+	return unique_resource<R, D>(resource,deleter);
+}
+template<class R,class D>
+auto
+make_unique_resource(std::reference_wrapper<R> resource, D deleter) noexcept {
+	return unique_resource<R&, D>(resource.get(),deleter);
 }
 
 template<class R,class D, class S=R>
 auto
 make_unique_resource_checked(R r, S invalid, D d ) noexcept {
-  bool mustrelease =  bool(r == invalid);
-  auto ur= unique_resource<R,D>(r, d);
-  if(mustrelease) ur.release();
-  return ur;
+	bool mustrelease =  bool(r == invalid);
+	auto ur= unique_resource<R,D>(r, d);
+	if(mustrelease) ur.release();
+	return ur;
 }
+
 }}
+
+
 #endif /* UNIQUE_RESOURCE_H_ */
 \end{codeblock}
 
