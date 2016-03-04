@@ -4,6 +4,7 @@
 #include <exception>
 #include <utility>
 #include <functional> // for reference wrappers
+#include <limits> // for maxint
 // modeled slightly after Andrescu's talk and article(s)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wterminate"
@@ -29,11 +30,11 @@ struct on_exit_policy
 
 struct on_fail_policy
 {
-    std::size_t ec_ = std::uncaught_exceptions();
+    int ec_ = std::uncaught_exceptions();
 
     void release() noexcept
     {
-        ec_ = (std::size_t) -1;
+        ec_ = std::numeric_limits<int>::max();
     }
 
     bool should_execute() noexcept
@@ -44,16 +45,16 @@ struct on_fail_policy
 
 struct on_success_policy
 {
-    std::size_t ec_ = std::uncaught_exceptions() + 1;
+    int ec_ = std::uncaught_exceptions() ;
 
     void release() noexcept
     {
-        ec_ = 0;
+        ec_ = -1;
     }
 
     bool should_execute() noexcept
     {
-        return ec_ >= std::uncaught_exceptions() + 1;
+        return ec_ >= std::uncaught_exceptions() ;
     }
 };
 }

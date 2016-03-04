@@ -158,7 +158,7 @@ void demonstrate_unique_resource_with_stdio() {
 	const std::string filename = "hello.txt";
 	{
 		auto file = make_unique_resource(::fopen(filename.c_str(), "w"), &::fclose);
-		::fputs("Hello World!\n", file);
+		::fputs("Hello World!\n", file.get());
 		ASSERT(file.get()!= NULL);
 	}
 	{
@@ -182,7 +182,7 @@ void demontrate_unique_resource_with_POSIX_IO() {
 	{
 		auto file = make_unique_resource(::open(filename.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666), &::close);
 
-		::write(file, "Hello World!\n", 12u);
+		::write(file.get(), "Hello World!\n", 12u);
 		ASSERT(file.get() != -1);
 	}
 	{
@@ -215,8 +215,9 @@ void test_make_unique_resource_checked(){
 void testReferenceWrapper(){
 	std::ostringstream out{};
 	int i{42};
-	{ auto uref=make_unique_resource(std::ref(i),[&out](int &j){out << "reference to "<<j;});
-	static_assert(std::is_same<int &,decltype(uref.release())>::value," should be reference");
+	{
+		auto uref=make_unique_resource(std::ref(i),[&out](int &j){out << "reference to "<<j;});
+//	static_assert(std::is_same<int &,decltype(uref.release())>::value," should be reference");
 	}
 	ASSERT_EQUAL("reference to 42",out.str());
 }
@@ -271,7 +272,7 @@ void testCompilabilityGuardForPointerTypes() {
 	auto y = make_unique_resource(new X { }, [](X * ptr) {delete ptr;});
 	y->foo(); // compiles, SFINAE works
 	(void)*y; // compiles, through SFINAE (again)
-	ASSERT_EQUAL(42,*(int*)(void*)x);
+	ASSERT_EQUAL(42,*(int*)(void*)x.get());
 }
 
 // type erasure no longer works, because std::function's copy ctor can throw
