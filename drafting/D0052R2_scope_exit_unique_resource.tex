@@ -487,7 +487,8 @@ public:
   ~unique_resource();
   void swap(unique_resource &other);
   void reset();
-  void reset(R r);
+  void reset(R const & r);
+  void reset(R && r);
   void release() noexcept;
   R const & get() const noexcept;
   R operator->() const noexcept;
@@ -595,7 +596,8 @@ void reset();
 \end{codeblock}
 
 \begin{itemdecl}
-void reset(R r) ;
+void reset(R const & r) ;
+void reset(R && r) ;
 \end{itemdecl}
 
 \pnum
@@ -605,7 +607,7 @@ void reset(R r) ;
   resource = move(r);
   execute_on_destruction = true;
 \end{codeblock}
-If move-assignment of the resource fails, \tcode{get_deleter()(r)} on the original value of r.
+If move-assignment of the resource fails, \tcode{get_deleter()(r)} on the original value of \tcode{r} and \tcode{execute_on_destruction=false}.
 
 %Invokes the deleter function for resource if it was not previously released, e.g. \tcode{reset(); }  Then moves newresource into the tracked resource member, e.g. \tcode{resource = std::move(newresource);}  Finally sets the object in the non-released state so that the deleter function will be invoked on destruction if \tcode{release()} is not called first.
 
