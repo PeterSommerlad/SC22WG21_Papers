@@ -310,7 +310,8 @@ template <typename EF>
 class scope_exit {
 public:
   explicit
-  scope_exit(EF f) ;
+  scope_exit(EF const & f) ;
+  scope_exit(EF && f) ;
   scope_exit(scope_exit&& rhs) ;
   ~scope_exit() ;
   void release() noexcept;
@@ -338,11 +339,12 @@ class scope_success {
 
 
 \pnum
+\requires
 If template argument \tcode{EF} is not a reference type, 
 \tcode{EF} shall satisfy
 the requirements of \tcode{Destructible} (Table~24
 %\ref{destructible}
-).
+). \tcode{EF} is \tcode{Callable}.
 
 \pnum
 The following specification only lists special cases for \tcode{scope_fail} and \tcode{scope_success}, when their semantic differs from \tcode{scope_exit}.
@@ -350,32 +352,40 @@ The following specification only lists special cases for \tcode{scope_fail} and 
 
 \begin{itemdecl}
 explicit
-scope_exit(EF f) ;
+scope_exit(EF const & f) ;
+explicit
+scope_exit(EF && f) ;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
-\effects Constructs a \tcode{scope_exit} object that will call \tcode{f()} on its destruction unless \tcode{release()} was called prior to that.
+\effects Constructs a \tcode{scope_exit} object that will call \tcode{f()} on its destruction unless \tcode{release()} was called prior to that. If construction fails, calls \tcode{f()}.
 \end{itemdescr}
 
 \begin{itemdecl}
 explicit
-scope_fail(EF f) ;
+scope_fail(EF const & f) ;
+explicit
+scope_fail(EF && f) ;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
-\effects Constructs a \tcode{scope_fail} object that will call \tcode{f()} on its destruction if its scope is left with a new exception, unless \tcode{release()} was called prior to that.
+\effects Constructs a \tcode{scope_fail} object that will call \tcode{f()} on its destruction if its scope is left with a new exception, unless \tcode{release()} was called prior to that. If construction fails, calls \tcode{f()}.
+
 \end{itemdescr}
 
 \begin{itemdecl}
 explicit
-scope_success(EF f) ;
+scope_success(EF && f) ;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \effects Constructs a \tcode{scope_success} object that will call \tcode{f()} on its destruction if its scope is left without an exception, unless \tcode{release()} was called prior to that.
+\enternote
+If construction fails, \tcode{f()} won't be called.
+\exitnote
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -422,7 +432,7 @@ The factory functions create \tcode{scope_exit}, \tcode{scope_fail}, and \tcode{
 
 \begin{itemdecl}
 template <typename EF>
-scope_exit<EF> make_scope_exit(EF exit_function) ;
+scope_exit<decay_t<EF>> make_scope_exit(EF && exit_function) ;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -433,7 +443,7 @@ The factory function creates a \tcode{scope_exit} object, that runs \tcode{exit_
 
 \begin{itemdecl}
 template <typename EF>
-scope_fail<EF> make_scope_fail(EF exit_function) ;
+scope_fail<decay_t<EF>> make_scope_fail(EF && exit_function) ;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -443,7 +453,7 @@ The factory function creates a \tcode{scope_fail} object, that runs \tcode{exit_
 \end{itemdescr}
 \begin{itemdecl}
 template <typename EF>
-scope_success<EF> make_scope_success(EF exit_function) ;
+scope_success<decay_t<EF>> make_scope_success(EF && exit_function) ;
 \end{itemdecl}
 
 \begin{itemdescr}
