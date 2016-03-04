@@ -327,17 +327,19 @@ public:
     {
         resource.reset(std::ref(r));
     }
-    //std::remove_cv_t<R> release()
-    //    noexcept(std::is_nothrow_move_constructible<std::remove_cv_t<R>>::value)
-    //{
-    //    auto rref = resource.release();
-    //    auto &&guard = make_scope_fail([rref,this]{ resource.get_deleter()(rref.get()); });
-    //    return std::move_if_noexcept(rref.get());
-    //}
-    void release() noexcept
+//    std::remove_cv_t<R> release()
+    R& release()
+//PS: allow throwing:        noexcept(std::is_nothrow_move_constructible<std::remove_cv_t<R>>::value)
+    // but it won't, because references and reference wrapper are passed
     {
-        resource.release();
+        auto rref = resource.release();
+        //PS Not needed://auto &&guard = make_scope_fail([rref,this]{ resource.get_deleter()(rref.get()); });
+        return rref.get();//std::move_if_noexcept(rref.get());
     }
+//    void release() noexcept
+//    {
+//        resource.release();
+//    }
     R &get() const noexcept
     {
         return resource.get();
