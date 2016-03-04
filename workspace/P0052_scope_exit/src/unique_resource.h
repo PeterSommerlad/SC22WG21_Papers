@@ -3,7 +3,7 @@
 #include <type_traits>
 namespace std{
 namespace experimental{
-// contribution by Eric Niebler, adapted by Peter Sommerlad
+// contribution by (c) Eric Niebler, slightly adapted by Peter Sommerlad
 inline namespace _detail {
 
 struct _immovable
@@ -401,7 +401,7 @@ make_unique_resource_checked(R &&r, S const &invalid, D &&d)
     return ur;
 }
 
-
+// end of (c) Eric Niebler part
 
 
 #if 0

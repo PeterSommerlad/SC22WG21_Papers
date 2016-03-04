@@ -13,6 +13,7 @@ namespace std {
 namespace experimental {
 // new policy-based exception proof design by Eric Niebler
 namespace detail{
+// (c) copyright Eric Niebler, slightly adapted by Peter Sommerlad
 struct on_exit_policy
 {
     bool execute_ = true;
@@ -150,6 +151,7 @@ scope_success<std::decay_t<EF>> make_scope_success(EF &&ef)
 }
 #pragma GCC diagnostic pop
 
+// end (c) Eric Niebler
 
 #if 0
 template<typename EF>
