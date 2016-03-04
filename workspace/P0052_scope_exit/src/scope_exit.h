@@ -103,7 +103,7 @@ struct basic_scope_exit : private Policy
         throw;
     }
     basic_scope_exit(basic_scope_exit &&that)
-        noexcept(std::is_nothrow_move_constructible<EF>::value)
+        noexcept(std::is_nothrow_move_constructible<EF>{})
       try: Policy((Policy &&) that), ef_(std::move_if_noexcept(that.ef_))
     {
         that.release();

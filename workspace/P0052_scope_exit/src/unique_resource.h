@@ -253,17 +253,17 @@ public:
     }
     //// I would probably change release() to return void, but this is what it should
     //// look like if you wanted to return the value "safely".
-    R release()
+//    R release()
        // PS: allow throwing:  noexcept(std::is_nothrow_move_constructible<R>::value)
-    {
-        execute_on_destruction = false;
-        auto &&guard = make_scope_fail([this]{ _delete(get()); });
-        return std::move_if_noexcept(resource.value);
-    }
-//    void release() noexcept
 //    {
 //        execute_on_destruction = false;
+//        auto &&guard = make_scope_fail([this]{ _delete(get()); });
+//        return std::move_if_noexcept(resource.value);
 //    }
+    void release() noexcept
+    {
+        execute_on_destruction = false;
+    }
     R const &get() const noexcept
     {
         return resource.value;
@@ -272,10 +272,10 @@ public:
     {
         return deleter.value;
     }
-    explicit operator R const &() const noexcept // Not sure if this is still desirable.
-    {
-        return get();
-    }
+//    explicit operator R const &() const noexcept // Not sure if this is still desirable.
+//    {
+//        return get();
+//    }
     decltype(auto) operator*() const noexcept
     {
         return *get();
