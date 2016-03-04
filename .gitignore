@@ -42,3 +42,10 @@ drafting/N3xxx-complex_literals.pdf
 drafting/Nxxxx.pdf
 
 drafting/NXXXX_N3677.html
+
+Debug
+.metadata/
+.settings/
+*Test.xml
+.*.html
+
