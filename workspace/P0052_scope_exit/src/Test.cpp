@@ -217,7 +217,7 @@ void testReferenceWrapper(){
 	int i{42};
 	{
 		auto uref=make_unique_resource(std::ref(i),[&out](int &j){out << "reference to "<<j;});
-	static_assert(std::is_same<int &,decltype(uref.release())>::value," should be reference");
+//	static_assert(std::is_same<int &,decltype(uref.release())>::value," should be reference");
 	}
 	ASSERT_EQUAL("reference to 42",out.str());
 }

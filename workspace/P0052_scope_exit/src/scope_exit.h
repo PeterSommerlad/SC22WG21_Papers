@@ -74,7 +74,7 @@ using scope_success = basic_scope_exit<EF, detail::on_success_policy>;
 namespace detail{
 // DETAIL:
 template<class Policy, class EF>
-basic_scope_exit<std::decay_t<EF>, Policy> _make_guard(EF &&ef)
+auto _make_guard(EF &&ef)
 {
     return basic_scope_exit<std::decay_t<EF>, Policy>(std::forward<EF>(ef));
 }
@@ -82,39 +82,34 @@ basic_scope_exit<std::decay_t<EF>, Policy> _make_guard(EF &&ef)
 // Requires: EF is Callable
 // Requires: EF is nothrow MoveConstructible OR CopyConstructible
 template<class EF, class Policy /*= on_exit_policy*/>
-struct basic_scope_exit : private Policy
+class basic_scope_exit : private Policy
 {
-    using Policy::release;
+    EF ef_;
+    template<typename T>
+    explicit basic_scope_exit(T &&ef, Policy p)
+    try:
+        Policy(p), ef_(std::forward<T>(ef))
+    {}
+    catch(...)
+    {
+        auto &&guard = detail::_make_guard<Policy>(std::ref(ef));
+        throw;
+    }
+
+public:
 
     explicit basic_scope_exit(EF const &ef)
-      try: ef_(ef)
-    {}
-    catch(...)
-    {
-        auto &&guard = detail::_make_guard<Policy>(std::ref(ef));
-        throw;
-    }
-    explicit basic_scope_exit(EF &&ef)
-        noexcept(std::is_nothrow_move_constructible<EF>::value)
-      try: ef_(std::move_if_noexcept(ef))
-    {}
-    catch(...)
-    {
-        auto &&guard = detail::_make_guard<Policy>(std::ref(ef));
-        throw;
-    }
+    noexcept(std::is_nothrow_copy_constructible<EF>::value)
+    : basic_scope_exit(ef, Policy{})
+	  {}
+	explicit basic_scope_exit(EF &&ef)
+    noexcept(std::is_nothrow_move_constructible<EF>::value)
+	: basic_scope_exit(std::move_if_noexcept(ef), Policy{})
+	  {}
     basic_scope_exit(basic_scope_exit &&that)
-        noexcept(std::is_nothrow_move_constructible<EF>{})
-      try: Policy((Policy &&) that), ef_(std::move_if_noexcept(that.ef_))
-    {
-        that.release();
-    }
-    catch(...)
-    {
-        that.release();
-        auto &&guard = detail::_make_guard<Policy>(std::ref(that.ef_));
-        throw;
-    }
+        noexcept(std::is_nothrow_move_constructible<EF>::value)
+      : basic_scope_exit(std::move_if_noexcept(that.ef_), (that.release(), that))
+    {}
     ~basic_scope_exit()
     {
         if(this->should_execute())
@@ -124,30 +119,32 @@ struct basic_scope_exit : private Policy
     basic_scope_exit(basic_scope_exit const &) = delete;
     basic_scope_exit &operator=(basic_scope_exit const &) = delete;
     basic_scope_exit &operator=(basic_scope_exit &&) = delete;
+    using Policy::release;
 
-private:
-    EF ef_;
 };
 
 template<class EF, class Policy>
 void swap(basic_scope_exit<EF, Policy> &, basic_scope_exit<EF, Policy> &) = delete;
 
 template<class EF>
-scope_exit<std::decay_t<EF>> make_scope_exit(EF &&ef)
+auto make_scope_exit(EF &&ef)
+noexcept(std::is_nothrow_constructible<std::decay_t<EF>, EF>::value)
 {
-    return scope_exit<std::decay_t<EF>>{std::forward<EF>(ef)};
+    return detail::_make_guard<detail::on_exit_policy>(std::forward<EF>(ef));
 }
 
 template<class EF>
-scope_fail<std::decay_t<EF>> make_scope_fail(EF &&ef)
+auto make_scope_fail(EF &&ef)
+noexcept(std::is_nothrow_constructible<std::decay_t<EF>, EF>::value)
 {
-    return scope_fail<std::decay_t<EF>>{std::forward<EF>(ef)};
+    return detail::_make_guard<detail::on_fail_policy>(std::forward<EF>(ef));
 }
 
 template<class EF>
-scope_success<std::decay_t<EF>> make_scope_success(EF &&ef)
+auto make_scope_success(EF &&ef)
+noexcept(std::is_nothrow_constructible<std::decay_t<EF>, EF>::value)
 {
-    return scope_success<std::decay_t<EF>>{std::forward<EF>(ef)};
+    return detail::_make_guard<detail::on_success_policy>(std::forward<EF>(ef));
 }
 #pragma GCC diagnostic pop
 
