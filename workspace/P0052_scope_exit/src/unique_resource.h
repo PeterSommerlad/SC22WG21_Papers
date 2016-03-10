@@ -51,15 +51,12 @@ template<typename T>
 struct _resource_traits
 {
     using reference = T &;
-    static const bool is_const{true};
 };
 
 template<typename T>
 struct _resource_traits<std::reference_wrapper<T>>
 {
 	using reference = T &;
-    using value_type = std::remove_cv_t<T>;
-    static const bool is_const{std::is_const<T>::value};
 };
 template<typename T>
 constexpr std::conditional_t<
