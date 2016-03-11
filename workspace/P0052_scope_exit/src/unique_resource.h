@@ -87,12 +87,25 @@ T _implicit_cast(typename _id<T>::type t)
     return static_cast<T &&>(t);
 }
 
-template<typename T, typename TT>
+//namespace std{ // should come from there, but gcc has it not yet implemented today:
+template<class T>
+constexpr auto is_reference_v=std::is_reference<T>::value;
+template<class T>
+constexpr auto is_nothrow_move_constructible_v=std::is_nothrow_move_constructible<T>::value;
+template<class T, class TT>
+constexpr auto is_nothrow_constructible_v=std::is_nothrow_constructible<T, TT>::value;
+//}
+
+
+template<class T, class TT>
 using _is_constructible =
-    typename std::conditional<
-        std::is_reference<TT>::value || !std::is_nothrow_move_constructible<TT>::value,
+    conditional_t<
+        is_reference_v<TT> || !is_nothrow_move_constructible_v<TT>,
         std::is_constructible<T, TT const &>,
-        std::is_constructible<T, TT>>::type;
+        std::is_constructible<T, TT>>;
+template<class T, class TT>
+constexpr auto  is_copy_or_nothrow_move_constructible_from_v=
+		_is_constructible<T,TT>::value;
 
 
 }
@@ -138,11 +151,13 @@ class unique_resource
 
 public:
     template<typename RR, typename DD,
-        typename = std::enable_if_t<_is_constructible<R, RR>::value>,
-        typename = std::enable_if_t<_is_constructible<D, DD>::value>>
+   typename = std::enable_if_t<is_copy_or_nothrow_move_constructible_from_v<R, RR>>,
+    typename = std::enable_if_t<is_copy_or_nothrow_move_constructible_from_v<D, DD>>>
+ //   typename = std::enable_if_t<_is_constructible<R, RR>::value>,
+ //   typename = std::enable_if_t<_is_constructible<D, DD>::value>>
     explicit unique_resource(RR &&r, DD &&d)
-        noexcept(std::is_nothrow_constructible<R, RR>::value &&
-                 std::is_nothrow_constructible<D, DD>::value)
+        noexcept((is_nothrow_constructible_v<R, RR> || is_nothrow_constructible_v<R, const R &>)&&
+        		(is_nothrow_constructible_v<D, DD> || is_nothrow_constructible_v<D, const D &>))
       : resource(std::forward<RR>(r), [&](auto &&rr) mutable {
             d(_implicit_cast<reference>(rr)); })
       , deleter(std::forward<DD>(d), [&,this](auto &&dd) mutable {
@@ -329,8 +344,8 @@ void swap(unique_resource<R, D> &lhs, unique_resource<R, D> &rhs)
 
 template<typename R, typename D>
 auto make_unique_resource(R &&r, D &&d)
-    noexcept(std::is_nothrow_constructible<std::decay_t<R>, R>::value &&
-             std::is_nothrow_constructible<std::decay_t<D>, D>::value)
+    noexcept(is_nothrow_constructible_v<std::decay_t<R>, R> &&
+             is_nothrow_constructible_v<std::decay_t<D>, D>)
 {
     return unique_resource<std::decay_t<R>, std::decay_t<D>>{
         std::forward<R>(r), std::forward<D>(d)};
