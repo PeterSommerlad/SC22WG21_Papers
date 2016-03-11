@@ -274,16 +274,19 @@ class unique_resource;
 
 template<class R,class D>
 unique_resource<decay_t<R>, decay_t<D>>
-make_unique_resource( R &&  r, D && d) noexcept;
+make_unique_resource( R &&  r, D && d) 
+noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
+         is_nothrow_constructible_v<decay_t<D>, D>);
 
 template<class R,class D>
 unique_resource<R&, decay_t<D>>
-make_unique_resource( reference_wrapper<R>  r, D && d) noexcept;
+make_unique_resource( reference_wrapper<R>  r, D && d) 
+noexcept(is_nothrow_constructible_v<decay_t<D>, D>);
 
 template<class R,class D, class S=R>
 unique_resource<decay_t<R>, decay_t<D>>
-make_unique_resource_checked(R && r, S const & invalid, D && d) noexcept;
-
+make_unique_resource_checked(R && r, S const & invalid, D && d) noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
+         is_nothrow_constructible_v<decay_t<D>, D>);
 }
 \end{codeblock}
 
@@ -803,8 +806,7 @@ noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
 template<class R,class D>
 unique_resource<R&,decay_t<D>>
 make_unique_resource( reference_wrapper<R> r, D d) 
-noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
-         is_nothrow_constructible_v<decay_t<D>, D>);
+noexcept(is_nothrow_constructible_v<decay_t<D>, D>);
 \end{itemdecl}
 
 \begin{itemdescr}
