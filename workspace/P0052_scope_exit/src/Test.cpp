@@ -53,6 +53,23 @@ void testScopeExitWithReferenceWrapper(){
 	}
 	ASSERT_EQUAL("lambda done.\n",out.str());
 }
+struct non_assignable_resource{
+	non_assignable_resource()=default;
+	non_assignable_resource(int){}
+	void operator=(non_assignable_resource const &)=delete;
+	non_assignable_resource& operator=(non_assignable_resource  &&) noexcept(false){ throw "buh";};
+	non_assignable_resource(non_assignable_resource  &&) =default;
+};
+void testscopeExitWithNonAssignableResourceAndReset(){
+	std::ostringstream out { };
+	auto const &lambda=[&](auto &&){ out << "lambda done.\n";};
+	{
+		auto guard=make_unique_resource(non_assignable_resource{},std::cref(lambda));
+		//guard.reset(2);//throws... need to figure out, what I wanted to trigger here.
+	}
+	ASSERT_EQUAL("lambda done.\n",out.str());
+}
+
 
 
 // by Eric Niebler, adapted for unit testing
@@ -394,7 +411,7 @@ void runAllTests(int argc, char const *argv[]){
 	cute::suite s;
 	//TODO add your test here
 	s.push_back(CUTE(thisIsATest));
-//	s.push_back(CUTE(testmakeUniqueResourcetypeerased));
+	s.push_back(CUTE(testscopeExitWithNonAssignableResourceAndReset));
 	s.push_back(CUTE(testCompilabilityGuardForPointerTypes));
 	s.push_back(CUTE(testTalkToTheWorld));
 	s.push_back(CUTE(demontrate_unique_resource_with_POSIX_IO));

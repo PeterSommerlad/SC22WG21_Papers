@@ -2,10 +2,13 @@
 #define SCOPE_EXIT_H_
 
 #include <exception>
-#include <utility>
 #include <functional> // for reference wrappers
 #include <limits> // for maxint
 // modeled slightly after Andrescu's talk and article(s)
+// (c) copyright Eric Niebler, slightly adapted by Peter Sommerlad
+
+#include "_scope_guard_common.h"
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wterminate"
 
@@ -13,7 +16,7 @@ namespace std {
 namespace experimental {
 // new policy-based exception proof design by Eric Niebler
 namespace detail{
-// (c) copyright Eric Niebler, slightly adapted by Peter Sommerlad
+
 struct on_exit_policy
 {
     bool execute_ = true;
@@ -28,6 +31,7 @@ struct on_exit_policy
         return execute_;
     }
 };
+
 
 struct on_fail_policy
 {
@@ -78,47 +82,51 @@ auto _make_guard(EF &&ef)
 {
     return basic_scope_exit<std::decay_t<EF>, Policy>(std::forward<EF>(ef));
 }
+struct _empty_scope_exit
+{
+    void release() noexcept
+    {}
+};
+
 }
+
 // Requires: EF is Callable
 // Requires: EF is nothrow MoveConstructible OR CopyConstructible
 template<class EF, class Policy /*= on_exit_policy*/>
-class basic_scope_exit : private Policy
+class basic_scope_exit :  Policy
 {
-    EF ef_;
-    template<typename T>
-    explicit basic_scope_exit(T &&ef, Policy p)
-    try:
-        Policy(p), ef_(std::forward<T>(ef))
-    {}
-    catch(...)
+    detail::_box<EF> exit_function;
+
+    static auto _make_failsafe(std::true_type, void const *)
     {
-        auto &&guard = detail::_make_guard<Policy>(std::ref(ef));
-        throw;
+        return detail::_empty_scope_exit{};
     }
-
+    template<typename Fn>
+    static auto _make_failsafe(std::false_type, Fn *fn)
+    {
+        return basic_scope_exit<Fn &, Policy>(*fn);
+    }
+    template<typename EFP>
+    using _ctor_from = std::is_constructible<detail::_box<EF>, EFP, detail::_empty_scope_exit>;
+    template<typename EFP>
+    using _noexcept_ctor_from = detail::_bool<noexcept(detail::_box<EF>(std::declval<EFP>(), detail::_empty_scope_exit{}))>;
 public:
-
-    explicit basic_scope_exit(EF const &ef)
-    noexcept(std::is_nothrow_copy_constructible<EF>::value)
-    : basic_scope_exit(ef, Policy{})
-	  {}
-	explicit basic_scope_exit(EF &&ef)
-    noexcept(std::is_nothrow_move_constructible<EF>::value)
-	: basic_scope_exit(std::move_if_noexcept(ef), Policy{})
-	  {}
-    basic_scope_exit(basic_scope_exit &&that)
-        noexcept(std::is_nothrow_move_constructible<EF>::value)
-      : basic_scope_exit(std::move_if_noexcept(that.ef_), (that.release(), that))
+    template<typename EFP, typename = std::enable_if_t<_ctor_from<EFP>::value>>
+    explicit basic_scope_exit(EFP &&ef) noexcept(_noexcept_ctor_from<EFP>::value)
+      : exit_function((EFP &&) ef, _make_failsafe(_noexcept_ctor_from<EFP>{}, &ef))
     {}
-    ~basic_scope_exit()
+    basic_scope_exit(basic_scope_exit &&that) noexcept(noexcept(detail::_box<EF>(that.exit_function.move(), that)))
+      : Policy(that), exit_function(that.exit_function.move(), that)
+    {}
+    ~basic_scope_exit() noexcept(noexcept(exit_function.get()()))
     {
         if(this->should_execute())
-            ef_();
+            exit_function.get()();
     }
-
     basic_scope_exit(basic_scope_exit const &) = delete;
     basic_scope_exit &operator=(basic_scope_exit const &) = delete;
     basic_scope_exit &operator=(basic_scope_exit &&) = delete;
+
     using Policy::release;
 
 };

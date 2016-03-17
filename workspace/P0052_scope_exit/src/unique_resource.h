@@ -1,180 +1,92 @@
 #ifndef UNIQUE_RESOURCE_H_
 #define UNIQUE_RESOURCE_H_
 #include <type_traits>
+#include "_scope_guard_common.h"
 namespace std{
 namespace experimental{
-// contribution by (c) Eric Niebler, slightly adapted by Peter Sommerlad
-inline namespace _detail {
-
-struct _immovable
-{
-    _immovable() = default;
-    _immovable(_immovable const &) = delete;
-    _immovable(_immovable &&) = delete;
-    _immovable &operator=(_immovable const &) = delete;
-    _immovable &operator=(_immovable &&) = delete;
-};
-template<typename T>
-struct _box : _immovable
-{
-private:
-    template<typename TT>
-    _box(TT &&t, auto &&on_error, int)
-    try:
-        value(std::forward<TT>(t))
-    {}
-    catch(...)
-    {
-        on_error(t);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wterminate"
-        throw;
-#pragma GCC diagnostic pop
-    }
-public:
-    _box(T const &t, auto &&on_error)
-      : _box(t, on_error, 0)
-    {}
-    _box(T &t, auto &&on_error)
-      : _box(t, on_error, 0)
-    {}
-    _box(T &&t, auto &&on_error)
-      : _box(std::move_if_noexcept(t), on_error, 0)
-    {}
-
-    T value;
-};
-
-
-
-template<typename T>
-struct _resource_traits
-{
-    using reference = T &;
-};
-
-template<typename T>
-struct _resource_traits<std::reference_wrapper<T>>
-{
-	using reference = T &;
-};
-template<typename T>
-constexpr std::conditional_t<
-    (!std::is_nothrow_move_assignable<T>::value &&
-      std::is_copy_assignable<T>::value),
-    T const &,
-    T &&>
-_move_assign_if_noexcept(T &x) noexcept
-{
-    return std::move(x);
-}
-
+// contribution by (c) Eric Niebler 2016, slightly adapted by Peter Sommerlad
+namespace detail {
 template<typename T>
 using _is_nothrow_movable =
-    std::integral_constant<bool,
-        std::is_nothrow_move_constructible<T>::value &&
-        std::is_nothrow_move_assignable<T>::value>;
+    _bool<std::is_nothrow_move_constructible<T>::value &&
+          std::is_nothrow_move_assignable<T>::value>;
 
 template<typename T>
-struct _id
-{
-    using type = T;
-};
+constexpr bool _is_nothrow_movable_v = _is_nothrow_movable<T>::value;
 
+//template<typename T>
+//using _is_nothrow_movable =
+//    std::integral_constant<bool,
+//        std::is_nothrow_move_constructible<T>::value &&
+//        std::is_nothrow_move_assignable<T>::value>;
+
+// the following is never ODR used. it is only relevant for obtaining a noexcept value
 template<typename T>
-T _implicit_cast(typename _id<T>::type t)
+T for_noexcept_on_copy_construction(T const &t) noexcept(noexcept(T(t)))
 {
-    return static_cast<T &&>(t);
+    return t;
 }
 
+
+
+} // detail
 //namespace std{ // should come from there, but gcc has it not yet implemented today:
+}
 template<class T>
 constexpr auto is_reference_v=std::is_reference<T>::value;
 template<class T>
 constexpr auto is_nothrow_move_constructible_v=std::is_nothrow_move_constructible<T>::value;
+template<class T>
+constexpr auto is_copy_constructible_v=std::is_copy_constructible<T>::value;
 template<class T, class TT>
 constexpr auto is_nothrow_constructible_v=std::is_nothrow_constructible<T, TT>::value;
 //}
-
-
-template<class T, class TT>
-using _is_constructible =
-    conditional_t<
-        is_reference_v<TT> || !is_nothrow_move_constructible_v<TT>,
-        std::is_constructible<T, TT const &>,
-        std::is_constructible<T, TT>>;
-template<class T, class TT>
-constexpr auto  is_copy_or_nothrow_move_constructible_from_v=
-		_is_constructible<T,TT>::value;
-
-
-}
+namespace experimental {
 
 
 template<typename R, typename D>
 class unique_resource
 {
-    static_assert(std::is_nothrow_move_constructible<R>::value ||
-                  std::is_copy_constructible<R>::value, "");
-    static_assert(std::is_nothrow_move_constructible<D>::value ||
-                  std::is_copy_constructible<D>::value, "");
+    static_assert(std::is_nothrow_move_constructible_v<R> ||
+                  std::is_copy_constructible_v<R>,
+				  "resource must be notrhow_move_constructible or copy_constructible");
+    static_assert(std::is_nothrow_move_constructible_v<D> ||
+                  std::is_copy_constructible_v<D>,
+				  "deleter must be notrhow_move_constructible or copy_constructible");
 
-    using reference = typename _resource_traits<R>::reference;
+    static unique_resource const &this_; // never ODR used! Just for getting no_except() expr
 
-    // PS: what does that help?
-    template<typename, typename>
-    friend class unique_resource;
-    _box<R> resource;
-    _box<D> deleter;
-    bool is_owned = true;
+    detail::_box<R> resource;
+    detail::_box<D> deleter;
+    bool execute_on_destruction = true;
 
+    static constexpr auto is_nowthrow_delete_v=detail::_bool<noexcept(std::declval<D &>()(std::declval<R &>()))>::value;
 
-
-    template<typename RR>
-    void _reset(RR &&r)
-    {
-        reset();
-        auto &&guard = make_scope_exit([&,this]{ get_deleter()(r); });
-        resource.value = std::forward<RR>(r);
-        is_owned = true;
-        guard.release();
-    }
-
-    using _is_nothrow_delete =
-        std::integral_constant<bool,
-            noexcept(std::declval<D&>()(std::declval<R const &>()))>;
-    using _is_nothrow_swappable =
-        std::integral_constant<bool,
-            _is_nothrow_delete::value &&
-            _is_nothrow_movable<R>::value &&
-            _is_nothrow_movable<D>::value>;
+    static constexpr auto is_nothrow_swappable_v=detail::_bool<is_nowthrow_delete_v &&
+            detail::_is_nothrow_movable_v<R> &&
+            detail::_is_nothrow_movable_v<D>>::value;
 
 public:
     template<typename RR, typename DD,
-   typename = std::enable_if_t<is_copy_or_nothrow_move_constructible_from_v<R, RR>>,
-    typename = std::enable_if_t<is_copy_or_nothrow_move_constructible_from_v<D, DD>>>
- //   typename = std::enable_if_t<_is_constructible<R, RR>::value>,
- //   typename = std::enable_if_t<_is_constructible<D, DD>::value>>
+        typename = std::enable_if_t<std::is_constructible<detail::_box<R>, RR, detail::_empty_scope_exit>::value &&
+                                    std::is_constructible<detail::_box<D>, DD, detail::_empty_scope_exit>::value>>
     explicit unique_resource(RR &&r, DD &&d)
-        noexcept((is_nothrow_constructible_v<R, RR> || is_nothrow_constructible_v<R, const R &>)&&
-        		(is_nothrow_constructible_v<D, DD> || is_nothrow_constructible_v<D, const D &>))
-      : resource(std::forward<RR>(r), [&](auto &&rr) mutable {
-            d(_implicit_cast<reference>(rr)); })
-      , deleter(std::forward<DD>(d), [&,this](auto &&dd) mutable {
-            dd(_implicit_cast<reference>(resource.value)); })
+        noexcept(noexcept(detail::_box<R>((RR &&) r, detail::_empty_scope_exit{})) &&
+                 noexcept(detail::_box<D>((DD &&) d, detail::_empty_scope_exit{})))
+      : resource((RR &&) r, make_scope_exit([&]{ d(r); }))
+      , deleter((DD &&) d, make_scope_exit([&, this]{ d(get()); }))
     {}
     unique_resource(unique_resource &&that)
-        noexcept(std::is_nothrow_move_constructible<R>::value &&
-                 std::is_nothrow_move_constructible<D>::value)
-      : resource(std::move(that.resource.value), [&](auto &&rr) mutable {
-            that.deleter.value(_implicit_cast<reference>(rr)); }),
-        deleter(std::move(that.deleter.value), [&,this](auto &&dd) mutable {
-            dd(_implicit_cast<reference>(resource.value)); }),
-        is_owned(std::exchange(that.is_owned, false))
+        noexcept(noexcept(detail::_box<R>(that.resource.move(), detail::_empty_scope_exit{})) &&
+                 noexcept(detail::_box<D>(that.deleter.move(), detail::_empty_scope_exit{})))
+      : resource(that.resource.move(), detail::_empty_scope_exit{})
+      , deleter(that.deleter.move(),
+                make_scope_exit([&, this]{ that.get_deleter()(get()); that.release(); }))
+      , execute_on_destruction(std::exchange(that.execute_on_destruction, false))
     {}
 
     unique_resource &operator=(unique_resource &&that)
-        noexcept(_is_nothrow_delete::value &&
+        noexcept(is_nowthrow_delete_v &&
                  std::is_nothrow_move_assignable<R>::value &&
                  std::is_nothrow_move_assignable<D>::value)
     {
@@ -187,37 +99,36 @@ public:
         if(&that == this)
             return *this;
         reset();
-        if(std::is_nothrow_move_assignable<R>::value)
+        if(std::is_nothrow_move_assignable<detail::_box<R>>::value)
         {
-            deleter.value = _move_assign_if_noexcept(that.deleter.value);
-            resource.value = _move_assign_if_noexcept(that.resource.value);
+            deleter = _move_assign_if_noexcept(that.deleter);
+            resource = _move_assign_if_noexcept(that.resource);
         }
-        else if(std::is_nothrow_move_assignable<D>::value)
+        else if(std::is_nothrow_move_assignable<detail::_box<D>>::value)
         {
-            resource.value = _move_assign_if_noexcept(that.resource.value);
-            deleter.value = _move_assign_if_noexcept(that.deleter.value);
+            resource = _move_assign_if_noexcept(that.resource);
+            deleter = _move_assign_if_noexcept(that.deleter);
         }
         else
         {
-            deleter.value = that.deleter.value;
-            resource.value = that.resource.value;
+            resource = _as_const(that.resource);
+            deleter = _as_const(that.deleter);
         }
-        std::swap(is_owned, that.is_owned);
+        execute_on_destruction = std::exchange(that.execute_on_destruction, false);
         return *this;
     }
-    ~unique_resource()
+    ~unique_resource() //noexcept(is_nowthrow_delete_v)
     {
         reset();
     }
-    void swap(unique_resource &that)
-        noexcept(_is_nothrow_swappable::value)
+    void swap(unique_resource &that) noexcept(is_nothrow_swappable_v)
     {
-        if(_is_nothrow_swappable::value)
+        if(is_nothrow_swappable_v)
         {
             using std::swap;
-            swap(is_owned, that.is_owned);
-            swap(resource.value, that.resource.value);
-            swap(deleter.value, that.deleter.value);
+            swap(execute_on_destruction, that.execute_on_destruction);
+            swap(resource.get(), that.resource.get());
+            swap(deleter.get(), that.deleter.get());
         }
         else
         {
@@ -227,125 +138,67 @@ public:
         }
     }
     void reset()
-        noexcept(_is_nothrow_delete::value)
+        noexcept(is_nowthrow_delete_v)
     {
-        if(is_owned)
+        if(execute_on_destruction)
         {
-            is_owned = false;
-            get_deleter()(resource.value);
+            execute_on_destruction = false;
+            get_deleter()(get());
         }
     }
-    void reset(R const &r)
-        noexcept(_is_nothrow_delete::value && std::is_nothrow_copy_assignable<R>::value)
+    template<typename RR>
+    auto reset(RR &&r)
+        noexcept(is_nowthrow_delete_v && noexcept(resource.reset((RR &&) r)))
+        -> decltype(resource.reset((RR &&) r), void())
     {
-        _reset(r);
-    }
-    void reset(R &r)
-        noexcept(_is_nothrow_delete::value && std::is_nothrow_copy_assignable<R>::value)
-    {
-        _reset(r);
-    }
-    void reset(R &&r)
-        noexcept(_is_nothrow_delete::value && std::is_nothrow_move_assignable<R>::value)
-    {
-        _reset(std::move_if_noexcept(r));
+        auto &&guard = make_scope_exit([&, this]{ get_deleter()(r); });
+        reset();
+        resource.reset((RR &&) r);
+        execute_on_destruction = true;
+        guard.release();
     }
     void release() noexcept
     {
-        is_owned = false;
+        execute_on_destruction = false;
     }
-    R const &get() const noexcept
+    decltype(auto) get() const noexcept
     {
-        return resource.value;
+        return resource.get();
     }
-    D const &get_deleter() const noexcept
+    decltype(auto) get_deleter() noexcept
     {
-        return deleter.value;
+        return deleter.get();
     }
-    D &get_deleter() noexcept
+    decltype(auto) get_deleter() const noexcept
     {
-        return deleter.value;
+        return deleter.get();
+    }
+    auto operator->() const noexcept(noexcept(detail::for_noexcept_on_copy_construction(this_.get())))
+    {
+        return get();
     }
     decltype(auto) operator*() const noexcept
     {
         return *get();
     }
-    R operator->() const noexcept(std::is_nothrow_copy_constructible<R>::value)
-    {
-        return get();
-    }
+
     unique_resource& operator=(unique_resource const &) = delete;
     unique_resource(unique_resource const &) = delete;
 
 };
 
-// Specialization for references
-template<typename R, typename D>
-class unique_resource<R &, D>
-{
-    unique_resource<std::reference_wrapper<R>, D> resource;
-public:
-    template<typename DD,
-        typename = std::enable_if_t<_is_constructible<D, DD>::value>>
-    unique_resource(R &r, DD &&d)
-        noexcept(std::is_nothrow_constructible<D, DD>::value)
-      : resource(std::ref(r), std::forward<DD>(d))
-    {}
-    void swap(unique_resource &that)
-        noexcept(_is_nothrow_movable<D>::value)
-    {
-        resource.swap(that.resource);
-    }
-    void reset() noexcept
-    {
-        resource.reset();
-    }
-    void reset(R &r) noexcept
-    {
-        resource.reset(std::ref(r));
-    }
-    void release() noexcept
-    {
-        resource.release();
-    }
-    R &get() const noexcept
-    {
-        return resource.get();
-    }
-    D const &get_deleter() const noexcept
-    {
-        return resource.get_deleter();
-    }
-    D &get_deleter()  noexcept
-    {
-        return resource.get_deleter();
-    }
-    explicit operator R &() const noexcept // Not sure if this is still desirable.
-    {
-        return resource.get();
-    }
-    decltype(auto) operator*() const noexcept
-    {
-        return *get();
-    }
-    std::remove_cv_t<R> operator->() const
-        noexcept(std::is_nothrow_copy_constructible<std::remove_cv_t<R>>::value)
-    {
-        return get();
-    }
-};
 
 template<typename R, typename D>
 void swap(unique_resource<R, D> &lhs, unique_resource<R, D> &rhs)
-    noexcept(_is_nothrow_movable<R>::value && _is_nothrow_movable<D>::value)
+    noexcept(detail::_is_nothrow_movable_v<R> && detail::_is_nothrow_movable_v<D>)
 {
     lhs.swap(rhs);
 }
 
 template<typename R, typename D>
 auto make_unique_resource(R &&r, D &&d)
-    noexcept(is_nothrow_constructible_v<std::decay_t<R>, R> &&
-             is_nothrow_constructible_v<std::decay_t<D>, D>)
+    noexcept(noexcept(unique_resource<std::decay_t<R>, std::decay_t<D>>{
+        std::forward<R>(r), std::forward<D>(d)}))
 {
     return unique_resource<std::decay_t<R>, std::decay_t<D>>{
         std::forward<R>(r), std::forward<D>(d)};
@@ -353,16 +206,14 @@ auto make_unique_resource(R &&r, D &&d)
 
 template<typename R, typename D>
 auto make_unique_resource(std::reference_wrapper<R> r, D &&d)
-    noexcept(std::is_nothrow_constructible<std::decay_t<D>, D>::value)
+noexcept(noexcept(unique_resource<R &, std::decay_t<D>>{r.get(), std::forward<D>(d)}))
 {
     return unique_resource<R &, std::decay_t<D>>{r.get(), std::forward<D>(d)};
 }
 
 template<typename R, typename D, typename S>
 auto make_unique_resource_checked(R &&r, S const &invalid, D &&d)
-    noexcept(std::is_nothrow_constructible<std::decay_t<R>, R>::value &&
-             std::is_nothrow_constructible<std::decay_t<D>, D>::value /*&&
-             std::is_nothrow_move_constructible<std::decay_t<R>>::value*/)
+noexcept(noexcept(make_unique_resource(std::forward<R>(r), std::forward<D>(d))))
 {
     bool must_release = bool(r == invalid);
     auto ur = make_unique_resource(std::forward<R>(r), std::forward<D>(d));

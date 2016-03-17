@@ -1,6 +1,7 @@
 <testsuites>
-	<testsuite name="AllTests" tests="21">
+	<testsuite name="AllTests" tests="22">
 		<testcase classname="AllTests" name="thisIsATest"/>
+		<testcase classname="AllTests" name="testscopeExitWithNonAssignableResourceAndReset"/>
 		<testcase classname="AllTests" name="testCompilabilityGuardForPointerTypes"/>
 		<testcase classname="AllTests" name="testTalkToTheWorld"/>
 		<testcase classname="AllTests" name="demontrate_unique_resource_with_POSIX_IO"/>

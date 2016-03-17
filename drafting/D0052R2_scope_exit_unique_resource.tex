@@ -11,19 +11,23 @@
 \usepackage{underscore}   % remove special status of '_' in ordinary text
 \usepackage{xspace}
 \pagestyle{myheadings}
-\markboth{P0052R2 2016-02-12}{P0052R2 2016-02-12}
 
-\title{P0052R2 - Generic Scope Guard and RAII Wrapper for the Standard Library}
-\author{Peter Sommerlad and Andrew L. Sandoval}
-\date{2016-02-12}                        % Activate to display a given date or no date
+\newcommand{\papernumber}{P0052R2}
+\newcommand{\paperdate}{2016-03-18}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - Generic Scope Guard and RAII Wrapper for the Standard Library}
+\author{Peter Sommerlad and Andrew L. Sandoval\\with contributions by Eric Niebler and Daniel Kr\"ugler}
+\date{\paperdate}                        % Activate to display a given date or no date
 \input{macros}
 \setsecnumdepth{subsection}
 
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: P0052R2 &   (update of N4189, N3949, N3830, N3677)\\\hline
-Date: & 2016-02-12 \\\hline
+Document Number: \papernumber &   (update of N4189, N3949, N3830, N3677)\\\hline
+Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
 Audience: & LWG/LEWG\\\hline
 \end{tabular}
@@ -32,11 +36,11 @@ Audience: & LWG/LEWG\\\hline
 \section{Changes from P0052R1}
 The Jacksonville LEWG, especially Eric Niebler gave splendid input in how to improve the classes in this paper. I (Peter) follow Eric's design in specifying scope_exit as well as unique_resource in a more general way.
 \begin{itemize}
-\item Provide \tcode{scope_fail} and \tcode{scope_success} as classes. However, we may even hide these types and just provide the factories.
+\item Provide \tcode{scope_fail} and \tcode{scope_success} as classes. However, we may even hide all of the scope guard types and just provide the factories.
 \item safe guard all classes against construction errors, i.e., failing to copy the deleter/exit-function, by calling the passed argument in the case of an exception, except for scope_success.
 \item relax the requirements for the template arguments.
 \end{itemize}
-Special thanks go to Eric Niebler for providing an implementation that removed previous restrictions on template arguments in a exception-safe way. Also thanks to Axel Naumann for presenting in Jacksonville and to Axel, Eric, and Daniel Kr\"ugler for wording improvements.
+Special thanks go to Eric Niebler for providing several incarnations of an implementation that removed previous restrictions on template arguments in an exception-safe way (Eric: "This is HARD."). Also thanks to Axel Naumann for presenting in Jacksonville and to Axel, Eric, and Daniel Kr\"ugler for wording improvements.
 
 \section{Changes from P0052R0}
 In Kona LWG gave a lot of feedback and especially expressed the desire to simplify the constructors and specification by only allowing \emph{nothrow-copyable} \tcode{RESOURCE} and \tcode{DELETER} types. If a reference is required, because they aren't, users are encouraged to pass a \tcode{std::ref/std::cref} wrapper to the factory function instead.
@@ -212,11 +216,11 @@ The following issues have been recommended by LWG already:
 
 \section{Open Issues to be Discussed by LEWG / LWG}
 \begin{itemize}
-\item Should we make the regular constructor of the scope guard templates private and friend the factory function only? This could prohibit the use as class members, which might sneakily be used to create "destructor" functionality by not writing a destructor.
+\item Should we make the regular constructor of the scope guard templates private and friend the factory function only? This could prohibit the use as class members, which might sneakily be used to create "destructor" functionality by not writing a destructor by adding a \tcode{scope_exit} member variable. 
+\item Should the scope guard classes be move-assignable? Doing so, would enable/ease using them as class members. I do not think this use is good, but may be someone can come up with a use case for that.
 \item which "callable" definition in the standard should be applied (call expression (as it is now) or via INVOKE (\tcode{is_callable_v<EF\&>}).
-\item Are the exception specifications correct? They are derived from Eric Niebler's implementation and should be cross checked (Daniel Kr\"ugler did, but I am not sure, I adjusted them correctly).
-\item Should we provide a non-explicit conversion operator to R in unique_resource<R,D> ? Last time people seem to have been strongly against, however, it would make the use of unique_resource much easier in contexts envisioned by author Andrew Sandoval. Please re-visit, since it is omitted here.
-\item LWG: Do we need to specifiy the \tcode{unique_resource<R\&,D>} lvalue reference specialization, that is required to implement assignment etc.
+\item Are the exception specifications correct? They are derived from Eric Niebler's implementation and should be cross checked (Daniel Kr\"ugler did, but I am not sure, I adjusted them correctly). Especially, should scope_exit and scope_fail destructors be conditionally noexcept, scope_success must be.
+\item Should we provide a non-explicit conversion operator to \tcode{R} in \tcode{unique_resource<R,D>} ? Last time people seem to have been strongly against, however, it would make the use of unique_resource much easier in contexts envisioned by author Andrew Sandoval. Please re-visit, since it is omitted here.
 \end{itemize}
 
 
@@ -309,10 +313,10 @@ The following clauses describe the class templates \tcode{scope_exit}, \tcode{sc
 template <class EF>
 class @\tcode{\textit{scope_guard}}@ {
 public:
-  explicit @\tcode{\textit{scope_guard}}@(EF const & f) ;
-  explicit @\tcode{\textit{scope_guard}}@(EF && f) ;
+  template<class EFP>
+  explicit @\tcode{\textit{scope_guard}}@(EFP && f) ;
   @\tcode{\textit{scope_guard}}@(@\tcode{\textit{scope_guard}}@&& rhs) ;
-  ~@\tcode{\textit{scope_guard}}@() ;
+  ~@\tcode{\textit{scope_guard}}@() noexcept(@\seebelow@);
   void release() noexcept;
 
   @\tcode{\textit{scope_guard}}@(const @\tcode{\textit{scope_guard}}@&)=delete;
@@ -350,64 +354,70 @@ the requirements of \tcode{Destructible} (Table~24
 ). 
 %\tcode{is_callable<EF\&>::value} is \tcode{true}.
 Given an lvalue \tcode{f} of type \tcode{EF}, the expression \tcode{f()} shall be well formed and shall have well-defined behavior.
-The constructor arguments \tcode{f} in the following constructors shall be a function object (20.9)[function.objects].
+The constructor arguments \tcode{f} in the following constructors shall be a function object (20.9)[function.objects], 
+lvalue reference to function, or 
+lvalue reference to function object.
 
 \begin{itemdecl}
+template<class EFP>
 explicit
-scope_exit(EF const & f) ;
-explicit
-scope_exit(EF && f) ;
+scope_exit(EFP && f) ;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
-\requires The call expression of \tcode{EF} shall not throw an exception. 
+\remark This constructor only takes part in overload resolution if \tcode{is_constructible_v<EF,EFP>}.
 
-\pnum
-\effects For the first form, initializes \tcode{exit_function} with \tcode{f}, for the second form, initializes \tcode{exit_function} with \tcode{forward<EF>(f)}. 
-If construction fails, calls \tcode{f()}.
-
-\pnum
-\throws Any exception thrown by the selected constructor of EF.
-
-\end{itemdescr}
-
-
-\begin{itemdecl}
-explicit
-scope_fail(EF const & f) ;
-explicit
-scope_fail(EF && f) ;
-\end{itemdecl}
-
-\begin{itemdescr}
 \pnum
 \requires The call expression of \tcode{EF} shall not throw an exception.
 
 \pnum
-\effects For the first form, initializes \tcode{exit_function} with \tcode{f}, for the second form, initializes \tcode{exit_function} with \tcode{forward<EF>(f)}. 
-If construction fails, calls \tcode{f()}.
+\effects If \tcode{EFP} is not a lvalue-reference type, move-constructs  \tcode{exit_function} from \tcode{f}  if that can not throw an exception, otherwise copy-constructs \tcode{exit_function} from \tcode{f}. If the copying throws an exception, calls \tcode{f()}.
 
 \pnum
-\throws Any exception thrown by the selected constructor of EF.
+\throws Any exception thrown during the copying of \tcode{f}.
+
 \end{itemdescr}
 
+
 \begin{itemdecl}
+template<class EFP>
 explicit
-scope_success(EF const & f) ;
-explicit
-scope_success(EF && f) ;
+scope_fail(EFP && f) ;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
-\effects For the first form, initializes \tcode{exit_function} with \tcode{f}, for the second form, initializes \tcode{exit_function} with \tcode{forward<EF>(f)}.\\
+\remark This constructor only takes part in overload resolution if \tcode{is_constructible_v<EF,EFP>}.
+
+\pnum
+\requires The call expression of \tcode{EF} shall not throw an exception.
+
+\pnum
+\effects If \tcode{EFP} is not a lvalue-reference type, move-constructs  \tcode{exit_function} from \tcode{f} if that can not throw an exception, otherwise copy-constructs \tcode{exit_function} from \tcode{f}. If the copying throws an exception, calls \tcode{f()}.
+
+\pnum
+\throws Any exception thrown during the copying of \tcode{f}.
+
+\end{itemdescr}
+
+\begin{itemdecl}
+template<class EFP>
+explicit
+scope_success(EFP && f) ;
+\end{itemdecl}
+
+\begin{itemdescr}
+\remark This constructor only takes part in overload resolution if \tcode{is_constructible_v<EF,EFP>}.
+
+\pnum
+\effects \effects If \tcode{EFP} is not a lvalue-reference type, move-constructs  \tcode{exit_function} from \tcode{f} if that can not throw an exception, otherwise copy-constructs \tcode{exit_function} from \tcode{f}.\\
 \enternote
-If construction fails, \tcode{f()} won't be called.
+If copying fails, \tcode{f()} won't be called.
 \exitnote
 
 \pnum
-\throws Any exception thrown by the selected constructor of EF.
+\throws Any exception thrown during the copying of \tcode{f}.
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -416,13 +426,16 @@ If construction fails, \tcode{f()} won't be called.
 
 \begin{itemdescr}
 \pnum
-\effects Copies the release state from \tcode{rhs}.
-\tcode{execute_on_destruction} yields the value \tcode{rhs.execute_on_destruction} yielded before the construction and sets \tcode{rhs.execute_on_destruction} to \tcode{false}.
-If \tcode{is_nothrow_move_constructible_v<EF>} move constructs otherwise copy constructs \tcode{exit_function} from \tcode{rhs.exit_function}.  In case of an exception during the last operations, calls \tcode{rhs.exit_function()} if it would be called when \tcode{rhs} would have been destroyed without being moved from.
+\effects %Copies the release state from \tcode{rhs}.
+\tcode{execute_on_destruction} yields the value \tcode{rhs.execute_on_destruction} yielded before the construction.
+If \tcode{is_nothrow_move_constructible_v<EF>} move constructs otherwise copy constructs \tcode{exit_function} from \tcode{rhs.exit_function}. If construction succeeds, call \tcode{rhs.release()}.
+
+\pnum
+\throws Any exception thrown during the copying of \tcode{rhs.exit_function}.
 \end{itemdescr}
 
 \begin{itemdecl}
-~scope_exit() ;
+~scope_exit() noexcept(noexcept(exit_function()));
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -436,7 +449,7 @@ if (execute_on_destruction)
 \end{itemdescr}
 
 \begin{itemdecl}
-~scope_fail() ;
+~scope_fail() noexcept(noexcept(exit_function()));
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -451,7 +464,7 @@ if (execute_on_destruction
 \end{itemdescr}
 
 \begin{itemdecl}
-~scope_success() ;
+~scope_success() noexcept(noexcept(exit_function()));
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -530,10 +543,10 @@ class unique_resource {
 public:
   template<class RR, class DD>
   explicit unique_resource(RR &&r, DD &&d)
-        noexcept((is_nothrow_constructible_v<R, RR> || is_nothrow_constructible_v<R, const R &>)&&
-        		(is_nothrow_constructible_v<D, DD> || is_nothrow_constructible_v<D, const D &>))
+    noexcept(is_nothrow_constructible_v<R, RR>&&
+             is_nothrow_constructible_v<D, DD>)
   unique_resource(unique_resource&& rhs)
-  	noexcept(is_nothrow_move_constructible_v<R> &&
+    noexcept(is_nothrow_move_constructible_v<R> &&
              is_nothrow_move_constructible_v<D>);
   unique_resource(unique_resource const &)=delete; 
   ~unique_resource();
@@ -541,8 +554,8 @@ public:
   unique_resource& operator=(unique_resource const &)=delete;
   void swap(unique_resource &other);
   void reset();
-  void reset(R const & r);
-  void reset(R && r);
+  template<class RR>
+  void reset(RR && r);
   void release() noexcept;
   R const & get() const noexcept;
   R operator->() const noexcept;
@@ -551,7 +564,7 @@ public:
 private:
   R resource; // exposition only
   D deleter; // exposition only
-  bool execute_on_destruction; // exposition only
+  bool execute_on_destruction{true}; // exposition only
 };
 \end{codeblock}
 
@@ -590,8 +603,9 @@ a value \tcode{d} of type \tcode{D} and a value
 Destructible 
 (Table~24
 %\ref{destructible}
-) object type.
-% or an lvalue reference, which will be wrapped with a reference_wrapper<R> internally.%%need to disucss
+) object type 
+or a lvalue reference type.
+%, which will be wrapped with a \tcode{reference_wrapper<R>} internally.%%need to disucss
 %and shall not throw an exception.  %% thanks to Daniel
 %Copy construction and move assignment of \tcode{D} and \tcode{R} shall not throw an exception.
 
@@ -605,10 +619,8 @@ Destructible
 \begin{itemdecl}
     template<class RR, class DD>
     explicit unique_resource(RR &&r, DD &&d)
-        noexcept((is_nothrow_constructible_v<R, RR> 
-                  || is_nothrow_constructible_v<R, const R &>)
-              && (is_nothrow_constructible_v<D, DD> 
-                  || is_nothrow_constructible_v<D, const D &>))
+        noexcept(is_nothrow_constructible_v<R, RR> 
+                && is_nothrow_constructible_v<D, DD>)
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -618,30 +630,25 @@ Destructible
 given 
 \begin{codeblock}
 template<class T, class TT>
-using _is_constructible =
+using @\tcode{\textit{_is_constructible}}@ =
      conditional_t<
         is_reference_v<TT> || !is_nothrow_move_constructible_v<TT>,
         is_constructible<T, TT const &>,
         is_constructible<T, TT>>;
 template<class T, class TT>
-constexpr auto is_copy_or_nothrow_move_constructible_from_v=
-		_is_constructible<T,TT>::value;
+constexpr auto @\tcode{\textit{is_copy_or_nothrow_move_constructible_from_v}}@=
+		@\tcode{\textit{_is_constructible}}@<T,TT>::value;
 \end{codeblock}
-this constructor only participates in overload resolution if
-\\ \tcode{is_nothrow_move_or_copy_constructible_from_v<R, const RR \&>}\\
+this constructor shall not participate in overload resolution unless
+\\ \tcode{\textit{is_nothrow_move_or_copy_constructible_from_v}<R, RR>}\\
 and\\
-\tcode{is_nothrow_move_or_copy_constructible_from_v<D, const DD \&>}
+\tcode{\textit{is_nothrow_move_or_copy_constructible_from_v}<D, DD>}
 
 \pnum
-\effects If RR is not a lvalue-reference Move-constructs \tcode{resource} from \tcode{r} if that can not throw an exception, otherwise copy-constructs \tcode{resource} from \tcode{r}. Then, if \tcode{DD} is not an lvalue reference, move-constructs \tcode{deleter} from \tcode{d} if that can not throw an exception, otherwise copy-constructs \tcode{deleter} from \tcode{d}. If construction of \tcode{resource} throws an exception, calls \tcode{d(r)}.  If construction of \tcode{deleter} throws an exception, calls \tcode{d(resource)}. 
+\effects If RR is not a lvalue-reference, move-constructs \tcode{resource} from \tcode{r} if that can not throw an exception, otherwise copy-constructs \tcode{resource} from \tcode{r}. Then, if \tcode{DD} is not an lvalue reference, move-constructs \tcode{deleter} from \tcode{d} if that can not throw an exception, otherwise copy-constructs \tcode{deleter} from \tcode{d}. If construction of \tcode{resource} throws an exception, calls \tcode{d(r)}.  If construction of \tcode{deleter} throws an exception, calls \tcode{d(resource)}. 
 \enternote
 The explained mechanism should ensure no leaking resources.
 \exitnote
-
-\pnum
-\postconditions \tcode{get() == r}.
-\tcode{get_deleter()} returns a reference to the stored
-function object \tcode{d}.
 
 \pnum
 \throws any exception thrown during construction.
@@ -655,12 +662,16 @@ unique_resource(unique_resource&& rhs)
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Move-constructs \tcode{resource} from \tcode{rhs.resource} if that can not throw an exception, otherwise copy-constructs \tcode{resource} from \tcode{rhs.resource}. Then move-constructs \tcode{deleter} from \tcode{rhs.deleter} if that can not throw an exception, otherwise copy-constructs \tcode{deleter} from \tcode{rhs.deleter}. If construction of \tcode{resource} throws an exception, calls \tcode{rhs.deleter(rhs.resource)}.  If construction of \tcode{deleter} throws an exception, calls \tcode{rhs.deleter(resource)}. 
+\effects Move-constructs \tcode{resource} from \tcode{rhs.resource} if that can not throw an exception, otherwise copy-constructs \tcode{resource} from \tcode{rhs.resource}.  
+\enternote
+If construction of \tcode{resource} throws an exception \tcode{rhs} is left owning the resource and will free it in due time.
+%If construction of \tcode{resource} throws an exception, leaves \tcode{rhs} in its state. 
+\exitnote
+Then move-constructs \tcode{deleter} from \tcode{rhs.deleter} if that can not throw an exception, otherwise copy-constructs \tcode{deleter} from \tcode{rhs.deleter}. If construction of \tcode{deleter} throws an exception: if \tcode{!is_nothrow_move_constructible_v<R>}, then \tcode{rhs.deleter(resource) ; rhs.release();} otherwise \tcode{rhs.resource} and \tcode{rhs.deleter} are unmodified and \tcode{rhs} can be left owning the resource. 
+Finally, \tcode{execute_on_destruction} is initialized with \tcode{exchange(rhs.execute_on_destruction,false)}.
 \enternote
 The explained mechanism should ensure no leaking resources.
 \exitnote
-Finally calls \tcode{rhs.release()}. 
-%If construction fails, as if \tcode{rhs.reset()}.
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -674,10 +685,15 @@ and\\
 \tcode{(is_nothrow_move_assignable_v<D> || is_copy_assignable_v<D>)}
 
 \pnum
-\effects If \tcode{this == \&rhs} no effect, otherwise \tcode{reset()}, then move assigns members from \tcode{rhs} if the member is nothrow_move_assignable. Remaining members are then copy-assigned from \tcode{rhs}. Then \tcode{rhs.release()}. If a copy of a member throws and exception leaves \tcode{rhs} intact.
+\effects If \tcode{this == \&rhs} no effect. Otherwise \tcode{reset();} followed by
+Given the members \tcode{resource} and \tcode{deleter} 
+If \tcode{nothrow_move_assignable_v<R>}, try to copy or move assign \tcode{deleter} from \tcode{rhs.deleter} first then \tcode{resource=move(rhs.resource)}, if  \tcode{nothrow_move_assignable_v<D>}, try to copy or move \tcode{resource} from \tcode{rhs.resource} first then \tcode{deleter=move(rhs.deleter)}, otherwise try to copy the two members. Then \tcode{execute_on_destruction = exchange(rhs.execute_on_destruction, false);}. 
+\enternote
+If a copy of a member throws an exception this mechanism leaves \tcode{rhs} intact and \tcode{*this} in the released state.
+\exitnote
 
 \pnum
-\throws Any exception thrown during a copy-assignment of a member that can not be moved without risking an exception.
+\throws Any exception thrown during a copy-assignment of a member that can not be moved without an exception.
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -705,34 +721,41 @@ void reset();
 \end{itemdescr}
 
 \begin{itemdecl}
-void reset(R && r) ;
+template <class RR>
+void reset(RR && r) ;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
-\effects Equivalent to
+Given
 \begin{codeblock}
-  reset();
-  resource = move(r);
-  execute_on_destruction = true;
+template<class T>
+constexpr conditional_t<
+    (!is_nothrow_move_assignable_v<T> &&
+      is_copy_assignable_v<T>),
+    T const &,
+    T &&>
+@\tcode{\textit{move_assign_if_noexcept}}@(T &x) noexcept
+{
+    return std::move(x);
+}
 \end{codeblock}
-If move-assignment of \tcode{resource} throws an exception, \tcode{get_deleter()(r)} on the original value of \tcode{r} and \tcode{execute_on_destruction=false}.
-\end{itemdescr}
 
-\begin{itemdecl}
-void reset(R const & r) ;
-\end{itemdecl}
-
-\begin{itemdescr}
 \pnum
-\effects Equivalent to
+\remarks This function shall not participate in overload resolution if \tcode{resource = \textit{move_assign_if_noexcept}(r)} is ill-formed.
+
+\pnum
+\effects 
+Equivalent to
 \begin{codeblock}
   reset();
-  resource = r;
+  resource = @\tcode{\textit{move_assign_if_noexcept}}@(r);
   execute_on_destruction = true;
 \end{codeblock}
-If copy-assignment of \tcode{resource} fails, \tcode{get_deleter()(r)} and \tcode{execute_on_destruction=false}.
+If copy-assignment of \tcode{resource} throws an exception, \tcode{get_deleter()(r)}.
+% and \tcode{release()}. %% that seems implicit from reset()
 \end{itemdescr}
+
 
 
 %Invokes the deleter function for resource if it was not previously released, e.g. \tcode{reset(); }  Then moves newresource into the tracked resource member, e.g. \tcode{resource = std::move(newresource);}  Finally sets the object in the non-released state so that the deleter function will be invoked on destruction if \tcode{release()} is not called first.
@@ -754,8 +777,8 @@ R operator->() const noexcept ;
 
 \begin{itemdescr}
 \pnum
-\remarks
-\tcode{operator->} is only available if \\
+\remarks Member
+\tcode{operator->} shall not participate in overload resolution unless \\
 \tcode{is_pointer_v<R> \&\& is_nothrow_copy_constructible_v<R>}\\
 \tcode{\&\&(is_class_v<remove_pointer_t<R>> || }\tcode{is_union_v<remove_pointer_t<R>>)} is \tcode{true}. 
 
@@ -769,7 +792,7 @@ R operator->() const noexcept ;
 
 \begin{itemdescr}
 \pnum
-\remarks \tcode{operator*} is only available if \tcode{is_pointer_v<R>} is \tcode{true}.
+\remarks Member \tcode{operator*} shall not participate in overload resolution unless \tcode{is_pointer_v<R>} is \tcode{true}.
 
 \pnum
 \returns \tcode{*resource}. The return type is equivalent to 
@@ -798,7 +821,7 @@ noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
 
 \begin{itemdescr}
 \pnum
-\returns \tcode{ unique_resource<decay_t<R>, decay_t<D>>(forward<R>(r), forward<D>(d)) }
+\returns \\\tcode{unique_resource<decay_t<R>, decay_t<D>>(forward<R>(r), forward<D>(d))}
 \end{itemdescr}
 
 
@@ -813,7 +836,7 @@ noexcept(is_nothrow_constructible_v<decay_t<D>, D>);
 \pnum
 \returns \tcode{unique_resource<R\&,decay_t<D>>(r.get(),forward<D>(d))}
 
-\pnum \enternote There is no need to overload on \tcode{reference_wrapper} for the deleter. A specialization for \tcode{unique_resource<R\&,D>} should internally re-wrap the reference obtained through \tcode{r.get()} \exitnote
+\pnum \enternote There is no need to overload on \tcode{reference_wrapper} for the deleter. \exitnote
 \end{itemdescr}
 
 
