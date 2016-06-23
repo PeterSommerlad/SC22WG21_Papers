@@ -442,6 +442,10 @@ Add a new section.
 </dt>
 <dd>
 
+<p><i>Requires:</i>
+<code>os.rdbuf() != nullptr</code>.
+</p>
+
 <p><i>Effects:</i>
 Stores the reference <code>os</code>,
 which will be the final destination of characters.
@@ -450,19 +454,19 @@ A copy of <code>allocator</code> is used to allocate memory for the internal buf
 
 <p>
 Constructs a stream buffer object [stream.buffers].
-<!--of a type derived from <code>basic_streambuf&lt;charT,traits&gt;</code>.-->
+<!--of a type derived from <code>basic_streambuf&lt;charT,traits&gt;</code>.
 Any flush on the created <code>basic_osyncstream</code> 
 meaning internally calling <code>sync()</code> 
 on the constructed stream buffer object will not act immediately on <code>os</code>,
 but will be deferred until immediately after
-the transfer of characters to <code>os</code> in <code>emit()</code>.
+the transfer of characters to <code>os</code> in <code>emit()</code>.-->
 </p>
 
 <p><i>Remarks:</i>
 While the underlying <code>basic_ostream&lt;charT,traits&gt;</code> object 
 <code>os</code> is wrapped by any <code>basic_osyncstream</code>
 calling <code>rdbuf(basic_streambuf&lt;charT,traits&gt;*)</code> on <code>os</code> to 
-exchange its associated stream buffer causes undefined behavior.
+exchange its associated stream buffer results in undefined behavior.
 </p>
 
 <p>
@@ -472,9 +476,10 @@ May construct a mutex.
 </p>
 <p>
 [<i>Note:</i>
-If <code>os.rdbuf()</code> returns a user provided stream buffer then this stream buffer's
+If <code>os.rdbuf()</code> returns a user provided stream buffer then its
 implementation must
-be aware that its functions might be called from <code>emit()</code> while a lock is held.
+be aware that its member functions might be called from <code>emit()</code> 
+while a lock is held.
 &mdash;<i>end note</i>]
 </p>
 
@@ -534,8 +539,9 @@ Transfers the contents of the internal stream buffer
 to the <code>basic_ostream&lt;charT,traits&gt;</code> object obtained in the constructor,
 so that they appear in the output stream as a contiguous sequence of characters.
 If and only if a flush was requested on <code>*this</code>,&nbsp; 
-<code>sync()</code> is called on the stream buffer of 
-the <code>basic_ostream&lt;charT,traits&gt;</code> obtained in the constructor.
+<code>pubsync()</code> is called on the stream buffer of 
+the <code>basic_ostream&lt;charT,traits&gt;</code> obtained in the constructor. 
+A failure in transferring the characters or flushing calls <code>setstate(badbit)</code>.
 </p>
 
 <p><i>Synchronization:</i>
@@ -676,7 +682,7 @@ P0053R0 C++ Synchronized Buffered Ostream</a>
 <p>
 Add remark to note that exchanging the stream buffer while the stream is wrapped causes
 undefined behavior and added a note to warn stream buffer implementers about the lock 
-being held in <code>emit()</code>.
+being held in <code>emit()</code>. Call setstate(badbit) if IO errors occur in emit().
 </p>
 </li>
 <li>

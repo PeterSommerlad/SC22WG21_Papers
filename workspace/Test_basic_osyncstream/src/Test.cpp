@@ -133,6 +133,11 @@ void manyThreadsOnSingleStream(){
 	ASSERT_EQUAL(sz,detail__::thelocks.size());
 	ASSERT_EQUAL("",out.str()+out2.str());
 }
+void trigger_assert_in_ctor(){
+	std::ostream noout{nullptr};
+	//osyncstream sync(noout); // should abort
+}
+
 
 
 
@@ -147,6 +152,7 @@ void runAllTests(int argc, char const *argv[]) {
 	s.push_back(CUTE(testSeekingWithPotentialMissingOutput));
 	s.push_back(CUTE(ostreamsWithSharingStreambuf));
 	s.push_back(CUTE(manyThreadsOnSingleStream));
+	s.push_back(CUTE(trigger_assert_in_ctor));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<> > lis(xmlfile.out);
 	cute::makeRunner(lis, argc, argv)(s, "AllTests");

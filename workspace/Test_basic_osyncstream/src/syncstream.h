@@ -47,7 +47,7 @@ public:
 		{
 			std::lock_guard<std::mutex> lk{*mxptr};
 			sentry __s(*this);
-			if (__s && out.rdbuf())
+			if (__s && out.rdbuf()) // should do some exception handling here like in ostream
 			{
 				if (len != out.rdbuf()->sputn(this->pbase(), len)){
 					this->setstate(std::ios_base::badbit);
@@ -69,7 +69,9 @@ public:
 		:mybuf{std::ios_base::out} // should pass a here, but basic_stringbuf doesn't take it (yet)
 		,std::basic_ostream<charT, traits>{this}
 	 	,out{os}
-	 	,mxptr{detail__::thelocks.get_lock(out.rdbuf())}{	}
+	 	,mxptr{detail__::thelocks.get_lock(out.rdbuf())}{
+	 		assert(out.rdbuf()!=nullptr);
+	 	}
 	~basic_osyncstream() noexcept {
 		this->emit();
 		detail__::thelocks.release_lock(mxptr,out.rdbuf());
