@@ -26,10 +26,10 @@ public:
 	}
 	void release_lock(spmx& sp,void *sbufptr){
 		guard lx{mx};
-		std::weak_ptr<std::mutex>& mxptr=thelocks[sbufptr];
+		auto iter = thelocks.find(sbufptr);
 		sp.reset();
-		if (mxptr.expired()){
-			thelocks.erase(sbufptr);
+		if (iter != thelocks.end() && iter->second.expired()){
+			thelocks.erase(iter);
 		}
 	}
 	// testing only
