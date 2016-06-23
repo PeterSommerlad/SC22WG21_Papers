@@ -94,6 +94,22 @@ void testSeekingWithPotentialMissingOutput(){
 	ASSERT_EQUAL("hillo world\nhello lawrence\n", outer.str());
 
 }
+void ostreamsWithSharingStreambuf(){
+	std::ostringstream out{};
+	std::ostream out2{out.rdbuf()};
+
+	{
+		osyncstream inner{out};
+		osyncstream inner2{out2};
+		inner << "inner"<<std::endl;
+		inner2 << "inner2\n";
+	}
+	ASSERT_EQUAL("inner2\ninner\n",out.str());
+}
+
+
+
+
 void manyThreadsOnSingleStream(){
 	auto sz=detail__::thelocks.size();
 	std::ostringstream out{};
@@ -129,6 +145,7 @@ void runAllTests(int argc, char const *argv[]) {
 	s.push_back(CUTE(testNestedBufferedStream));
 	s.push_back(CUTE(testSeekingBufferedStream));
 	s.push_back(CUTE(testSeekingWithPotentialMissingOutput));
+	s.push_back(CUTE(ostreamsWithSharingStreambuf));
 	s.push_back(CUTE(manyThreadsOnSingleStream));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<> > lis(xmlfile.out);

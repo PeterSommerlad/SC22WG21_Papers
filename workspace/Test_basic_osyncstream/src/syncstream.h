@@ -34,7 +34,6 @@ public:
     typedef typename traits_type::off_type off_type;
     typedef Allocator                     allocator_type;
 
-
     typedef detail__::noteflush_streambuf<charT, traits, Allocator> mybuf; // implementation detail
 private:
 	std::basic_ostream<charT,traits> &out;
@@ -42,25 +41,35 @@ private:
 
 public:
 	void emit() {
+		using sentry=typename std::basic_ostream<charT,traits>::sentry;
 		this->seekp(0, std::ios::end);
+		auto const len=this->pptr() - this->pbase();
 		{
 			std::lock_guard<std::mutex> lk{*mxptr};
-			out.write(this->pbase(), this->pptr() - this->pbase());
-			if (this->rdbuf()->flushed()) {
-				out.flush();
+			sentry __s(*this);
+			if (__s && out.rdbuf())
+			{
+				if (len != out.rdbuf()->sputn(this->pbase(), len)){
+					this->setstate(std::ios_base::badbit);
+
+				}
+				if (this->rdbuf()->flushed()) {
+					if (out.rdbuf()->pubsync() == -1)
+						this->setstate(std::ios_base::badbit);
+				}
 				this->rdbuf()->flushed() = false;
 			}
 		}// UNLOCK
 		assert(!(this->rdbuf()->flushed()));
 		this->seekpos(std::ios::beg);
-		this->str().clear(); //efficient?
+		this->str().clear(); //efficient? should retain allocated memory
 	}
 
-	explicit basic_osyncstream(std::basic_ostream<charT,traits> &os)
-		:mybuf{std::ios_base::out}
+	explicit basic_osyncstream(std::basic_ostream<charT,traits> &os, Allocator const &a=Allocator())
+		:mybuf{std::ios_base::out} // should pass a here, but basic_stringbuf doesn't take it (yet)
 		,std::basic_ostream<charT, traits>{this}
-	 	,out(os)
-	 	,mxptr(detail__::thelocks.get_lock(out.rdbuf())){	}
+	 	,out{os}
+	 	,mxptr{detail__::thelocks.get_lock(out.rdbuf())}{	}
 	~basic_osyncstream() noexcept {
 		this->emit();
 		detail__::thelocks.release_lock(mxptr,out.rdbuf());
