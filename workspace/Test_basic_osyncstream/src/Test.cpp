@@ -23,7 +23,16 @@ void testlockmapsimple(){
 	ASSERT_EQUAL(0+sz,detail__::thelocks.size());
 }
 
+void testlockmapwithnullreturnsnull(){
+	auto const sz=detail__::thelocks.size();
+	{
+		auto mx=detail__::thelocks.get_lock(nullptr);
+		ASSERT(mx == nullptr);
+		detail__::thelocks.release_lock(mx,nullptr); // should be no-op
+	}
+	ASSERT_EQUAL(0+sz,detail__::thelocks.size());
 
+}
 
 void thisIsATest() {
 	std::ostringstream outer { };
@@ -35,8 +44,8 @@ void thisIsATest() {
 	}
 	outer << "hello lawrence\n";
 	ASSERT_EQUAL("hello world\nhello lawrence\n", outer.str());
-	// cerr: needsflush\ndid flush
 }
+
 void testBSIclearForReuseFeature() {
 	std::ostringstream outer { };
 	{
@@ -57,7 +66,7 @@ void testNestedBufferedStream() {
 		osyncstream outer { outs };
 		outer << "hello ";
 		{
-			osyncstream inner { outer.get() };
+			osyncstream inner { outer.rdbuf_wrapped() };
 			inner << "hello world\n";
 			ASSERT_EQUAL("", outs.str());
 			inner.emit();
@@ -108,10 +117,65 @@ void ostreamsWithSharingStreambuf(){
 }
 
 
+void testMoveConstruction(){
+	auto const sz=detail__::thelocks.size();
+	std::ostringstream out{};
+	{
+		osyncstream os{out};
+		os << "hallo\n";
+		{
+			osyncstream os1{std::move(os)};
+			os1 << "welt\n";
+		}
+		ASSERT_EQUAL("hallo\nwelt\n",out.str());
+	}
+	ASSERT_EQUAL(sz,detail__::thelocks.size());
+}
+void testMoveAssignment(){
+	auto const sz=detail__::thelocks.size();
+	std::ostringstream out{};
+	std::ostringstream dummy{};
+	{
+		osyncstream os{out};
+		os << "hallo\n";
+		{
+			osyncstream os1{dummy};
+			os1 << "welt\n";
+			ASSERT_EQUAL("welt\n",os1.rdbuf()->str());
+			os1 = std::move(os);
+			ASSERT_EQUAL("hallo\n",os1.rdbuf()->str());
+			os1 << "world\n";
+		}
+		ASSERT_EQUAL("welt\n",dummy.str());
+		ASSERT_EQUAL("hallo\nworld\n",out.str());
+	}
+	ASSERT_EQUAL(sz,detail__::thelocks.size());
+}
 
+void testMemberSwap(){
+	auto const sz=detail__::thelocks.size();
+	std::ostringstream out{};
+	std::ostringstream dummy{};
+	{
+		osyncstream os{out};
+		os << "hallo\n";
+		{
+			osyncstream os1{dummy};
+			os1 << "welt\n";
+			ASSERT_EQUAL("welt\n",os1.rdbuf()->str());
+			os1.swap(os);
+			ASSERT_EQUAL("hallo\n",os1.rdbuf()->str());
+			os1 << "world\n";
+		}
+		os.emit();
+		ASSERT_EQUAL("welt\n",dummy.str());
+		ASSERT_EQUAL("hallo\nworld\n",out.str());
+	}
+	ASSERT_EQUAL(sz,detail__::thelocks.size());
+}
 
 void manyThreadsOnSingleStream(){
-	auto sz=detail__::thelocks.size();
+	auto const sz=detail__::thelocks.size();
 	std::ostringstream out{};
 	std::ostringstream out2{};
 	{
@@ -135,7 +199,7 @@ void manyThreadsOnSingleStream(){
 }
 void trigger_assert_in_ctor(){
 	std::ostream noout{nullptr};
-	//osyncstream sync(noout); // should abort
+//	osyncstream sync(noout); // should abort
 }
 
 
@@ -145,14 +209,18 @@ void runAllTests(int argc, char const *argv[]) {
 	cute::suite s;
 	//TODO add your test here
 	s.push_back(CUTE(testlockmapsimple));
+	s.push_back(CUTE(testlockmapwithnullreturnsnull));
 	s.push_back(CUTE(thisIsATest));
 	s.push_back(CUTE(testBSIclearForReuseFeature));
 	s.push_back(CUTE(testNestedBufferedStream));
 	s.push_back(CUTE(testSeekingBufferedStream));
 	s.push_back(CUTE(testSeekingWithPotentialMissingOutput));
 	s.push_back(CUTE(ostreamsWithSharingStreambuf));
-	s.push_back(CUTE(manyThreadsOnSingleStream));
 	s.push_back(CUTE(trigger_assert_in_ctor));
+	s.push_back(CUTE(testMoveConstruction));
+	s.push_back(CUTE(testMoveAssignment));
+	s.push_back(CUTE(manyThreadsOnSingleStream));
+	s.push_back(CUTE(testMemberSwap));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<> > lis(xmlfile.out);
 	cute::makeRunner(lis, argc, argv)(s, "AllTests");
@@ -162,7 +230,7 @@ int main(int argc, char const *argv[]) {
 	runAllTests(argc, argv);
 	osyncstream outer { std::cout };
 	{
-		osyncstream inner { outer.get() };
+		osyncstream inner { outer.rdbuf_wrapped() };
 		inner << "hello world";
 		inner << std::endl;
 	}
