@@ -728,7 +728,8 @@ P0053R1 C++ Synchronized Buffered Ostream</a>
 <ul>
 <li>
 <p>
-Provide move construction and move assignment.
+Provide move construction and move assignment and specify the moved-from state to be 
+detached from the wrapped stream buffer.
 </p>
 </li>
 <li>
@@ -738,7 +739,8 @@ Rename <code>get()</code> to <code>rdbuf_wrapped()</code> and provide noexcept s
 </li>
 <li>
 <p>
-Changed to explicitly rely on wrapping a stream buffer, instead of an ostream object.
+Changed to explicitly rely on wrapping a stream buffer, 
+instead of an ostream object and adjust explanations accordingly.
 </p>
 </li>
 </ul>

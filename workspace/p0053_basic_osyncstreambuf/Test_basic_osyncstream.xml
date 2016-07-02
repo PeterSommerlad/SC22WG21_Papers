@@ -1,0 +1,21 @@
+<testsuites>
+	<testsuite name="AllTests" tests="13">
+		<testcase classname="AllTests" name="testlockmapsimple"/>
+		<testcase classname="AllTests" name="testlockmapwithnullreturnsnull"/>
+		<testcase classname="AllTests" name="thisIsATest"/>
+		<testcase classname="AllTests" name="testBSIclearForReuseFeature"/>
+		<testcase classname="AllTests" name="testNestedBufferedStream"/>
+		<testcase classname="AllTests" name="testSeekingBufferedStream"/>
+		<testcase classname="AllTests" name="testSeekingWithPotentialMissingOutput"/>
+		<testcase classname="AllTests" name="ostreamsWithSharingStreambuf"/>
+		<testcase classname="AllTests" name="trigger_assert_in_ctor"/>
+		<testcase classname="AllTests" name="testMoveConstruction"/>
+		<testcase classname="AllTests" name="testMoveAssignment"/>
+		<testcase classname="AllTests" name="manyThreadsOnSingleStream">
+			<failure message="../src/Test.cpp:198 manyThreadsOnSingleStream: &quot;&quot; == out.str()+out2.str() expected:		but was:	main 0 sz= 1\nhello 0\nmain 1 sz= 1\nmain 2 sz= 1\nhello 1\nhello 2\nmain 3 sz= 1\nhello 3\nhello 4\nmain 4 sz= 1\nmain 5 sz= 1\nhello 5\nmain 6 sz= 1\nhello 6\nmain 7 sz= 1\nhello 7\nmain 8 sz= 1\nhello 8\nmain 9 sz= 1\nhello 9\n2 hello 0\n2 hello 1\n2 hello 2\n2 hello 3\n2 hello 4\n2 hello 5\n2 hello 6\n2 hello 7\n2 hello 8\n2 hello 9\n2 main 0 sz= 1\n2 main 1 sz= 2\n2 main 2 sz= 1\n2 main 3 sz= 1\n2 main 4 sz= 1\n2 main 5 sz= 1\n2 main 6 sz= 1\n2 main 7 sz= 2\n2 main 8 sz= 1\n2 main 9 sz= 1\n	">
+manyThreadsOnSingleStream: &quot;&quot; == out.str()+out2.str() expected:		but was:	main 0 sz= 1\nhello 0\nmain 1 sz= 1\nmain 2 sz= 1\nhello 1\nhello 2\nmain 3 sz= 1\nhello 3\nhello 4\nmain 4 sz= 1\nmain 5 sz= 1\nhello 5\nmain 6 sz= 1\nhello 6\nmain 7 sz= 1\nhello 7\nmain 8 sz= 1\nhello 8\nmain 9 sz= 1\nhello 9\n2 hello 0\n2 hello 1\n2 hello 2\n2 hello 3\n2 hello 4\n2 hello 5\n2 hello 6\n2 hello 7\n2 hello 8\n2 hello 9\n2 main 0 sz= 1\n2 main 1 sz= 2\n2 main 2 sz= 1\n2 main 3 sz= 1\n2 main 4 sz= 1\n2 main 5 sz= 1\n2 main 6 sz= 1\n2 main 7 sz= 2\n2 main 8 sz= 1\n2 main 9 sz= 1\n	
+			</failure>
+		</testcase>
+		<testcase classname="AllTests" name="testMemberSwap"/>
+	</testsuite>
+</testsuites>

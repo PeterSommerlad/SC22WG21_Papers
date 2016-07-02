@@ -12,17 +12,78 @@ struct basic_osyncstream;
 namespace detail__{
 template <class charT, class traits, class Allocator>
 class noteflush_streambuf:public std::basic_stringbuf<charT, traits, Allocator>{
+	using base=std::basic_stringbuf<charT, traits, Allocator>;
 	bool needs_flush_=false; // exposition only
-	friend struct basic_osyncstream<charT, traits, Allocator>;
+	//friend struct basic_osyncstream<charT, traits, Allocator>;
+	std::basic_streambuf<charT,traits> *out;
+	detail__::spmx mxptr;
 public:
-	using std::basic_stringbuf<charT, traits, Allocator>::basic_stringbuf;
+	explicit noteflush_streambuf(std::basic_streambuf<charT,traits>* wrapped=nullptr,Allocator const &a=Allocator())
+	:base::basic_stringbuf(std::ios_base::out) // should pass a
+	,out{wrapped}
+	,mxptr{detail__::thelocks.get_lock(out)}{
+	}
+	noteflush_streambuf(noteflush_streambuf&& other)
+	:base::basic_stringbuf{std::move(other)}
+	,out{other.out}
+	,mxptr{std::move(other.mxptr)}
+	{
+		std::exchange(this->flushed(),other.flushed());
+		other.pubseekoff(0,std::ios::beg,std::ios_base::out);
+		other.str().clear();
+		assert(other.pbase()==other.pptr());
+
+	}
+	noteflush_streambuf& operator=(noteflush_streambuf&& other){
+		if (this != &other){
+			this->emit(); // might throw
+			detail__::thelocks.release_lock(mxptr,out); // might throw
+			out = nullptr;
+			this->swap(other);
+		}
+		return *this;
+	}
+	~noteflush_streambuf(){
+		try{
+			detail__::thelocks.release_lock(mxptr,out);
+		}catch(...){}
+	}
+
+	std::basic_streambuf<charT,traits>* rdbuf_wrapped() const noexcept {
+		return out;
+	}
+	bool emit() {
+		//using sentry=typename std::basic_ostream<charT,traits>::sentry;
+		bool result{true};
+		this->pubseekoff(0, std::ios::end,std::ios_base::out);
+		auto const len=this->pptr() - this->pbase();
+		if (out && mxptr && (len>0||this->flushed()) )
+		{
+			std::lock_guard<std::mutex> lk{*mxptr};
+				if (len>0 && len != out->sputn(this->pbase(), len)){
+					result=false;//this->setstate(std::ios_base::badbit);
+				}
+				if (this->flushed()) {
+					if (out->pubsync() == -1)
+						result=false;//this->setstate(std::ios_base::badbit);
+				}
+		}// UNLOCK
+		this->flushed() = false;
+		this->pubseekpos(0,std::ios_base::out);
+		this->_M_string.clear(); //efficient? should retain allocated memory, only gcc
+		return result;
+	}
+
 protected:
 	bool& flushed() noexcept{return needs_flush_;} // exposition only
 	bool flushed()const noexcept{return needs_flush_;} // exposition only
 	virtual int sync(){ needs_flush_=true; return 0;}
-	void swap(noteflush_streambuf &other){
+	void swap(noteflush_streambuf &other){ // not thread safe!
+		using std::swap;
 		std::basic_stringbuf<charT, traits, Allocator>::swap(other); // this is not noexcept!
-		std::swap(needs_flush_,other.needs_flush_);
+		swap(needs_flush_,other.needs_flush_);
+		swap(out,other.out);
+		swap(mxptr,other.mxptr);
 	}
 };
 }
@@ -40,74 +101,27 @@ public:
 	typedef Allocator                     allocator_type;
 
 	typedef detail__::noteflush_streambuf<charT, traits, Allocator> mybuf; // implementation detail
-private:
-	std::basic_streambuf<charT,traits> *out;
-	detail__::spmx mxptr;
-
 public:
-	void emit() {
-		using sentry=typename std::basic_ostream<charT,traits>::sentry;
-		this->seekp(0, std::ios::end);
-		auto const len=this->pptr() - this->pbase();
-		if (out && mxptr && (len>0||this->flushed()) )
-		{
-			std::lock_guard<std::mutex> lk{*mxptr};
-			sentry __s(*this);
-			if (__s ) // should do some exception handling here like in ostream
-			{
-				if (len>0 && len != out->sputn(this->pbase(), len)){
-					this->setstate(std::ios_base::badbit);
-				}
-				if (this->flushed()) {
-					if (out->pubsync() == -1)
-						this->setstate(std::ios_base::badbit);
-				}
-			}
-		}// UNLOCK
-		this->flushed() = false;
-		this->seekpos(std::ios::beg);
-		this->_M_string.clear(); //efficient? should retain allocated memory
-	}
 
 	explicit basic_osyncstream(std::basic_ostream<charT,traits> &os, Allocator const &a=Allocator())
 	:basic_osyncstream{os.rdbuf(),a}{}
 
 	explicit basic_osyncstream(std::basic_streambuf<charT,traits> *outbuf=0, Allocator const &a=Allocator())
-	:mybuf{std::ios_base::out} // should pass a here, but basic_stringbuf doesn't take it (yet)
+	:mybuf{outbuf,a}
 	,std::basic_ostream<charT, traits>{this}
-	,out{outbuf}
-	,mxptr{detail__::thelocks.get_lock(out)}{
-	}
+	{}
 	basic_osyncstream(basic_osyncstream&& other) // can not be noexcept
 	:mybuf{std::move(other)}
 	,std::basic_ostream<charT, traits>{std::move(other)} // doesn't transfer streambuf
-	,out{other.out}
-	,mxptr{std::move(other.mxptr)}
 	{
 		assert(this->rdbuf()==nullptr); // sanity check. base' move ctor doesn't
 		this->set_rdbuf(this);
-		std::exchange(this->flushed(),other.flushed());
-		other.seekpos(std::ios::beg);
-		other.rdbuf()->_M_string.clear();
-		assert(other.rdbuf()->pbase()==other.rdbuf()->pptr());
 	}
 	basic_osyncstream & operator=(basic_osyncstream &&other){ // can not be noexcept
 		if (this != &other){ // not really required!
-			this->emit(); // might throw
-			detail__::thelocks.release_lock(mxptr,out); // might throw
-			out = nullptr;
-			std::basic_ios<charT,traits>::swap(static_cast<std::basic_ios<charT,traits>&>(other));
+			mybuf::operator=(std::move(other));
+			std::basic_ostream<charT,traits>::operator=(std::move(other));
 			assert(this==rdbuf());
-			// retains streambuf mybuf
-			std::swap(mxptr,other.mxptr);
-			//std::exchange(this->flushed(),other.flushed());
-			std::swap(out,other.out);
-			mybuf::swap(other);
-//			auto bufstring=other.rdbuf()->str();
-//			this->str(bufstring); // might throw, copies (moves with my adaptation and inlining)
-//			other.seekoff(0,std::ios::end);
-//			this->seekpos(other.tellp());
-			//mxptr = detail__::thelocks.get_lock(out);
 		}
 		return *this;
 	}
@@ -116,17 +130,11 @@ public:
 		try{
 			this->emit();
 		} catch(...){}
-		try{
-			detail__::thelocks.release_lock(mxptr,out);
-		}catch(...){}
 	}
 	void swap(basic_osyncstream & other){
 		if (this != &other){
 			mybuf::swap(other);
 			std::basic_ostream<charT,traits>::swap(other);
-			std::swap(mxptr,other.mxptr);
-			std::exchange(this->flushed(),other.flushed());
-			std::swap(out,other.out);
 		}
 	}
 
@@ -134,7 +142,14 @@ public:
 		return dynamic_cast<mybuf*>(std::basic_ostream<charT,traits>::rdbuf());
 	}
 	std::basic_streambuf<charT,traits>* rdbuf_wrapped() const noexcept {
-		return out;
+		return mybuf::rdbuf_wrapped();
+	}
+	void emit(){
+		using sentry=typename std::basic_ostream<charT,traits>::sentry;
+		sentry s{*this};
+		if (not s || not mybuf::emit()){
+			this->setstate(std::ios_base::badbit);
+		}
 	}
 };
 using osyncstream = basic_osyncstream<char>;

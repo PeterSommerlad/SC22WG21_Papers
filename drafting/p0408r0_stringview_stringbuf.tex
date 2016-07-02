@@ -1,0 +1,347 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}  % Activate to begin paragraphs with an empty line rather than an indent
+
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{p0408r0}
+\newcommand{\paperdate}{2016-07-01}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - Efficient Access to basic\_stringbuf's Buffer}
+\author{Peter Sommerlad}
+\date{\paperdate}                        % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: \papernumber & \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++\\\hline 
+Audience: & LWG/LEWG\\\hline
+\end{tabular}
+
+\chapter{Motivation}
+Streams have been the oldest part of the C++ standard library and their specification doesn't take into account many things introduced since C++11. One of  the oversights is that there is no non-copying access to the internal buffer of a \tcode{basic_stringbuf} which makes at least the obtaining of the output results from an \tcode{ostringstream} inefficient, because a copy is always made. I personally speculate that this was also the reason why \tcode{basic_strbuf} took so long to get deprecated with its \tcode{char *} access.
+
+With move semantics and \tcode{basic_string_view} there is no longer a reason to keep this pessimissation alive on \tcode{basic_stringbuf}.
+
+
+\chapter{Introduction}
+This paper proposes to adjust the API of \tcode{basic_stringbuf} and the corresponding stream class templates to allow accessing the underlying string more efficiently.
+
+C++17 and library TS have \tcode{basic_string_view} allowing an efficient read-only access to a contiguous sequence of characters which I believe \tcode{basic_stringbuf} has to guarantee about its internal buffer, even if it is not implemented using \tcode{basic_string} obtaining a \tcode{basic_string_view} on the internal buffer should work sidestepping the copy overhead of calling \tcode{str()}. 
+
+On the other hand, there is no means to construct a \tcode{basic_string} and move from it into a \tcode{basic_stringbuf} via a constructor or a move-enabled overload of \tcode{str(basic_string \&\&)}.
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item Daniel Kr\"ugler encouraged me to pursue this track.
+\end{itemize}
+
+
+%\chapter{example code}
+
+
+\chapter{Impact on the Standard}
+This is an extension to the API of \tcode{basic_stringbuf}, \tcode{basic_stringstream}, \tcode{basic_istringstream}, and \tcode{basic_ostringstream} class templates.
+\chapter{Design Decisions}
+After experimentation I decided that substituting the \tcode{(basic_string<charT,traits,Allocator const \&)} constructors in favor of passing a \tcode{basic_string_view} would lead to ambiguities with the new move-from-string constructors.
+\section{Open Issues to be Discussed by LEWG / LWG}
+\begin{itemize}
+\item name of the \tcode{str_view()} member function
+\item should the \tcode{str()\&\&} overload be provided for move-out.
+\end{itemize}
+
+\chapter{Technical Specifications}
+The following is relative to n4594.
+\section{27.8.2 Adjust synopsis of basic\_stringbuf [stringbuf]}
+Add a new constructor overload:
+\begin{codeblock}
+      explicit basic_stringbuf(
+        basic_string<charT, traits, Allocator>&& s,
+        ios_base::openmode which = ios_base::inœ | ios_base::out);
+\end{codeblock}
+
+Add two overloads of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+\begin{codeblock}
+void str(basic_string<charT, traits, Allocator>&& s);
+basic_string<charT,traits,Allocator> str() &&;
+basic_string_view<charT, traits> str_view() const;
+\end{codeblock}
+
+\subsection{27.8.2.1 basic\_stringbuf constructors [stringbuf.cons]}
+Add the following constructor specification:
+\begin{itemdecl}
+      explicit basic_stringbuf(
+        basic_string<charT, traits, Allocator>&& s,
+        ios_base::openmode which = ios_base::in | ios_base::out);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} (27.6.3.1), and initializing mode with which. Then calls \tcode{str(std::move(s))}.
+\end{itemdescr}
+
+\subsection{27.8.2.3 Member functions [stringbuf.members]}
+Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{str_view() const} member function.:
+\begin{itemdecl}
+void str(basic_string<charT, traits, Allocator>&& s);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects 
+Moves the content of \tcode{s} into the \tcode{basic_stringbuf} underlying character sequence and initializes the input and output sequences according to \tcode{mode}.
+
+\pnum
+\postconditions
+Let \tcode{size} denote the original value of \tcode{s.size()} before the move.
+If \tcode{mode \& ios_base::out} is true, \tcode{pbase()} points to the first underlying character and \tcode{epptr() >= pbase() + size} holds; in addition, if \tcode{mode \& ios_base::ate} is true, \tcode{pptr() == pbase() + size} holds, otherwise \tcode{pptr() == pbase()} is true. If \tcode{mode \& ios_base::in} is true, \tcode{eback()} points to the first underlying character, and both \tcode{gptr() == eback()} and \tcode{egptr() == eback() + size} hold.
+\end{itemdescr}
+
+\begin{itemdecl}
+basic_string<charT, traits, Allocator> str() &&;
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\returns A \tcode{basic_string} object moved from the \tcode{basic_stringbuf} underlying character sequence. If the \tcode{basic_stringbuf} was created only in input mode, \tcode{basic_string(eback(), egptr()-eback())}. If the \tcode{basic_stringbuf} was created with \tcode{which \& ios_base::out} being true then \tcode{basic_string(pbase(), high_mark-pbase())}, where \tcode{high_mark} represents the position one past the highest initialized character in the buffer. Characters can be initialized by writing to the stream, by constructing the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling one of the \tcode{str(basic_string)} member functions. In the case of calling one of the \tcode{str(basic_string)} member functions, all characters initialized prior to the call are now considered uninitialized (except for those characters re-initialized by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode an empty \tcode{basic_string} is returned. 
+
+\pnum
+\postcondition The underlying character sequence is empty.
+%% this might not be the right way to say that
+\end{itemdescr}
+
+\begin{itemdecl}
+basic_string_view<charT, traits> str_view() const;
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\returns A \tcode{basic_string_view} object referring to the \tcode{basic_stringbuf} underlying character sequence. If the \tcode{basic_stringbuf} was created only in input mode,  \tcode{basic_string_view(eback(), egptr()-eback())}. If the \tcode{basic_stringbuf} was created with \tcode{which \& ios_base::out} being true then \tcode{basic_string_view(pbase(), high_mark-pbase())}, where \tcode{high_mark} represents the position one past the highest initialized character in the buffer. Characters can be initialized by writing to the stream, by constructing the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling one of the \tcode{str(basic_string)} member functions. In the case of calling one of the \tcode{str(basic_string)} member functions, all characters initialized prior to the call are now considered uninitialized (except for those characters re-initialized by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode a \tcode{basic_string_view} referring to an empty range is returned. 
+
+\pnum
+\enternote
+Using the returned object after destruction or any modification of \tcode{*this}, such as output on the holding stream, will cause undefined behavior, because the internal string referred by the return value might have changed or re-allocated. 
+\exitnote
+\end{itemdescr}
+%% istream
+\section{27.8.3 Adjust synopsis of basic\_istringstream [istringstream]}
+Add a new constructor overload:
+\begin{codeblock}
+           explicit basic_istringstream(
+             basic_string<charT, traits, Allocator>&& str,
+             ios_base::openmode which = ios_base::in);
+\end{codeblock}
+
+Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+\begin{codeblock}
+void str(basic_string<charT, traits, Allocator>&& s);
+basic_string_view<charT, traits> str_view() const;
+\end{codeblock}
+
+\subsection{27.8.3.1 basic\_istringstream constructors [istringstream.cons]}
+Add the following constructor specification:
+\begin{itemdecl}
+explicit basic_istringstream(
+  const basic_string<charT, traits, Allocator>&& str,
+  ios_base::openmode which = ios_base::in);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{basic_istringstream<charT, traits>}, initializing the base class with \tcode{basic_istream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (27.8.2.1).
+\end{itemdescr}
+\subsection{27.8.3.3 Member functions [istringstream.members]}
+Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{str_view() const} member function.:
+\begin{itemdecl}
+void str(basic_string<charT, traits, Allocator>&& s);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects \tcode{rdbuf()->str(std::move(s))}.
+\end{itemdescr}
+\begin{itemdecl}
+basic_string_view<charT, traits> str_view() const;
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\returns \tcode{rdbuf()->str_view()}.
+\end{itemdescr}
+
+%%ostream
+
+\section{27.8.4 Adjust synopsis of basic\_ostringstream [ostringstream]}
+Add a new constructor overload:
+\begin{codeblock}
+           explicit basic_ostringstream(
+             basic_string<charT, traits, Allocator>&& str,
+             ios_base::openmode which = ios_base::in);
+\end{codeblock}
+
+Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+\begin{codeblock}
+void str(basic_string<charT, traits, Allocator>&& s);
+basic_string_view<charT, traits> str_view() const;
+\end{codeblock}
+
+\subsection{27.8.4.1 basic\_ostringstream constructors [ostringstream.cons]}
+Add the following constructor specification:
+\begin{itemdecl}
+explicit basic_ostringstream(
+  const basic_string<charT, traits, Allocator>&& str,
+  ios_base::openmode which = ios_base::in);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{basic_ostringstream<charT, traits>}, initializing the base class with \tcode{basic_ostream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (27.8.2.1).
+\end{itemdescr}
+\subsection{27.8.4.3 Member functions [ostringstream.members]}
+Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{str_view() const} member function.:
+\begin{itemdecl}
+void str(basic_string<charT, traits, Allocator>&& s);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects \tcode{rdbuf()->str(std::move(s))}.
+\end{itemdescr}
+\begin{itemdecl}
+basic_string_view<charT, traits> str_view() const;
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\returns \tcode{rdbuf()->str_view()}.
+\end{itemdescr}
+
+%%stringstream
+\section{27.8.5 Adjust synopsis of basic\_stringstream [stringstream]}
+Add a new constructor overload:
+\begin{codeblock}
+           explicit basic_stringstream(
+             basic_string<charT, traits, Allocator>&& str,
+             ios_base::openmode which = ios_base::in);
+\end{codeblock}
+
+Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+\begin{codeblock}
+void str(basic_string<charT, traits, Allocator>&& s);
+basic_string_view<charT, traits> str_view() const;
+\end{codeblock}
+
+\subsection{27.8.4.1 basic\_stringstream constructors [stringstream.cons]}
+Add the following constructor specification:
+\begin{itemdecl}
+explicit basic_stringstream(
+  const basic_string<charT, traits, Allocator>&& str,
+  ios_base::openmode which = ios_base::in);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{basic_stringstream<charT, traits>}, initializing the base class with \tcode{basic_stream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (27.8.2.1).
+\end{itemdescr}
+\subsection{27.8.4.3 Member functions [stringstream.members]}
+Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{str_view() const} member function.:
+\begin{itemdecl}
+void str(basic_string<charT, traits, Allocator>&& s);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects \tcode{rdbuf()->str(std::move(s))}.
+\end{itemdescr}
+\begin{itemdecl}
+basic_string_view<charT, traits> str_view() const;
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\returns \tcode{rdbuf()->str_view()}.
+\end{itemdescr}
+
+
+
+\chapter{Appendix: Example Implementations}
+
+The given specification has been implemented within a recent version of the sstream header of gcc6. Here are some definitions taken from there:
+\begin{codeblock}
+// basic_stringbuf:
+      explicit
+      basic_stringbuf(__string_type&& __str,
+		      ios_base::openmode __mode = ios_base::in | ios_base::out)
+      : __streambuf_type(), _M_mode(), _M_string(std::move(__str))
+      { _M_stringbuf_init(__mode); }
+  	using __string_view_type=experimental::basic_string_view<_CharT,_Traits>;
+
+      __string_view_type str_view() const {
+      	__string_view_type __ret{};
+      	if ( this->pptr())  {
+      	    // The current egptr() may not be the actual string end.
+      	    if (this->pptr() > this->egptr())
+      	      __ret = __string_view_type(this->pbase(), this->pptr()-this->pbase());
+      	    else
+       	      __ret = __string_view_type(this->pbase(), this->egptr()-this->pbase());
+      	  }
+      	else {
+      		__ret = _M_string;
+      	}
+      	return __ret;
+      }
+     void
+      str(__string_type&& __s)
+      {
+	_M_string.assign(std::move(__s));
+	_M_stringbuf_init(_M_mode);
+      }
+
+//basic_istringstream
+      explicit
+      basic_istringstream(__string_type&& __str,
+			  ios_base::openmode __mode = ios_base::in)
+      : __istream_type(), _M_stringbuf(std::move(__str), __mode | ios_base::in)
+      { this->init(&_M_stringbuf); }
+  	using __string_view_type=experimental::basic_string_view<_CharT,_Traits>;
+      __string_view_type
+      str_view() const
+      { return _M_stringbuf.str_view(); }
+      void
+      str( __string_type&& __s)
+      { _M_stringbuf.str(std::move(__s)); }
+
+//basic_ostringstream
+      explicit
+      basic_ostringstream(__string_type&& __str,
+			  ios_base::openmode __mode = ios_base::out)
+      : __ostream_type(), _M_stringbuf(std::move(__str), __mode | ios_base::out)
+      { this->init(&_M_stringbuf); }
+  	using __string_view_type=experimental::basic_string_view<_CharT,_Traits>;
+      __string_view_type
+      str_view() const
+      { return _M_stringbuf.str_view(); }
+      void
+      str( __string_type&& __s)
+      { _M_stringbuf.str(std::move(__s)); }
+
+//basic_stringstream
+      explicit
+      basic_stringstream( __string_type&& __str,
+			 ios_base::openmode __m = ios_base::out | ios_base::in)
+      : __iostream_type(), _M_stringbuf(std::move(__str), __m)
+      { this->init(&_M_stringbuf); }
+  	using __string_view_type=experimental::basic_string_view<_CharT,_Traits>;
+      __string_view_type
+      str_view() const
+      { return _M_stringbuf.str_view(); }
+      void
+      str( __string_type&& __s)
+      { _M_stringbuf.str(std::move(__s)); }
+
+\end{codeblock}
+
+
+\end{document}
+
