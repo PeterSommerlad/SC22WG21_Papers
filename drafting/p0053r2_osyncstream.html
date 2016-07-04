@@ -228,6 +228,16 @@ For example,
 <h2><a name="Design">Design</a></h2>
 
 <p>
+While it has been pointed out that the implementation should actually in the used stream
+buffer object, I believe the specification should hide that effect, because such a 
+stream buffer is not intended to be ever be used stand alone. Therefore, the specification
+here only provides the basic_osyncstream class template and not any details on the 
+underlying stream buffer implementing the mechanics. I have an implementation, where the 
+basic_osyncstream is more or less just a shell to the real meat in the stream buffer
+but that stream buffer is not meant to be exchanged or shared or anything.
+</p>
+
+<p>
 We follow typical stream conventions
 of <code>basic_</code> prefixes and typedefs.
 </p>
@@ -235,10 +245,11 @@ of <code>basic_</code> prefixes and typedefs.
 <p>
 The constructor for <code>osyncstream</code>
 takes a non-const reference
-to a <code>basic_ostream</code>.
-This non-const reference indicates that
-the destruction of the buffer
-may write to the stream associated with the argument.
+to a <code>basic_ostream</code> obtaining its stream buffer
+or a <code>basic_streambuf</code>.
+This stream buffer indicates that
+the destruction of the osyncstream
+may write to the stream buffer obtained with the constructor argument.
 </p>
 
 <p>
@@ -666,57 +677,15 @@ Hello, World!
 <h2><a name="implementation">Implementation</a></h2>
 
 <p>
-The stream buffer class used by <code>basic_osyncstream</code> could be something along the lines of the 
-following.
-</p>
-
-<blockquote>
-
-<pre><code>template &lt;class charT, class traits, class Allocator&gt;
-class noteflush_streambuf
-  : public std::basic_stringbuf&lt;charT,traits,Allocator&gt;
-{
-  protected:
-    virtual int sync();
-};
-</code></pre>
-<p>
-The class template <code>noteflush_streambuf</code>
-behaves like a <code>basic_stringbuf</code>
-except that flushes of the stream using it,
-which incur in calling the <code>sync()</code> member function,
-are noted instead of being a no-op.
-</p>
-
-<dl>
-<dt><code>int sync() noexcept;</code></dt>
-<dd>
-
-<p><i>Effects:</i>
-Notes the request of a flush within the object.
-</p>
-<p>[<i>Note</i>:
-Any call to <code>sync()</code> ensures that
-a subsequent call to <code>emit()</code>
-in the owning <code>basic_osyncstream</code>
-will flush the stream being synchronized.
-&mdash;<i>end note</i>]
-</p>
-
-<p><i>Returns:</i>
-<code>0</code>.
-</p>
-
-</dd>
-
-</dl>
-
-</blockquote>
-
-<p>
-An example implementation is available on 
+Two example implementations are available on 
 <a href="https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/Test_basic_osyncstream">
-github.com/PeterSommerlad/SC22WG21_Papers/workspace/Test_basic_osyncstream</a>.
+github.com/PeterSommerlad/SC22WG21_Papers/workspace/Test_basic_osyncstream</a> and
+<a href="https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/p0053_basic_osyncstreambuf">
+https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/p0053_basic_osyncstreambuf</a>.
+</p>
+<p>The latter actually implements almost all of the mechanics in a stream buffer
+as proposed by Pablo Halpern where the first one is my original implementation with 
+most of the mechanics stuck in the basic_osyncstream.
 </p>
 
 <h2><a name="Revisions">Revisions</a></h2>
