@@ -1,3 +1,4 @@
+#include "string"
 #include <experimental/string_view>
 #include "sstream"
 #include "cute.h"
@@ -23,7 +24,7 @@ void time_many_in_conversions(){
 		in >> s;
 	}
 	std::chrono::nanoseconds dur=std::chrono::system_clock::now()-now;
-	ASSERT_EQUAL(1, dur.count()/1000); // forces failure and output
+	//ASSERT_EQUAL(1, dur.count()/1000); // forces failure and output
 }
 
 void test_to_stringview_from_stringbuf(){
@@ -53,6 +54,41 @@ void test_to_stringview_from_istream(){
 	std::istringstream in{"42 43"};
 	ASSERT_EQUAL("42 43",in.str_view());
 }
+void test_str_from_rvalue_moved_out(){
+	char const * const msg="xxxxx, world\n";
+	std::stringstream out{msg};
+	out << "hello";
+	std::string s{std::move(out).str()};
+	ASSERT_EQUAL("hello, world\n",s);
+	ASSERT_EQUAL(0,out.str_view().size());
+}
+void test_str_from_rvalue_moved_out_output_only(){
+	char const * const msg="hello, world\n";
+	std::stringstream out{};
+	out << msg;
+	std::string s{std::move(out).str()};
+	ASSERT_EQUAL(msg,s);
+	ASSERT_EQUAL(0,out.str().size());
+}
+void test_str_from_rvalue_moved_out_frombuf(){
+	char const * const msg="hello, world\n";
+	std::ostringstream out{};
+	out << msg;
+	std::string s{std::move(*out.rdbuf()).str()};
+	ASSERT_EQUAL(msg,s);
+	ASSERT_EQUAL(0,out.str().size());
+}
+
+void test_str_from_rvalue_moved_out_with_seek(){
+	char const * const msg="xxxxx, world\n";
+	std::stringstream out{};
+	out << msg;
+	out.seekp(0,std::ios::beg);
+	out << "hello";
+	std::string s{std::move(out).str()};
+	ASSERT_EQUAL("hello, world\n",s);
+	ASSERT_EQUAL(0,out.str_view().size());
+}
 
 
 
@@ -67,6 +103,10 @@ void runAllTests(int argc, char const *argv[]){
 	s.push_back(CUTE(test_to_stringview_from_ostream));
 	s.push_back(CUTE(test_to_stringview_from_partially_read_written_stringstream));
 	s.push_back(CUTE(test_to_stringview_from_istream));
+	s.push_back(CUTE(test_str_from_rvalue_moved_out));
+	s.push_back(CUTE(test_str_from_rvalue_moved_out_output_only));
+	s.push_back(CUTE(test_str_from_rvalue_moved_out_frombuf));
+	s.push_back(CUTE(test_str_from_rvalue_moved_out_with_seek));
 	cute::xml_file_opener xmlfile(argc,argv);
 	cute::xml_listener<cute::ide_listener<> >  lis(xmlfile.out);
 	cute::makeRunner(lis,argc,argv)(s, "AllTests");
