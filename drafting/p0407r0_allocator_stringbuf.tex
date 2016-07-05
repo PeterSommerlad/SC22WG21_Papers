@@ -13,7 +13,7 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{p0407r0}
-\newcommand{\paperdate}{2016-07-04}
+\newcommand{\paperdate}{2016-07-05}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -66,86 +66,221 @@ Allocator support in the standard library is lacking for string-based streams an
 \chapter{Technical Specifications}
 
 \section{27.8.2 Adjust synopsis of \tcode{basic_stringbuf} [stringbuf]}
-Change each of the non-special member constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
+Change each of the non-moving, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
-explicit basic_stringbuf(        ios_base::openmode which = ios_base::in | ios_base::out
-        const Allocator&a=Allocator());
-explicit basic_stringbuf(        const basic_string<charT, traits, Allocator>& str,        ios_base::openmode which = ios_base::in | ios_base::out
-        const Allocator&a=Allocator());
+explicit basic_stringbuf(        ios_base::openmode which = ios_base::in | ios_base::out@\ins{,}@
+        @\ins{const Allocator \&a=Allocator()}@);
+explicit basic_stringbuf(        const basic_string<charT, traits, Allocator>& str,        ios_base::openmode which = ios_base::in | ios_base::out@\ins{,}@
+        @\ins{const Allocator \&a=Allocator()}@);
 \end{codeblock}
 
 \textit{Append a paragraph p3 to the text following the synopsis:}
 
+\begin{insrt}
 \pnum
 In every specialization \tcode{basic_stringbuf<charT, traits, Allocator>}, the type \tcode{allocator_traits<Allocator>::value_type} shall name the same type as \tcode{charT}. Every object of type \tcode{basic_stringbuf<charT, traits, Allocator>} shall use an object of type \tcode{Allocator} to allocate and free storage for the internal buffer of \tcode{charT} objects as needed. The \tcode{Allocator} object used shall be obtained as described in 23.2.1 [container.requirements.general].
 \enternote
 Implementations using \tcode{basic_string} internally, will simply pass the allocator parameter to the corresponding \tcode{basic_string} constructors.
 \exitnote
+\end{insrt}
+
 \subsection{27.8.2.1 \tcode{basic_stringbuf} constructors [stringbuf.cons]}
-Adjust the constructor specifications taking the additional Allocator parameter, no further explanation required.
+Adjust the constructor specifications taking the additional Allocator parameter, no further explanation required:
+
+\begin{itemdecl}
+explicit basic_stringbuf(
+  ios_base::openmode which = ios_base::in | ios_base::out@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+and
+
+\begin{itemdecl}
+explicit basic_stringbuf(
+  const basic_string<charT, traits, Allocator>& s,
+  ios_base::openmode which = ios_base::in | ios_base::out@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
 
 %% basic_istringstream
 \section{27.8.3 Adjust synopsis of basic\_istringstream [istringstream]}
-Change each of the non-special member constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
+Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
-explicit basic_istringstream(             ios_base::openmode which = ios_base::in
-             const Allocator&a=Allocator());
-explicit basic_istringstream(             const basic_string<charT, traits, Allocator>& str,             ios_base::openmode which = ios_base::in
-        const Allocator&a=Allocator());
+explicit basic_istringstream(             ios_base::openmode which = ios_base::in@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+explicit basic_istringstream(             const basic_string<charT, traits, Allocator>& str,             ios_base::openmode which = ios_base::in@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
 \end{codeblock}
 
 \textit{Append a paragraph p2 to the text following the synopsis:}
 
+\begin{insrt}
 \pnum
 In every specialization \tcode{basic_istringstream<charT, traits, Allocator>}, the type \tcode{allocator_traits<Allocator>::value_type} shall name the same type as \tcode{charT}. Every object of type \tcode{basic_istringstream<charT, traits, Allocator>} shall use an object of type \tcode{Allocator} to allocate and free storage for the internal buffer of \tcode{charT} objects as needed. The \tcode{Allocator} object used shall be obtained as described in 23.2.1 [container.requirements.general].
 \enternote
 Implementations using \tcode{basic_string} internally, will simply pass the allocator parameter to the corresponding \tcode{basic_string} constructors.
 \exitnote
+\end{insrt}
+
 \subsection{27.8.3.1 \tcode{basic_istringstream} constructors [istringstream.cons]}
 Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_stringbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
+
+\begin{itemdecl}
+explicit basic_istringstream(ios_base::openmode which = ios_base::in@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_istringstream<charT, traits>},
+initializing the base class with
+\tcode{basic_istream(\&sb)}
+and initializing \tcode{sb} with
+\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(which | ios_base::in\ins{, a}))}~({27.8.2.1}).
+\end{itemdescr}
+
+\begin{itemdecl}
+explicit basic_istringstream(
+  const basic_string<charT, traits, Allocator>& str,
+  ios_base::openmode which = ios_base::in@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_istringstream<charT, traits>},
+initializing the base class with
+\tcode{basic_istream(\&sb)}
+and initializing \tcode{sb} with
+\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(str, which | ios_base::in\ins{, a)})}~({27.8.2.1}).
+\end{itemdescr}
+
 
 
 %% basic_ostringstream
 \section{27.8.4 Adjust synopsis of \tcode{basic_ostringstream} [ostringstream]}
-Change each of the non-special member constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
+Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
-explicit basic_ostringstream(             ios_base::openmode which = ios_base::out
-             const Allocator&a=Allocator());
-explicit basic_ostringstream(             const basic_string<charT, traits, Allocator>& str,             ios_base::openmode which = ios_base::out
-             const Allocator&a=Allocator());
+explicit basic_ostringstream(             ios_base::openmode which = ios_base::out@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+explicit basic_ostringstream(             const basic_string<charT, traits, Allocator>& str,             ios_base::openmode which = ios_base::out@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
 \end{codeblock}
 
 \textit{Append a paragraph p2 to the text following the synopsis:}
 
+\begin{insrt}
 \pnum
 In every specialization \tcode{basic_ostringstream<charT, traits, Allocator>}, the type \tcode{allocator_traits<Allocator>::value_type} shall name the same type as \tcode{charT}. Every object of type \tcode{basic_ostringstream<charT, traits, Allocator>} shall use an object of type \tcode{Allocator} to allocate and free storage for the internal buffer of \tcode{charT} objects as needed. The \tcode{Allocator} object used shall be obtained as described in 23.2.1 [container.requirements.general].
 \enternote
 Implementations using \tcode{basic_string} internally, will simply pass the allocator parameter to the corresponding \tcode{basic_string} constructors.
 \exitnote
+\end{insrt}
+
+
 \subsection{27.8.4.1 \tcode{basic_ostringstream} constructors [ostringstream.cons]}
 Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_stringbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
+
+\begin{itemdecl}
+explicit basic_ostringstream(
+  ios_base::openmode which = ios_base::out@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_ostringstream},
+initializing the base class with
+\tcode{basic_ostream(\brk{}\&sb)}
+and initializing \tcode{sb} with
+\tcode{basic_stringbuf<charT, traits, Allocator>(which | \brk{}ios_base::out\ins{, a}))}~({27.8.2.1}).
+\end{itemdescr}
+
+\begin{itemdecl}
+explicit basic_ostringstream(
+  const basic_string<charT, traits, Allocator>& str,
+  ios_base::openmode which = ios_base::out@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_ostringstream<charT, traits>},
+initializing the base class with
+\tcode{basic_ostream(\&sb)}
+and initializing \tcode{sb} with
+\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(str, which | ios_base::out\ins{, a}))}~({27.8.2.1}).
+\end{itemdescr}
 
 
 %% basic_stringstream
 \section{27.8.5 Adjust synopsis of \tcode{basic_stringstream} [stringstream]}
-Change each of the non-special member constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
+Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
-explicit basic_stringstream(             ios_base::openmode which = ios_base::out | ios_base::in
-             const Allocator&a=Allocator());
-explicit basic_ostringstream(             const basic_string<charT, traits, Allocator>& str,             ios_base::openmode which = ios_base::out | ios_base::in
-             const Allocator&a=Allocator());
+explicit basic_stringstream(             ios_base::openmode which = ios_base::out | ios_base::in@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+explicit basic_ostringstream(             const basic_string<charT, traits, Allocator>& str,             ios_base::openmode which = ios_base::out | ios_base::in@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
 \end{codeblock}
 
 \textit{Append a paragraph p2 to the text following the synopsis:}
 
+\begin{insrt}
 \pnum
 In every specialization \tcode{basic_stringstream<charT, traits, Allocator>}, the type \tcode{allocator_traits<Allocator>::value_type} shall name the same type as \tcode{charT}. Every object of type \tcode{basic_stringstream<charT, traits, Allocator>} shall use an object of type \tcode{Allocator} to allocate and free storage for the internal buffer of \tcode{charT} objects as needed. The \tcode{Allocator} object used shall be obtained as described in 23.2.1 [container.requirements.general].
 \enternote
 Implementations using \tcode{basic_string} internally, will simply pass the allocator parameter to the corresponding \tcode{basic_string} constructors.
 \exitnote
+\end{insrt}
+
 \subsection{27.8.5.1 \tcode{basic_stringstream} constructors [stringstream.cons]}
 Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_stringbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
+\begin{itemdecl}
+explicit basic_stringstream(
+  ios_base::openmode which = ios_base::out | ios_base::in@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
 
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_stringstream<charT, traits>},
+initializing the base class with
+\tcode{basic_iostream(\&sb)}
+and initializing
+\tcode{sb}
+with
+\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(which\ins{, a})}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{basic_stringstream}!constructor}%
+\begin{itemdecl}
+explicit basic_stringstream(
+  const basic_string<charT, traits, Allocator>& str,
+  ios_base::openmode which = ios_base::out | ios_base::in@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_stringstream<charT, traits>},
+initializing the base class with
+\tcode{basic_iostream(\&sb)}
+and initializing
+\tcode{sb}
+with
+\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(str, which\ins{, a})}.
+\end{itemdescr}
 
 
 

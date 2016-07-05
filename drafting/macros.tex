@@ -488,3 +488,10 @@
   \scriptsize\raisebox{.7ex}{\arabic{Paras}}}\hspace{\@totalleftmargin}\quad}}
 \makeatother
 
+%% PS: add some helpers for coloring, assumes \usepackage{color}
+\definecolor{insertcolor}{rgb}{0,0.5,0.25}
+\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
+\newcommand{\ins}[1]{\textcolor{insertcolor}{\underline{#1}}}
+
+\newenvironment{insrt}{\color{insertcolor}}{\color{black}}
+

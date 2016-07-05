@@ -10,10 +10,19 @@
 \usepackage{color}        % define colors for strikeouts and underlines
 \usepackage{underscore}   % remove special status of '_' in ordinary text
 \usepackage{xspace}
+\usepackage[normalem]{ulem}
 \pagestyle{myheadings}
+
 
 \newcommand{\papernumber}{p0408r0}
 \newcommand{\paperdate}{2016-07-01}
+
+%\definecolor{insertcolor}{rgb}{0,0.5,0.25}
+%\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
+%\newcommand{\ins}[1]{\textcolor{insertcolor}{\underline{#1}}}
+%
+%\newenvironment{insrt}{\color{insertcolor}}{\color{black}}
+
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -69,28 +78,32 @@ After experimentation I decided that substituting the \tcode{(basic_string<charT
 The following is relative to n4594.
 \section{27.8.2 Adjust synopsis of basic\_stringbuf [stringbuf]}
 Add a new constructor overload:
+\begin{insrt}
 \begin{codeblock}
       explicit basic_stringbuf(
         basic_string<charT, traits, Allocator>&& s,
         ios_base::openmode which = ios_base::in | ios_base::out);
 \end{codeblock}
+\end{insrt}
 
 Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const &;
+basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
 
 
 Add two overloads of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+\begin{insrt}
 \begin{codeblock}
 void str(basic_string<charT, traits, Allocator>&& s);
 basic_string<charT,traits,Allocator> str() &&;
 basic_string_view<charT, traits> str_view() const;
 \end{codeblock}
-
+\end{insrt}
 
 \subsection{27.8.2.1 basic\_stringbuf constructors [stringbuf.cons]}
 Add the following constructor specification:
+\begin{insrt}
 \begin{itemdecl}
       explicit basic_stringbuf(
         basic_string<charT, traits, Allocator>&& s,
@@ -98,16 +111,47 @@ Add the following constructor specification:
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} (27.6.3.1), and initializing mode with which. Then calls \tcode{str(std::move(s))}.
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} (27.6.3.1), and initializing \tcode{mode} with \tcode{which}. Then calls \tcode{str(std::move(s))}.
 \end{itemdescr}
+\end{insrt}
 
 \subsection{27.8.2.3 Member functions [stringbuf.members]}
 Change the \tcode{const}-overload of \tcode{str()} member function specification to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const &;
+basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
 
+Change p1 to use plural for "\tcode{str(basic_string)} member functions":
+
+\begin{itemdescr}
+\pnum
+\returns
+A
+\tcode{basic_string}
+object whose content is equal to the
+\tcode{basic_stringbuf}
+underlying character sequence.
+If the \tcode{basic_stringbuf} was created only in input mode, the resultant
+\tcode{basic_string} contains the character sequence in the range
+\range{eback()}{egptr()}. If the \tcode{basic_stringbuf} was created with
+\tcode{which \& ios_base::out} being true then the resultant \tcode{basic_string}
+contains the character sequence in the range \range{pbase()}{high_mark}, where
+\tcode{high_mark} represents the position one past the highest initialized character
+in the buffer. Characters can be initialized by writing to the stream, by constructing
+the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling 
+\ins{one of }
+the
+\tcode{str(basic_string)} member function\ins{s}. In the case of calling 
+\ins{one of }
+the
+\tcode{str(basic_string)} member function\ins{s}, all characters initialized prior to
+the call are now considered uninitialized (except for those characters re-initialized
+by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created
+in neither input nor output mode and a zero length \tcode{basic_string} is returned. 
+\end{itemdescr}
+
 Add the following specifications and adjust the wording of \tcode{str() const \&} according to the wording given for \tcode{str_view() const} member function.:
+\begin{insrt}
 \begin{itemdecl}
 void str(basic_string<charT, traits, Allocator>&& s);
 \end{itemdecl}
@@ -129,7 +173,7 @@ basic_string<charT, traits, Allocator> str() &&;
 \begin{itemdescr}
 
 \pnum
-\returns A \tcode{basic_string} object moved from the \tcode{basic_stringbuf} underlying character sequence. If the \tcode{basic_stringbuf} was created only in input mode, \tcode{basic_string(eback(), egptr()-eback())}. If the \tcode{basic_stringbuf} was created with \tcode{which \& ios_base::out} being true then \tcode{basic_string(pbase(), high_mark-pbase())}, where \tcode{high_mark} represents the position one past the highest initialized character in the buffer. Characters can be initialized by writing to the stream, by constructing the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling one of the \tcode{str(basic_string)} member functions. In the case of calling one of the \tcode{str(basic_string)} member functions, all characters initialized prior to the call are now considered uninitialized (except for those characters re-initialized by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode an empty \tcode{basic_string} is returned. 
+\returns A \tcode{basic_string} object moved from the \tcode{basic_stringbuf} underlying character sequence. If the \tcode{basic_stringbuf} was created only in input mode, \tcode{basic_string(eback(), egptr()-eback())}. If the \tcode{basic_stringbuf} was created with \tcode{which \& ios_base::out} being true then \tcode{basic_string(pbase(), high_mark-pbase())}, where \tcode{high_mark} represents the position one past the highest initialized character in the buffer. Characters can be initialized by writing to the stream, by constructing the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling one of the \tcode{str(basic_string)} member functions. In the case of calling one of the \tcode{str(basic_string)} member functions, all characters initialized prior to the call are now considered uninitialized (except for those characters re-initialized by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode and an empty \tcode{basic_string} is returned. 
 
 \pnum
 \postcondition The underlying character sequence is empty.
@@ -142,37 +186,47 @@ basic_string_view<charT, traits> str_view() const;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\returns A \tcode{basic_string_view} object referring to the \tcode{basic_stringbuf} underlying character sequence. If the \tcode{basic_stringbuf} was created only in input mode,  \tcode{basic_string_view(eback(), egptr()-eback())}. If the \tcode{basic_stringbuf} was created with \tcode{which \& ios_base::out} being true then \tcode{basic_string_view(pbase(), high_mark-pbase())}, where \tcode{high_mark} represents the position one past the highest initialized character in the buffer. Characters can be initialized by writing to the stream, by constructing the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling one of the \tcode{str(basic_string)} member functions. In the case of calling one of the \tcode{str(basic_string)} member functions, all characters initialized prior to the call are now considered uninitialized (except for those characters re-initialized by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode a \tcode{basic_string_view} referring to an empty range is returned. 
+\returns A \tcode{basic_string_view} object referring to the \tcode{basic_stringbuf} underlying character sequence. If the \tcode{basic_stringbuf} was created only in input mode,  \tcode{basic_string_view(eback(), egptr()-eback())}. If the \tcode{basic_stringbuf} was created with \tcode{which \& ios_base::out} being true then \tcode{basic_string_view(pbase(), high_mark-pbase())}, where \tcode{high_mark} represents the position one past the highest initialized character in the buffer. Characters can be initialized by writing to the stream, by constructing the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling one of the \tcode{str(basic_string)} member functions. In the case of calling one of the \tcode{str(basic_string)} member functions, all characters initialized prior to the call are now considered uninitialized (except for those characters re-initialized by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode and a \tcode{basic_string_view} referring to an empty range is returned. 
 
 \pnum
 \enternote
 Using the returned object after destruction or any modification of \tcode{*this}, such as output on the holding stream, will cause undefined behavior, because the internal string referred by the return value might have changed or re-allocated. 
 \exitnote
 \end{itemdescr}
+
+\end{insrt}
 %% istream
 \section{27.8.3 Adjust synopsis of basic\_istringstream [istringstream]}
 Add a new constructor overload:
+\begin{insrt}
 \begin{codeblock}
            explicit basic_istringstream(
              basic_string<charT, traits, Allocator>&& str,
              ios_base::openmode which = ios_base::in);
 \end{codeblock}
+\end{insrt}
 
 Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const &;
+basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
 
 
 Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+
+\begin{insrt}
 \begin{codeblock}
 void str(basic_string<charT, traits, Allocator>&& s);
 basic_string<charT,traits,Allocator> str() &&;
 basic_string_view<charT, traits> str_view() const;
 \end{codeblock}
+\end{insrt}
 
 \subsection{27.8.3.1 basic\_istringstream constructors [istringstream.cons]}
 Add the following constructor specification:
+
+
+\begin{insrt}
 \begin{itemdecl}
 explicit basic_istringstream(
   const basic_string<charT, traits, Allocator>&& str,
@@ -182,13 +236,18 @@ explicit basic_istringstream(
 \pnum
 \effects Constructs an object of class \tcode{basic_istringstream<charT, traits>}, initializing the base class with \tcode{basic_istream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (27.8.2.1).
 \end{itemdescr}
+\end{insrt}
+
+
 \subsection{27.8.3.3 Member functions [istringstream.members]}
 Change the \tcode{const}-overload of \tcode{str()} member function specification to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const &;
+basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
 
 Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{str_view() const} member function.:
+
+\begin{insrt}
 \begin{itemdecl}
 void str(basic_string<charT, traits, Allocator>&& s);
 \end{itemdecl}
@@ -210,48 +269,57 @@ basic_string_view<charT, traits> str_view() const;
 \pnum
 \returns \tcode{rdbuf()->str_view()}.
 \end{itemdescr}
+\end{insrt}
 
 %%ostream
 
 \section{27.8.4 Adjust synopsis of basic\_ostringstream [ostringstream]}
 Add a new constructor overload:
+\begin{insrt}
 \begin{codeblock}
            explicit basic_ostringstream(
              basic_string<charT, traits, Allocator>&& str,
-             ios_base::openmode which = ios_base::in);
+             ios_base::openmode which = ios_base::out);
 \end{codeblock}
+\end{insrt}
 
 Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const &;
+basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
 
 
 Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+\begin{insrt}
 \begin{codeblock}
 void str(basic_string<charT, traits, Allocator>&& s);
 basic_string<charT,traits,Allocator> str() &&;
 basic_string_view<charT, traits> str_view() const;
 \end{codeblock}
+\end{insrt}
 
 \subsection{27.8.4.1 basic\_ostringstream constructors [ostringstream.cons]}
 Add the following constructor specification:
+\begin{insrt}
 \begin{itemdecl}
 explicit basic_ostringstream(
   const basic_string<charT, traits, Allocator>&& str,
-  ios_base::openmode which = ios_base::in);
+  ios_base::openmode which = ios_base::out);
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_ostringstream<charT, traits>}, initializing the base class with \tcode{basic_ostream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (27.8.2.1).
+\effects Constructs an object of class \tcode{basic_ostringstream<charT, traits>}, initializing the base class with \tcode{basic_ostream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::out))} (27.8.2.1).
 \end{itemdescr}
+\end{insrt}
+
 \subsection{27.8.4.3 Member functions [ostringstream.members]}
 Change the \tcode{const}-overload of \tcode{str()} member function specification to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const &;
+basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
 
 Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{str_view() const} member function.:
+\begin{insrt}
 \begin{itemdecl}
 void str(basic_string<charT, traits, Allocator>&& s);
 \end{itemdecl}
@@ -273,46 +341,55 @@ basic_string_view<charT, traits> str_view() const;
 \pnum
 \returns \tcode{rdbuf()->str_view()}.
 \end{itemdescr}
+\end{insrt}
 
 %%stringstream
 \section{27.8.5 Adjust synopsis of basic\_stringstream [stringstream]}
 Add a new constructor overload:
+\begin{insrt}
 \begin{codeblock}
            explicit basic_stringstream(
              basic_string<charT, traits, Allocator>&& str,
-             ios_base::openmode which = ios_base::in);
+             ios_base::openmode which = ios_base::in | ios_base::out);
 \end{codeblock}
+\end{insrt}
 
 Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const &;
+basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
 
 Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+\begin{insrt}
 \begin{codeblock}
 void str(basic_string<charT, traits, Allocator>&& s);
 basic_string<charT,traits,Allocator> str() &&;
 basic_string_view<charT, traits> str_view() const;
 \end{codeblock}
+\end{insrt}
 
 \subsection{27.8.4.1 basic\_stringstream constructors [stringstream.cons]}
 Add the following constructor specification:
+\begin{insrt}
 \begin{itemdecl}
 explicit basic_stringstream(
   const basic_string<charT, traits, Allocator>&& str,
-  ios_base::openmode which = ios_base::in);
+  ios_base::openmode which = ios_base::in | ios_base::out);
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_stringstream<charT, traits>}, initializing the base class with \tcode{basic_stream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (27.8.2.1).
+\effects Constructs an object of class \tcode{basic_stringstream<charT, traits>}, initializing the base class with \tcode{basic_stream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which))} (27.8.2.1).
 \end{itemdescr}
+\end{insrt}
+
 \subsection{27.8.4.3 Member functions [stringstream.members]}
 Change the \tcode{const}-overload of \tcode{str()} member function specification to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const &;
+basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
 
 Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{str_view() const} member function.:
+\begin{insrt}
 \begin{itemdecl}
 void str(basic_string<charT, traits, Allocator>&& s);
 \end{itemdecl}
@@ -334,12 +411,16 @@ basic_string_view<charT, traits> str_view() const;
 \pnum
 \returns \tcode{rdbuf()->str_view()}.
 \end{itemdescr}
-
+\end{insrt}
 
 
 \chapter{Appendix: Example Implementations}
 
-The given specification has been implemented within a recent version of the sstream header of gcc6. Here are some definitions taken from there:
+The given specification has been implemented within a recent version of the sstream header of gcc6. Modified version of the headers and some tests are available at
+
+{https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/Test_basic_stringbuf_efficient/src}.
+
+Here are some definitions taken from there:
 \begin{codeblock}
 // basic_stringbuf:
       explicit
