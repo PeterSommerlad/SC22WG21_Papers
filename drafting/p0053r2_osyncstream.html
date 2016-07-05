@@ -96,7 +96,7 @@ td {
 <h1>C++ Synchronized Buffered Ostream</h1>
 
 <p>
-ISO/IEC JTC1 SC22 WG21 p0053r2 - 2016-07-04
+ISO/IEC JTC1 SC22 WG21 p0053r2 - 2016-07-05
 </p>
 
 <p>
@@ -343,10 +343,10 @@ It defines a class template <code>basic_osyncstream</code>
 to buffer output and
 <!--atomically transfer the buffered content into a <code>basic_ostream</code> object.-->
 transfer the buffered content into an object of type
-<code>basic_ostream&lt;charT, traits&gt;</code> atomically 
+<code>basic_streambuf&lt;charT, traits&gt;</code> atomically 
 with respect to such transfers by other 
 <code>basic_osyncstream&lt;charT,traits,Allocator&gt;</code> objects referring 
-to the same <code>basic_ostream&lt;charT,traits&gt;</code>'s stream buffer object.
+to the same <code>basic_streambuf&lt;charT,traits&gt;</code> object.
 The transfer occurs when <code>emit()</code> is called
 and when the <code>basic_osyncstream&lt;chart,traits,Allocator&gt;</code> 
 object is destroyed.
@@ -382,16 +382,17 @@ public:
   typedef typename traits::pos_type pos_type;
   typedef typename traits::off_type off_type;
   typedef Allocator                 allocator_type;
+  typedef basic_streambuf&lt;charT,traits&gt; streambuf_type;
 
-  explicit basic_osyncstream(basic_streambuf&lt;charT,traits&gt; *obuf = 0, Allocator const &amp;allocator=Allocator());
+  explicit basic_osyncstream(streambuf_type *obuf, Allocator const &amp;allocator=Allocator());
   explicit basic_osyncstream(basic_ostream&lt;charT,traits&gt; &amp;os, Allocator const &amp;allocator=Allocator());
   basic_osyncstream(basic_osyncstream&amp;&amp;);
   ~basic_osyncstream();
   basic_osyncstream&amp; operator=(basic_osyncstream&amp;&amp;);
   void emit();
-  basic_streambuf&lt;charT,traits&gt;* rdbuf_wrapped() const noexcept;
+  streambuf_type* rdbuf_wrapped() const noexcept;
 private:
-  basic_streambuf&lt;charT,traits&gt; *out; // <i>exposition only</i>
+  streambuf_type *out; // <i>exposition only</i>
 };
 </code></pre>
 
@@ -441,7 +442,7 @@ Use a temporary object for streaming within a single statement.
 
 <dl>
 <dt>
-<code>explicit basic_osyncstream(basic_streambuf&lt;charT,traits&gt;&amp; *buf, Allocator const &amp;allocator=Allocator());</code>
+<code>explicit basic_osyncstream(streambuf_type *buf, Allocator const &amp;allocator=Allocator());</code>
 </dt>
 <dd>
 
@@ -450,8 +451,8 @@ Stores the stream buffer pointer <code>buf</code>
 which will be the final destination of characters in <code>out</code>. 
 If 
 the stored stream buffer pointer 
- <code>out</code>
-is <code>nullptr</code> output operations on 
+ <code>out == nullptr</code>
+ output operations on 
 <code>*this</code> fail.
 A copy of <code>allocator</code> is used to allocate memory 
 for the streams own internal buffer, if any.
@@ -466,7 +467,6 @@ on the constructed stream buffer object will not act immediately on <code>os</co
 but will be deferred until immediately after
 the transfer of characters to <code>os</code> in <code>emit()</code>.-->
 </p>
-
 <p>
 [<i>Note:</i>
 May construct a mutex. 
@@ -479,6 +479,10 @@ then its implementation must
 be aware that its member functions might be called from <code>emit()</code> 
 while a lock is held.
 &mdash;<i>end note</i>]
+</p>
+
+<p><i>Postconditions:</i>
+<code>out == buf</code>
 </p>
 
 <dt>
@@ -498,7 +502,7 @@ while a lock is held.
 The state necessary to perform <code>os.emit()</code> is moved to <code>*this</code>.
 <code>os.out=nullptr</code>
 [<i>Note:</i>
-This Disassociates <code>os</code> from its wrapped stream buffer ensuring 
+This disassociates <code>os</code> from its wrapped stream buffer ensuring 
 destruction of <code>os</code> produces no output.
 &mdash;<i>end note</i>]
 </p>
@@ -508,6 +512,7 @@ returned by <code>os.rdbuf_wrapped()</code> prior to calling this constructor.
 Output stored in <code>*os.rdbuf()</code> prior to calling this constructor
 will be stored in <code>*this->rdbuf()</code> afterwards. 
 <code>os.rdbuf()->pbase()==os.rdbuf()->pptr()</code>
+ and
 <code>nullptr == os.rdbuf_wrapped()</code>
 </p>
 
@@ -635,7 +640,7 @@ from operations on the underlying stream.
 
 </dd>
 
-<dt><code>basic_streambuf&lt;charT,traits&gt;* rdbuf_wrapped() const;</code></dt>
+<dt><code>streambuf_type* rdbuf_wrapped() const noexcept;</code></dt>
 <dd>
 
 <p><i>Returns:</i>
@@ -695,6 +700,12 @@ This paper revises
 P0053R1 C++ Synchronized Buffered Ostream</a>
 </p>
 <ul>
+<li>
+<p>
+Provide a typedef for the wrapped stream buffer and use it to shorten the specification 
+as suggested by Daniel Kr&uuml;gler.
+</p>
+</li>
 <li>
 <p>
 Provide move construction and move assignment and specify the moved-from state to be 
