@@ -1,0 +1,303 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}  % Activate to begin paragraphs with an empty line rather than an indent
+
+
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{xspace}
+\usepackage[normalem]{ulem} % for insertion marks with \uline
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{pXXXXr0}
+\newcommand{\paperdate}{2016-07-XX}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - A strstream replacement using a span as buffer}
+\author{Peter Sommerlad}
+\date{\paperdate}                        % Activate to display a given date or no date
+\input{macros}
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number: \papernumber & (N2065 done right :-)\\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++\\\hline 
+Audience: & LWG/LEWG\\\hline
+\end{tabular}
+
+\chapter{History}
+Streams have been the oldest part of the C++ standard library and especially strstreams that can use pre-allocated buffers have been deprecated for a long time now, waiting for a replacement. p0407 and p0408 provide the efficient access to the underlying buffer for stringstreams that strstream provided solving half of the problem that strstreams provide a solution for. The other half is using a fixed size pre-allocated buffer, e.g., allocated on the stack, that is used as the stream buffers internal storage.
+
+A combination of external-fixed and internal-growing buffer allocation that strstreambuf provides is IMHO a doomed approach and very hard to use right.
+
+There had been a proposal for the pre-allocated external memory buffer streams in N2065 but that went nowhere. Today, with span<T> we actually have a library type representing such buffers views we can use for specifying (and implementing) such streams. They can be used in areas where dynamic (re-)allocation of stringstreams is not acceptable but the burden of caring for a pre-existing buffer during the lifetime of the stream is manageable. 
+
+\chapter{Introduction}
+This paper proposes \tcode{basic_spanbuf} and the corresponding stream class templates to enable the use of streams on externally provided memory buffers. No ownership or re-allocation support is given. For those features we have string-based streams.
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item Thanks go to Jonathan Wakely who pointed the problem of strstream out to me and to Neil Macintosh to provide the span library type specification.
+\end{itemize}
+
+\chapter{Motivation}
+TODO...
+\begin{codeblock}
+\end{codeblock}
+
+\chapter{Impact on the Standard}
+This is an extension to the standard library to enable deletion of the deprecated \tcode{strstream} classes by providing \tcode{basic_spanbuf}, \tcode{basic_spanstream}, \tcode{basic_ispanstream}, and \tcode{basic_ospanstream} class templates that take an object of type \tcode{span<charT>} which provides an external buffer to be used by the stream. 
+
+\chapter{Design Decisions}
+\section{General Principles}
+\section{Open Issues to be Discussed by LEWG / LWG}
+\begin{itemize}
+\item TODO
+\end{itemize}
+
+\chapter{Technical Specifications}
+TODO!! 
+\section{27.8.2 Adjust synopsis of \tcode{basic_spanbuf} [spanbuf]}
+Change each of the non-moving, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
+\begin{codeblock}
+explicit basic_spanbuf(
+        ios_base::openmode which = ios_base::in | ios_base::out@\ins{,}@
+        @\ins{const Allocator \&a=Allocator()}@);
+
+explicit basic_spanbuf(
+        const basic_span<charT, traits, Allocator>& str,
+        ios_base::openmode which = ios_base::in | ios_base::out@\ins{,}@
+        @\ins{const Allocator \&a=Allocator()}@);
+\end{codeblock}
+
+\textit{Append a paragraph p3 to the text following the synopsis:}
+
+\begin{insrt}
+\pnum
+In every specialization \tcode{basic_spanbuf<charT, traits, Allocator>}, the type \tcode{allocator_traits<Allocator>::value_type} shall name the same type as \tcode{charT}. Every object of type \tcode{basic_spanbuf<charT, traits, Allocator>} shall use an object of type \tcode{Allocator} to allocate and free storage for the internal buffer of \tcode{charT} objects as needed. The \tcode{Allocator} object used shall be obtained as described in 23.2.1 [container.requirements.general].
+\enternote
+Implementations using \tcode{span<charT> } internally, will simply pass the allocator parameter to the corresponding \tcode{span<charT> } constructors.
+\exitnote
+\end{insrt}
+
+\subsection{27.8.2.1 \tcode{basic_spanbuf} constructors [spanbuf.cons]}
+Adjust the constructor specifications taking the additional Allocator parameter, no further explanation required:
+
+\begin{itemdecl}
+explicit basic_spanbuf(
+  ios_base::openmode which = ios_base::in | ios_base::out@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+and
+
+\begin{itemdecl}
+explicit basic_spanbuf(
+  const span<charT> <charT, traits, Allocator>& s,
+  ios_base::openmode which = ios_base::in | ios_base::out@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+%% basic_ispanstream
+\section{27.8.3 Adjust synopsis of basic\_ispanstream [ispanstream]}
+Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
+\begin{codeblock}
+explicit basic_ispanstream(
+             ios_base::openmode which = ios_base::in@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+explicit basic_ispanstream(
+             const span<charT> <charT, traits, Allocator>& str,
+             ios_base::openmode which = ios_base::in@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+\end{codeblock}
+
+\textit{Append a paragraph p2 to the text following the synopsis:}
+
+\begin{insrt}
+\pnum
+In every specialization \tcode{basic_ispanstream<charT, traits, Allocator>}, the type \tcode{allocator_traits<Allocator>::value_type} shall name the same type as \tcode{charT}. Every object of type \tcode{basic_ispanstream<charT, traits, Allocator>} shall use an object of type \tcode{Allocator} to allocate and free storage for the internal buffer of \tcode{charT} objects as needed. The \tcode{Allocator} object used shall be obtained as described in 23.2.1 [container.requirements.general].
+\enternote
+Implementations using \tcode{span<charT> } internally, will simply pass the allocator parameter to the corresponding \tcode{span<charT> } constructors.
+\exitnote
+\end{insrt}
+
+\subsection{27.8.3.1 \tcode{basic_ispanstream} constructors [ispanstream.cons]}
+Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_spanbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
+
+\begin{itemdecl}
+explicit basic_ispanstream(ios_base::openmode which = ios_base::in@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_ispanstream<charT, traits>},
+initializing the base class with
+\tcode{basic_istream(\&sb)}
+and initializing \tcode{sb} with
+\tcode{basic_spanbuf<charT, traits, Alloca\-tor>(which | ios_base::in\ins{, a}))}~({27.8.2.1}).
+\end{itemdescr}
+
+\begin{itemdecl}
+explicit basic_ispanstream(
+  const span<charT> <charT, traits, Allocator>& str,
+  ios_base::openmode which = ios_base::in@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_ispanstream<charT, traits>},
+initializing the base class with
+\tcode{basic_istream(\&sb)}
+and initializing \tcode{sb} with
+\tcode{basic_spanbuf<charT, traits, Alloca\-tor>(str, which | ios_base::in\ins{, a)})}~({27.8.2.1}).
+\end{itemdescr}
+
+
+
+%% basic_ospanstream
+\section{27.8.4 Adjust synopsis of \tcode{basic_ospanstream} [ospanstream]}
+Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
+\begin{codeblock}
+explicit basic_ospanstream(
+             ios_base::openmode which = ios_base::out@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+explicit basic_ospanstream(
+             const span<charT> <charT, traits, Allocator>& str,
+             ios_base::openmode which = ios_base::out@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+\end{codeblock}
+
+\textit{Append a paragraph p2 to the text following the synopsis:}
+
+\begin{insrt}
+\pnum
+In every specialization \tcode{basic_ospanstream<charT, traits, Allocator>}, the type \tcode{allocator_traits<Allocator>::value_type} shall name the same type as \tcode{charT}. Every object of type \tcode{basic_ospanstream<charT, traits, Allocator>} shall use an object of type \tcode{Allocator} to allocate and free storage for the internal buffer of \tcode{charT} objects as needed. The \tcode{Allocator} object used shall be obtained as described in 23.2.1 [container.requirements.general].
+\enternote
+Implementations using \tcode{span<charT> } internally, will simply pass the allocator parameter to the corresponding \tcode{span<charT> } constructors.
+\exitnote
+\end{insrt}
+
+
+\subsection{27.8.4.1 \tcode{basic_ospanstream} constructors [ospanstream.cons]}
+Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_spanbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
+
+\begin{itemdecl}
+explicit basic_ospanstream(
+  ios_base::openmode which = ios_base::out@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_ospanstream},
+initializing the base class with
+\tcode{basic_ostream(\brk{}\&sb)}
+and initializing \tcode{sb} with
+\tcode{basic_spanbuf<charT, traits, Allocator>(which | \brk{}ios_base::out\ins{, a}))}~({27.8.2.1}).
+\end{itemdescr}
+
+\begin{itemdecl}
+explicit basic_ospanstream(
+  const basic_span<charT, traits, Allocator>& str,
+  ios_base::openmode which = ios_base::out@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_ospanstream<charT, traits>},
+initializing the base class with
+\tcode{basic_ostream(\&sb)}
+and initializing \tcode{sb} with
+\tcode{basic_spanbuf<charT, traits, Alloca\-tor>(str, which | ios_base::out\ins{, a}))}~({27.8.2.1}).
+\end{itemdescr}
+
+
+%% basic_spanstream
+\section{27.8.5 Adjust synopsis of \tcode{basic_spanstream} [spanstream]}
+Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
+\begin{codeblock}
+explicit basic_spanstream(
+             ios_base::openmode which = ios_base::out | ios_base::in@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+explicit basic_ospanstream(
+             const span<charT> <charT, traits, Allocator>& str,
+             ios_base::openmode which = ios_base::out | ios_base::in@\ins{,}@
+             @\ins{const Allocator \&a=Allocator()}@);
+\end{codeblock}
+
+\textit{Append a paragraph p2 to the text following the synopsis:}
+
+\begin{insrt}
+\pnum
+In every specialization \tcode{basic_spanstream<charT, traits, Allocator>}, the type \tcode{allocator_traits<Allocator>::value_type} shall name the same type as \tcode{charT}. Every object of type \tcode{basic_spanstream<charT, traits, Allocator>} shall use an object of type \tcode{Allocator} to allocate and free storage for the internal buffer of \tcode{charT} objects as needed. The \tcode{Allocator} object used shall be obtained as described in 23.2.1 [container.requirements.general].
+\enternote
+Implementations using \tcode{span<charT> } internally, will simply pass the allocator parameter to the corresponding \tcode{span<charT> } constructors.
+\exitnote
+\end{insrt}
+
+\subsection{27.8.5.1 \tcode{basic_spanstream} constructors [spanstream.cons]}
+Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_spanbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
+\begin{itemdecl}
+explicit basic_spanstream(
+  ios_base::openmode which = ios_base::out | ios_base::in@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_spanstream<charT, traits>},
+initializing the base class with
+\tcode{basic_iostream(\&sb)}
+and initializing
+\tcode{sb}
+with
+\tcode{basic_spanbuf<charT, traits, Alloca\-tor>(which\ins{, a})}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{basic_spanstream}!constructor}%
+\begin{itemdecl}
+explicit basic_spanstream(
+  const basic_span<charT, traits, Allocator>& str,
+  ios_base::openmode which = ios_base::out | ios_base::in@\ins{,}@
+  @\ins{const Allocator \&a=Allocator()}@);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_spanstream<charT, traits>},
+initializing the base class with
+\tcode{basic_iostream(\&sb)}
+and initializing
+\tcode{sb}
+with
+\tcode{basic_spanbuf<charT, traits, Alloca\-tor>(str, which\ins{, a})}.
+\end{itemdescr}
+
+
+
+\chapter{Appendix: Example Implementations}
+An implementation of the additional constructor parameter was done by the author in the \tcode{<sstream>} header of gcc 6.1. It seems trivial, since all significant relevant usage is within \tcode{span<charT> }. 
+\end{document}
+
