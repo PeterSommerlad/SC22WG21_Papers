@@ -46,7 +46,7 @@
 %    \Sec1[intro.scope]{Scope}
 % defines a first-level section whose name is "Scope" and whose short
 % tag is intro.scope.  The square brackets are mandatory.
-\def\Sec#1[#2]#3{{%
+\def\Sec#1[#2]#3{%
 \ifcase#1\let\s=\chapter
       \or\let\s=\section
       \or\let\s=\subsection
@@ -54,7 +54,7 @@
       \or\let\s=\paragraph
       \or\let\s=\subparagraph
       \fi%
-\s[#3]{#3\hfill[#2]}\label{#2}}}
+\s[#3]{#3\hfill[#2]}\label{#2}}
 
 % A convenience feature (mostly for the convenience of the Project
 % Editor, to make it easy to move around large blocks of text):
@@ -67,10 +67,10 @@
 \newcounter{SectionDepthBase}
 \newcounter{scratch}
 
-\def\rSec#1[#2]#3{{%
+\def\rSec#1[#2]#3{%
 \setcounter{scratch}{#1}
 \addtocounter{scratch}{\value{SectionDepthBase}}
-\Sec{\arabic{scratch}}[#2]{#3}}}
+\Sec{\arabic{scratch}}[#2]{#3}}
 
 \newcommand{\synopsis}[1]{\textbf{#1}}
 
@@ -104,6 +104,8 @@
 \newcommand{\defn}[1]{\defnx{#1}{#1}}
 \newcommand{\term}[1]{\textit{#1}\xspace}
 \newcommand{\grammarterm}[1]{\textit{#1}\xspace}
+\newcommand{\placeholder}[1]{\textit{#1}}
+\newcommand{\placeholdernc}[1]{\textit{#1\nocorr}}
 
 %%--------------------------------------------------
 %% allow line break if needed for justification
@@ -113,18 +115,23 @@
 
 %%--------------------------------------------------
 %% Macros for funky text
-\newcommand{\Rplus}{\protect\hspace{-.1em}\protect\raisebox{.35ex}{\smaller{\smaller\textbf{+}}}}
-% \newcommand{\Rplus}{+}
-\newcommand{\Cpp}{\mbox{C\Rplus\Rplus}\xspace}
+\newcommand{\Cpp}{\texorpdfstring{C\kern-0.05em\protect\raisebox{.35ex}{\textsmaller[2]{+\kern-0.05em+}}}{C++}\xspace}
 \newcommand{\CppIII}{\Cpp 2003\xspace}
+\newcommand{\CppXI}{\Cpp 2011\xspace}
+\newcommand{\CppXIV}{\Cpp 2014\xspace}
 \newcommand{\opt}{{\ensuremath{_\mathit{opt}}}\xspace}
 \newcommand{\shl}{<{<}}
 \newcommand{\shr}{>{>}}
 \newcommand{\dcr}{-{-}}
 \newcommand{\exor}{\^{}}
 \newcommand{\bigoh}[1]{\ensuremath{\mathscr{O}(#1)}}
-% \renewcommand{\tilde}{{\smaller\ensuremath{\sim}}}    % extra level of braces is necessary
-\renewcommand{\tilde}{\protect\raisebox{-.5ex}{\larger\textasciitilde}}
+
+% Make all tildes a little larger to avoid visual similarity with hyphens.
+% FIXME: Remove \tilde in favour of \~.
+\renewcommand{\tilde}{\textasciitilde}
+\renewcommand{\~}{\textasciitilde}
+\let\OldTextAsciiTilde\textasciitilde
+\renewcommand{\textasciitilde}{\protect\raisebox{-0.17ex}{\larger\OldTextAsciiTilde}}
 
 %%--------------------------------------------------
 %% States and operators
@@ -142,6 +149,11 @@
 \newcommand{\exitnote}{\ExitBlock{note}}
 \newcommand{\enterexample}{\EnterBlock{Example}}
 \newcommand{\exitexample}{\ExitBlock{example}}
+%newer versions, legacy above!
+\newcommand{\noteintro}[1]{[\,\textit{#1:}\space}
+\newcommand{\noteoutro}[1]{\textit{\,---\,end #1}\,]}
+\newenvironment{note}[1][Note]{\noteintro{#1}}{\noteoutro{note}\xspace}
+\newenvironment{example}[1][Example]{\noteintro{#1}}{\noteoutro{example}\xspace}
 
 %% Library function descriptions
 \newcommand{\Fundescx}[1]{\textit{#1}\xspace}
@@ -159,15 +171,12 @@
 \newcommand{\complexity}{\Fundesc{Complexity}}
 \newcommand{\remark}{\Fundesc{Remark}}
 \newcommand{\remarks}{\Fundesc{Remarks}}
-\newcommand{\note}{\remark}
-\newcommand{\notes}{\remarks}
 \newcommand{\realnote}{\Fundesc{Note}}
 \newcommand{\realnotes}{\Fundesc{Notes}}
 \newcommand{\errors}{\Fundesc{Error conditions}}
 \newcommand{\sync}{\Fundesc{Synchronization}}
 \newcommand{\implimits}{\Fundesc{Implementation limits}}
 \newcommand{\replaceable}{\Fundesc{Replaceable}}
-\newcommand{\exceptionsafety}{\Fundesc{Exception safety}}
 \newcommand{\returntype}{\Fundesc{Return type}}
 \newcommand{\cvalue}{\Fundesc{Value}}
 \newcommand{\ctype}{\Fundesc{Type}}
@@ -191,26 +200,42 @@
 %% Code annotations
 \newcommand{\EXPO}[1]{\textit{#1}}
 \newcommand{\expos}{\EXPO{exposition only}}
-\newcommand{\exposr}{\expos}
-\newcommand{\exposrc}{\expos}
 \newcommand{\impdef}{\EXPO{implementation-defined}}
+\newcommand{\impdefnc}{\EXPO{implementation-defined\nocorr}}
 \newcommand{\impdefx}[1]{\indeximpldef{#1}\EXPO{implementation-defined}}
 \newcommand{\notdef}{\EXPO{not defined}}
 
 \newcommand{\UNSP}[1]{\textit{\texttt{#1}}}
-\newcommand{\unspec}{\UNSP{unspecified}\xspace}
+\newcommand{\UNSPnc}[1]{\textit{\texttt{#1}\nocorr}}
+\newcommand{\unspec}{\UNSP{unspecified}}
+\newcommand{\unspecnc}{\UNSPnc{unspecified}}
 \newcommand{\unspecbool}{\UNSP{unspecified-bool-type}}
 \newcommand{\seebelow}{\UNSP{see below}}
+\newcommand{\seebelownc}{\UNSPnc{see below}}
 \newcommand{\unspecuniqtype}{\UNSP{unspecified unique type}}
 \newcommand{\unspecalloctype}{\UNSP{unspecified allocator type}}
 
+\newcommand{\EXPLICIT}{\textit{\texttt{EXPLICIT}}}
+
+%% Manual insertion of italic corrections, for aligning in the presence
+%% of the above annotations.
+\newlength{\itcorrwidth}
+\newlength{\itletterwidth}
+\newcommand{\itcorr}[1][]{%
+ \settowidth{\itcorrwidth}{\textit{x\/}}%
+ \settowidth{\itletterwidth}{\textit{x\nocorr}}%
+ \addtolength{\itcorrwidth}{-1\itletterwidth}%
+ \makebox[#1\itcorrwidth]{}%
+}
+
 %% Double underscore
-\newcommand{\unun}{\_\,\_}
-\newcommand{\xname}[1]{\unun\,#1}
-\newcommand{\mname}[1]{\tcode{\unun\,#1\,\unun}}
+\newcommand{\ungap}{\kern.5pt}
+\newcommand{\unun}{\_\ungap\_}
+\newcommand{\xname}[1]{\tcode{\unun\ungap#1}}
+\newcommand{\mname}[1]{\tcode{\unun\ungap#1\ungap\unun}}
 
 %% Ranges
-\newcommand{\Range}[4]{\tcode{#1\brk{}#3,\brk{}#4\brk{}#2}\xspace}
+\newcommand{\Range}[4]{\tcode{#1#3,~\brk{}#4#2}\xspace}
 \newcommand{\crange}[2]{\Range{[}{]}{#1}{#2}}
 \newcommand{\brange}[2]{\Range{(}{]}{#1}{#2}}
 \newcommand{\orange}[2]{\Range{(}{)}{#1}{#2}}
@@ -225,7 +250,7 @@
 \newcommand{\howwide}{\diffdef{How widely used}}
 
 %% Miscellaneous
-\newcommand{\uniquens}{\textrm{\textit{\textbf{unique}}} }
+\newcommand{\uniquens}{\textrm{\textit{\textbf{unique}}}}
 \newcommand{\stage}[1]{\item{\textbf{Stage #1:}}\xspace}
 \newcommand{\doccite}[1]{\textit{#1}\xspace}
 \newcommand{\cvqual}[1]{\textit{#1}}
@@ -256,14 +281,22 @@
 % Our usual abbreviation for 'listings'.  Comments are in 
 % italics.  Arbitrary TeX commands can be used if they're 
 % surrounded by @ signs.
-\lstnewenvironment{codeblock}
-{
+\newcommand{\CodeBlockSetup}{
  \lstset{escapechar=@}
  \renewcommand{\tcode}[1]{\textup{\CodeStylex{##1}}}
  \renewcommand{\techterm}[1]{\textit{\CodeStylex{##1}}}
+ \renewcommand{\term}[1]{\textit{##1}}
+ \renewcommand{\grammarterm}[1]{\textit{##1}}
 }
-{
-}
+
+\lstnewenvironment{codeblock}{\CodeBlockSetup}{}
+
+% A code block in which single-quotes are digit separators
+% rather than character literals.
+\lstnewenvironment{codeblockdigitsep}{
+ \CodeBlockSetup
+ \lstset{deletestring=[b]{'}}
+}{}
 
 % Permit use of '@' inside codeblock blocks (don't ask)
 \makeatletter
@@ -312,7 +345,7 @@
 
 \newenvironment{bnfbase}
  {
- \newcommand{\nontermdef}[1]{\indexgrammar{\idxgram{##1}}\nonterminal{##1}:}
+ \newcommand{\nontermdef}[1]{\nonterminal{##1}\indexgrammar{\idxgram{##1}}:}
  \newcommand{\terminal}[1]{{\BnfTermshape ##1}\xspace}
  \newcommand{\descr}[1]{\normalfont{##1}}
  \newcommand{\bnfindentfirst}{\BnfIndent}
@@ -320,8 +353,10 @@
  \newcommand{\bnfindentrest}{\BnfRest}
  \begin{minipage}{.9\hsize}
  \newcommand{\br}{\hfill\\}
+ \frenchspacing
  }
  {
+ \nonfrenchspacing
  \end{minipage}
  }
 
@@ -467,12 +502,13 @@
 % usage: \definition{name}{xref}
 %\newcommand{\definition}[2]{\rSec2[#2]{#1}}
 % for ISO format, use:
-\newcommand{\definition}[2]
- {\hfill\vspace{.25ex plus .5ex minus .2ex}\\
- \addtocounter{subsection}{1}%
- \textbf{\thesubsection\hfill\relax[#2]}\\
- \textbf{#1}\label{#2}\\
- }
+\newcommand{\definition}[2]{%
+\subsection[#1]{\hfill[#2]}\vspace{-.3\onelineskip}\label{#2}\textbf{#1}\\%
+}
+\newcommand{\definitionx}[2]{%
+\subsubsection[#1]{\hfill[#2]}\vspace{-.3\onelineskip}\label{#2}\textbf{#1}\\%
+}
+\newcommand{\defncontext}[1]{\textlangle#1\textrangle}
  
  %% adopted from standard's layout.tex
  \newcounter{Paras}
@@ -489,9 +525,9 @@
 \makeatother
 
 %% PS: add some helpers for coloring, assumes \usepackage{color}
-\definecolor{insertcolor}{rgb}{0,0.5,0.25}
-\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
-\newcommand{\ins}[1]{\textcolor{insertcolor}{\underline{#1}}}
+%% should no longer be used, since we have those macros already!
+\newcommand{\del}[1]{\removed{#1}}}
+\newcommand{\ins}[1]{\added{#1}}}
 
-\newenvironment{insrt}{\color{insertcolor}}{\color{black}}
+\newenvironment{insrt}{\begin{addedblock}}{\end{addedblock}}
 
