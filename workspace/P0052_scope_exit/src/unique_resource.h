@@ -60,9 +60,9 @@ class unique_resource
     detail::_box<D> deleter;
     bool execute_on_destruction = true;
 
-    static constexpr auto is_nowthrow_delete_v=detail::_bool<noexcept(std::declval<D &>()(std::declval<R &>()))>::value;
+    static constexpr auto is_nothrow_delete_v=detail::_bool<noexcept(std::declval<D &>()(std::declval<R &>()))>::value;
 
-    static constexpr auto is_nothrow_swappable_v=detail::_bool<is_nowthrow_delete_v &&
+    static constexpr auto is_nothrow_swappable_v=detail::_bool<is_nothrow_delete_v &&
             detail::_is_nothrow_movable_v<R> &&
             detail::_is_nothrow_movable_v<D>>::value;
 
@@ -86,7 +86,7 @@ public:
     {}
 
     unique_resource &operator=(unique_resource &&that)
-        noexcept(is_nowthrow_delete_v &&
+        noexcept(is_nothrow_delete_v &&
                  std::is_nothrow_move_assignable<R>::value &&
                  std::is_nothrow_move_assignable<D>::value)
     {
@@ -138,7 +138,7 @@ public:
         }
     }
     void reset()
-        noexcept(is_nowthrow_delete_v)
+        noexcept(is_nothrow_delete_v)
     {
         if(execute_on_destruction)
         {
@@ -148,7 +148,7 @@ public:
     }
     template<typename RR>
     auto reset(RR &&r)
-        noexcept(is_nowthrow_delete_v && noexcept(resource.reset((RR &&) r)))
+        noexcept(is_nothrow_delete_v && noexcept(resource.reset((RR &&) r)))
         -> decltype(resource.reset((RR &&) r), void())
     {
         auto &&guard = make_scope_exit([&, this]{ get_deleter()(r); });
