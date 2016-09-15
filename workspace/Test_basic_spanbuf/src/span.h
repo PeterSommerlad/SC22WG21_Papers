@@ -1,8 +1,8 @@
 #ifndef SRC_SPAN_H_
 #define SRC_SPAN_H_
 // an experimental minimal implementation of the span<T> proposal
-// not guaranteed to work with anythin except span<char> :-), because I use it to implement spanstream/spanbuf
-// (c) 2016 Peter Sommerlad
+// not guaranteed to work with anything except span<char> :-), because I use it to implement spanstream/spanbuf
+// (c) 2016 Peter Sommerlad (+ stuff taken from elsewhere)
 //#include <bits/c++config.h>
 #include <iterator>
 #include <array>
@@ -13,7 +13,7 @@ namespace std //_GLIBCXX_VISIBILITY(default)
 //_GLIBCXX_BEGIN_NAMESPACE_VERSION
 //_GLIBCXX_BEGIN_NAMESPACE_CXX11
 namespace experimental{
-// type byte not defined yet:
+// type byte not defined yet, but considered for proposal:
 enum class byte:unsigned char{};
 
 // [views.constants], constants 

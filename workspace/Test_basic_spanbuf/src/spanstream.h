@@ -108,7 +108,7 @@ protected:
 	ios_base::openmode _M_mode;
 
 	// Data Members:
-	__span_type _M_string; // always dynamic Extent
+	__span_type _M_string; // always fixed Extent
 
 public:
 	// Constructors:

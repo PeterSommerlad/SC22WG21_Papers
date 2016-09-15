@@ -17,8 +17,11 @@ void thisIsATest() {
 	ASSERT_EQUAL(20,i);
 	is >> i;
 	ASSERT_EQUAL(30,i);
+	ASSERT(is.good());
+	//ASSERT(is.eof());
 	is >>i;
-	ASSERT(!is);
+	ASSERT(is.fail());
+	ASSERT(!is.bad());
 }
 
 void testOspanstreamOutputToCharArray(){
@@ -28,17 +31,18 @@ void testOspanstreamOutputToCharArray(){
 	ASSERT_EQUAL(sizeof(output),os.span().size());
 	std::string s{os.span().data(),size_t(os.span().size())};
 	ASSERT_EQUAL("102030hello world and a long s",s);
+	//ASSERT(os.eof());
 }
 
 void testOspanstreamWithShortOutput(){
-	char  output[30]{};
-	ospanstream os{span<char >{output}};
-	os << 10 << 20 << 30 ;
-	auto sp=os.span();
-	ASSERT_EQUAL(6,sp.size());
-	ASSERT_EQUAL("102030",std::string(os.span().data(),os.span().size()));
-	ASSERT_EQUAL(output,os.span().data()); // no copying of underlying data!
-	ASSERT_EQUAL("102030",output); // initialization above guarantees \0
+char  output[30]{};
+ospanstream os{span<char >{output}};
+os << 10 << 20 << 30 ;
+auto const sp = os.span();
+ASSERT_EQUAL(6,sp.size());
+ASSERT_EQUAL("102030",std::string(sp.data(),sp.size()));
+ASSERT_EQUAL(static_cast<void*>(output),sp.data()); // no copying of underlying data!
+ASSERT_EQUAL("102030",output); // initialization guarantees NUL termination
 }
 
 

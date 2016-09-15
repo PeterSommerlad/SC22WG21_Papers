@@ -14,20 +14,20 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{pXXXXr0}
-\newcommand{\paperdate}{2016-07-XX}
+\newcommand{\paperdate}{2016-09-30}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
-\title{\papernumber{} - A strstream replacement using a span as buffer}
+\title{\papernumber{} - A strstream replacement using a span\textless{}T\textgreater as buffer}
 \author{Peter Sommerlad}
-\date{\paperdate}                        % Activate to display a given date or no date
+\date{\paperdate}                % Activate to display a given date or no date
 \input{macros}
 \setsecnumdepth{subsection}
 
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: \papernumber & (N2065 done right :-)\\\hline
+Document Number: \papernumber & (N2065 done right?)\\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
 Audience: & LWG/LEWG\\\hline
@@ -38,20 +38,46 @@ Streams have been the oldest part of the C++ standard library and especially str
 
 A combination of external-fixed and internal-growing buffer allocation that strstreambuf provides is IMHO a doomed approach and very hard to use right.
 
-There had been a proposal for the pre-allocated external memory buffer streams in N2065 but that went nowhere. Today, with span<T> we actually have a library type representing such buffers views we can use for specifying (and implementing) such streams. They can be used in areas where dynamic (re-)allocation of stringstreams is not acceptable but the burden of caring for a pre-existing buffer during the lifetime of the stream is manageable. 
+There had been a proposal for the pre-allocated external memory buffer streams in N2065 but that went nowhere. Today, with \tcode{span<T>} we actually have a library type representing such buffers views we can use for specifying (and implementing) such streams. They can be used in areas where dynamic (re-)allocation of stringstreams is not acceptable but the burden of caring for a pre-existing buffer during the lifetime of the stream is manageable. 
 
 \chapter{Introduction}
-This paper proposes \tcode{basic_spanbuf} and the corresponding stream class templates to enable the use of streams on externally provided memory buffers. No ownership or re-allocation support is given. For those features we have string-based streams.
+This paper proposes a class template \tcode{basic_spanbuf} and the corresponding stream class templates to enable the use of streams on externally provided memory buffers. No ownership or re-allocation support is given. For those features we have string-based streams.
 
 \chapter{Acknowledgements}
 \begin{itemize}
-\item Thanks go to Jonathan Wakely who pointed the problem of strstream out to me and to Neil Macintosh to provide the span library type specification.
+\item Thanks go to Jonathan Wakely who pointed the problem of \tcode{strstream} out to me and to Neil Macintosh to provide the span library type specification.
 \end{itemize}
 
 \chapter{Motivation}
-TODO...
+To finally get rid of the deprecated \tcode{strstream} in the C++ standard we need a replacement. p0407/p0408 provide one for one half of the needs for \tcode{strstream}. This paper provides one for the second half: fixed sized buffers. 
+
+\begin{example} reading input from a fixed pre-arranged character buffer:
 \begin{codeblock}
+char input[] = "10 20 30";
+ispanstream is{span<char>{input}};
+int i;
+is >> i;
+ASSERT_EQUAL(10,i);
+is >> i ;
+ASSERT_EQUAL(20,i);
+is >> i;
+ASSERT_EQUAL(30,i);
+is >>i;
+ASSERT(!is);
 \end{codeblock}
+\end{example}
+\begin{example} writing to a fixed pre-arranged character buffer:
+\begin{codeblock}
+char  output[30]{}; // zero-initialize array
+ospanstream os{span<char >{output}};
+os << 10 << 20 << 30 ;
+auto const sp = os.span();
+ASSERT_EQUAL(6,sp.size());
+ASSERT_EQUAL("102030",std::string(sp.data(),sp.size()));
+ASSERT_EQUAL(static_cast<void*>(output),sp.data()); // no copying of underlying data!
+ASSERT_EQUAL("102030",output); // initialization guaranteed NUL termination
+\end{codeblock}
+\end{example}
 
 \chapter{Impact on the Standard}
 This is an extension to the standard library to enable deletion of the deprecated \tcode{strstream} classes by providing \tcode{basic_spanbuf}, \tcode{basic_spanstream}, \tcode{basic_ispanstream}, and \tcode{basic_ospanstream} class templates that take an object of type \tcode{span<charT>} which provides an external buffer to be used by the stream. 
@@ -60,12 +86,29 @@ This is an extension to the standard library to enable deletion of the deprecate
 \section{General Principles}
 \section{Open Issues to be Discussed by LEWG / LWG}
 \begin{itemize}
-\item TODO
+\item Should arbitrary types as template arguments to \tcode{span} be allowed to provide the underlying buffer by using the \tcode{byte} sequence representation \tcode{span} provides. (I do not think so, but someone might have a usecase.)
 \end{itemize}
 
 \chapter{Technical Specifications}
-TODO!! 
-\section{27.8.2 Adjust synopsis of \tcode{basic_spanbuf} [spanbuf]}
+Insert a new section 27.x in chapter 27 after section 27.8 [string.streams]
+
+\section{27.x Span-based Streams [span.streams]}
+This section introduces a stream interface for user-provided fixed-size buffers. 
+\subsection{27.x.1 Overview [span.streams.overview]}
+The header \tcode{<spanstream>} defines four class templates and eight types that associate stream buffers with objects of class \tcode{span} as described in [span].
+
+\paragraph{Header \tcode{<spanstream>} synobsis}
+
+\begin{codeblock}
+namespace std {
+namespace experimental {
+  template <class charT, class traits = char_traits<charT> >    class basic_spanbuf;  typedef basic_spanbuf<char>     spanbuf;  typedef basic_spanbuf<wchar_t> wspanbuf;  template <class charT, class traits = char_traits<charT> >    class basic_ispanstream;  typedef basic_ispanstream<char>     ispanstream;  typedef basic_ispanstream<wchar_t> wispanstream;  template <class charT, class traits = char_traits<charT> >    class basic_ospanstream;  typedef basic_ospanstream<char>     ospanstream;  typedef basic_ospanstream<wchar_t> wospanstream;  template <class charT, class traits = char_traits<charT> >    class basic_spanstream;  typedef basic_spanstream<char>     spanstream;  typedef basic_spanstream<wchar_t> wspanstream;
+}}
+\end{codeblock}
+\section{27.x \tcode{basic_spanbuf} [spanbuf]}
+
+{{\Large TODO}}
+
 Change each of the non-moving, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
 explicit basic_spanbuf(
