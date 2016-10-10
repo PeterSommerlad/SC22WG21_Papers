@@ -75,7 +75,6 @@ namespace experimental {
  *  @tparam _CharT  Type of character stream.
  *  @tparam _Traits  Traits for character type, defaults to
  *                   char_traits<_CharT>.
- *  @tparam _Alloc  Allocator type, defaults to allocator<_CharT>.
  *
  *  This class associates either or both of its input and output sequences
  *  with a sequence of characters, which can be initialized from, or made
@@ -114,7 +113,7 @@ public:
 	// Constructors:
 	/**
 	 *  @brief  Starts with an existing span buffer.
-	 *  @param  __str  A span to copy as a starting buffer (reference semantics!)
+	 *  @param  __str  A span to use as buffer (reference semantics! we do not own the buffer)
 	 *  @param  __mode  Whether the buffer can read, or write, or both.
 	 *
 	 *  This constructor initializes the parent class using its
@@ -126,36 +125,33 @@ public:
 	{
 		_M_spanbuf_init(__mode);
 	}
-	/**
-	 *  @brief  Starts with an empty span buffer.
-	 *  @param  __mode  Whether the buffer can read, or write, or both.
-	 *
-	 *  This constructor initializes the parent class using its
-	 *  own default ctor.
-	 */
-	
-	explicit basic_spanbuf(ios_base::openmode __mode = ios_base::in | ios_base::out) :
-			__streambuf_type { }, _M_mode { }, _M_string { } {
-		_M_spanbuf_init(__mode);
-	}
 
 	basic_spanbuf(basic_spanbuf const &) = delete;
 
 	// TODO: could move-enable the spanbuf but it is dangerous, because of the 
 	// non-managed memory area.
-	basic_spanbuf(basic_spanbuf&& __rhs) = delete;
-
-	// 27.8.2.2 Assign and swap:
+	basic_spanbuf(basic_spanbuf&& __rhs) noexcept 
+	:__streambuf_type { std::move(__rhs) } // might actually copy
+	, _M_mode{std::move(__rhs._M_mode)}
+	,_M_string{std::move(__rhs._M_string)}
+	{
+		// since we do not own any resource and destroying or re-assigning does not have a side-effect all is fine
+	}
+	
+	// 27.x.2.2 Assign and swap:
 
 	basic_spanbuf&
 	operator=(basic_spanbuf const &) = delete;
 
 	basic_spanbuf&
-	operator=(basic_spanbuf&& __rhs) = delete;
+	operator=(basic_spanbuf&& __rhs) noexcept {
+		this->swap(__rhs);
+		return *this;
+	}
 
-	void swap(basic_spanbuf& __rhs) {
-		__xfer_bufptrs  __l_st { *this, std::__addressof(__rhs) };
-		__xfer_bufptrs  __r_st{ __rhs, this };
+	void swap(basic_spanbuf& __rhs) noexcept {
+		__xfer_bufptrs const __l_st {*this, std::__addressof(__rhs)};
+		__xfer_bufptrs const __r_st {__rhs, this};
 		__streambuf_type& __base = __rhs;
 		__streambuf_type::swap(__base);
 		__rhs.pubimbue(this->pubimbue(__rhs.getloc()));
@@ -174,18 +170,10 @@ public:
 	 */
 
 	__span_type span() const {
-		__span_type  __ret { };
-		if (this->pptr()) {
-			// The current egptr() may not be the actual span end.
-			if (this->pptr() > this->egptr()) {
-				__ret = __span_type(this->pbase(), this->pptr() - this->pbase());
-			}
-			else
-				__ret = __span_type(this->pbase(), this->egptr() - this->pbase());
-		} else {
-			__ret = _M_string;
+		if (this->pptr() && (this->pptr() >= this->egptr()) ) { // output only
+				return __span_type(this->pbase(), this->pptr() - this->pbase());
 		}
-		return __ret;
+		return _M_string; // return the whole span
 	}
 	/**
 	 *  @brief  Setting a new buffer.
@@ -196,9 +184,7 @@ public:
 	 */
 	template<ptrdiff_t Extent>
 	void span(__span <Extent> __s) {
-		// Cannot use _M_string = __s, since v3 strings are COW
-		// (not always true now but assign() always works).
-		_M_string = __span_type{ __s .data(), __s.size() };
+		_M_string = __span_type{ __s.data(), __s.size() };
 		_M_spanbuf_init(_M_mode);
 	}
 protected:
@@ -206,7 +192,7 @@ protected:
 	void _M_spanbuf_init(ios_base::openmode __mode) {
 		_M_mode = __mode;
 		__size_type  __len = 0;
-		if (_M_mode & (ios_base::ate | ios_base::app))
+		if (_M_mode & (ios_base::ate | ios_base::app)) // doesn't make much sense, we can not grow span!
 			__len = _M_string.size();
 		_M_sync(_M_string.data(), 0, __len);
 	}
@@ -222,14 +208,14 @@ protected:
 
 	virtual int_type underflow() {
 		int_type __ret = traits_type::eof();
-		bool const __testin = this->_M_mode & ios_base::in;
-		if (__testin) {
-			// Update egptr() to match the actual span end.
-			_M_update_egptr();
-
-			if (this->gptr() < this->egptr())
-				__ret = traits_type::to_int_type(*this->gptr());
-		}
+//		bool const __testin = this->_M_mode & ios_base::in;
+//		if (__testin) {
+//			// Update egptr() to match the actual span end.
+//			_M_update_egptr();
+//
+//			if (this->gptr() < this->egptr())
+//				__ret = traits_type::to_int_type(*this->gptr());
+//		}
 		return __ret;
 	}
 
@@ -515,23 +501,6 @@ private:
 public:
 	// Constructors:
 	/**
-	 *  @brief  Default constructor starts with an empty span buffer.
-	 *  @param  __mode  Whether the buffer can read, or write, or both.
-	 *
-	 *  @c ios_base::in is automatically included in @a __mode.
-	 *
-	 *  Initializes @c sb using @c __mode|in, and passes @c &sb to the base
-	 *  class initializer.  Does not allocate any buffer.
-	 *
-	 *  That's a lie.  We initialize the base class with NULL, because the
-	 *  span class does its own memory management.
-	 */
-	explicit basic_ispanstream(ios_base::openmode __mode = ios_base::in) :
-			__istream_type { }, _M_stringbuf { __mode | ios_base::in } {
-		this->init(&_M_stringbuf);
-	}
-
-	/**
 	 *  @brief  Starts with an existing span buffer.
 	 *  @param  __str  A span to copy as a starting buffer.
 	 *  @param  __mode  Whether the buffer can read, or write, or both.
@@ -652,23 +621,6 @@ private:
 
 public:
 	// Constructors/destructor:
-	/**
-	 *  @brief  Default constructor starts with an empty span buffer.
-	 *  @param  __mode  Whether the buffer can read, or write, or both.
-	 *
-	 *  @c ios_base::out is automatically included in @a mode.
-	 *
-	 *  Initializes @c sb using @c mode|out, and passes @c &sb to the base
-	 *  class initializer.  Does not allocate any buffer.
-	 *
-	 *  That's a lie.  We initialize the base class with NULL, because the
-	 *  span class does its own memory management.
-	 */
-	explicit basic_ospanstream(ios_base::openmode __mode = ios_base::out) :
-			__ostream_type { }, _M_stringbuf { __mode | ios_base::out } {
-		this->init(&_M_stringbuf);
-	}
-
 	/**
 	 *  @brief  Starts with an existing span buffer.
 	 *  @param  __str  A span to copy as a starting buffer.
@@ -791,20 +743,6 @@ private:
 
 public:
 	// Constructors/destructors
-	/**
-	 *  @brief  Default constructor starts with an empty span buffer.
-	 *  @param  __m  Whether the buffer can read, or write, or both.
-	 *
-	 *  Initializes @c sb using the mode from @c __m, and passes @c
-	 *  &sb to the base class initializer.  Does not allocate any
-	 *  buffer.
-	 *
-	 *  That's a lie.  We initialize the base class with NULL.
-	 */
-	explicit basic_spanstream(ios_base::openmode __m = ios_base::out | ios_base::in) :
-			__iostream_type { }, _M_stringbuf { __m } {
-		this->init(&_M_stringbuf);
-	}
 
 	/**
 	 *  @brief  Starts with an existing span buffer.
@@ -827,8 +765,7 @@ public:
 	 *  The buffer is deallocated by the stringbuf object, not the
 	 *  formatting stream.
 	 */
-	~basic_spanstream() {
-	}
+	~basic_spanstream() =default;
 
 	basic_spanstream(basic_spanstream const &) = delete;
 
@@ -888,25 +825,25 @@ public:
 
 /// Swap specialization for spanbufs.
 template<class _CharT, class _Traits>
-inline void swap(basic_spanbuf<_CharT, _Traits>& __x, basic_spanbuf<_CharT, _Traits>& __y) {
+inline void swap(basic_spanbuf<_CharT, _Traits>& __x, basic_spanbuf<_CharT, _Traits>& __y) noexcept {
 	__x.swap(__y);
 }
 
 /// Swap specialization for ispanstreams.
 template<class _CharT, class _Traits>
-inline void swap(basic_ispanstream<_CharT, _Traits>& __x, basic_ispanstream<_CharT, _Traits>& __y) {
+inline void swap(basic_ispanstream<_CharT, _Traits>& __x, basic_ispanstream<_CharT, _Traits>& __y) noexcept {
 	__x.swap(__y);
 }
 
 /// Swap specialization for ospanstreams.
 template<class _CharT, class _Traits>
-inline void swap(basic_ospanstream<_CharT, _Traits>& __x, basic_ospanstream<_CharT, _Traits>& __y) {
+inline void swap(basic_ospanstream<_CharT, _Traits>& __x, basic_ospanstream<_CharT, _Traits>& __y) noexcept {
 	__x.swap(__y);
 }
 
 /// Swap specialization for spanstreams.
 template<class _CharT, class _Traits>
-inline void swap(basic_spanstream<_CharT, _Traits>& __x, basic_spanstream<_CharT, _Traits>& __y) {
+inline void swap(basic_spanstream<_CharT, _Traits>& __x, basic_spanstream<_CharT, _Traits>& __y) noexcept {
 	__x.swap(__y);
 }
 
