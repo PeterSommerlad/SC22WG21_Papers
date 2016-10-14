@@ -47,7 +47,9 @@ This paper proposes a class template \tcode{basic_spanbuf} and the corresponding
 
 \chapter{Acknowledgements}
 \begin{itemize}
+\item Thanks to those ISO C++ meeting members attending the Oulu meeting encouring me to write this proposal. I believe Neil and Pablo have been among them, but can't remember who else.
 \item Thanks go to Jonathan Wakely who pointed the problem of \tcode{strstream} out to me and to Neil Macintosh to provide the span library type specification.
+\item Thanks to Felix Morgner for proofreading.
 \end{itemize}
 
 \chapter{Motivation}
@@ -71,7 +73,7 @@ ASSERT(!is);
 \begin{example} writing to a fixed pre-arranged character buffer:
 \begin{codeblock}
 char  output[30]{}; // zero-initialize array
-ospanstream os{span<char >{output}};
+ospanstream os{span<char>{output}};
 os << 10 << 20 << 30 ;
 auto const sp = os.span();
 ASSERT_EQUAL(6,sp.size());
@@ -707,7 +709,7 @@ Calls
 namespace std {
   template <class charT, class traits = char_traits<charT>>
   class basic_ospanstream
-    : public basic_istream<charT, traits> {
+    : public basic_ostream<charT, traits> {
   public:
     using char_type      = charT;
     using int_type       = typename traits::int_type;
@@ -776,7 +778,7 @@ explicit basic_ospanstream(
 Constructs an object of class
 \tcode{basic_ospanstream<charT, traits>},
 initializing the base class with
-\tcode{basic_istream(\&sb)}
+\tcode{basic_ostream(\&sb)}
 and initializing \tcode{sb} with
 \tcode{basic_spanbuf<charT, traits>{span, which | ios_base::out})}~(\ref{spanbuf.cons}).
 \end{itemdescr}
@@ -822,7 +824,7 @@ void swap(basic_ospanstream& rhs) noexcept;
 \pnum
 \effects Exchanges the state of \tcode{*this} and
 \tcode{rhs} by calling
-\tcode{basic_istream<charT, traits>::swap(rhs)} and
+\tcode{basic_ostream<charT, traits>::swap(rhs)} and
 \tcode{sb.swap(rhs.sb)}.
 \end{itemdescr}
 
@@ -886,7 +888,7 @@ Calls
 namespace std {
   template <class charT, class traits = char_traits<charT>>
   class basic_spanstream
-    : public basic_istream<charT, traits> {
+    : public basic_iostream<charT, traits> {
   public:
     using char_type      = charT;
     using int_type       = typename traits::int_type;
@@ -955,7 +957,7 @@ explicit basic_spanstream(
 Constructs an object of class
 \tcode{basic_spanstream<charT, traits>},
 initializing the base class with
-\tcode{basic_istream(\&sb)}
+\tcode{basic_iostream(\&sb)}
 and initializing \tcode{sb} with
 \tcode{basic_spanbuf<charT, traits>{span, which})}~(\ref{spanbuf.cons}).
 \end{itemdescr}
@@ -970,7 +972,7 @@ basic_spanstream(basic_spanstream&& rhs) noexcept;
 \effects Move constructs from the rvalue \tcode{rhs}. This
 is accomplished by move constructing the base class, and the contained
 \tcode{basic_spanbuf}.
-Next \tcode{basic_ostream<charT, traits>::set_rdbuf(\&sb)} is called to
+Next \tcode{basic_istream<charT, traits>::set_rdbuf(\&sb)} is called to
 install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
@@ -1001,7 +1003,7 @@ void swap(basic_spanstream& rhs) noexcept;
 \pnum
 \effects Exchanges the state of \tcode{*this} and
 \tcode{rhs} by calling
-\tcode{basic_istream<charT, traits>::swap(rhs)} and
+\tcode{basic_iostream<charT, traits>::swap(rhs)} and
 \tcode{sb.swap(rhs.sb)}.
 \end{itemdescr}
 
