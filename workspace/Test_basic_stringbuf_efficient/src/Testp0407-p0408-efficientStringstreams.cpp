@@ -9,6 +9,7 @@
 
 void thisIsATest() {
 	std::string s{"input"};
+	auto x = [](auto i){return ++i;}(41);
 	std::istringstream in{std::move(s)};
 	in >> s;
 	ASSERT_EQUAL("input",s);
