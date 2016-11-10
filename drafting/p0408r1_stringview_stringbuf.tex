@@ -14,8 +14,8 @@
 \pagestyle{myheadings}
 
 
-\newcommand{\papernumber}{p0408r0}
-\newcommand{\paperdate}{2016-07-01}
+\newcommand{\papernumber}{p0408r1}
+\newcommand{\paperdate}{2016-11-10}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -35,7 +35,7 @@
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: \papernumber & \\\hline
+Document Number: & \papernumber  \\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
 Audience: & LWG/LEWG\\\hline
@@ -45,6 +45,8 @@ Audience: & LWG/LEWG\\\hline
 Streams have been the oldest part of the C++ standard library and their specification doesn't take into account many things introduced since C++11. One of  the oversights is that there is no non-copying access to the internal buffer of a \tcode{basic_stringbuf} which makes at least the obtaining of the output results from an \tcode{ostringstream} inefficient, because a copy is always made. I personally speculate that this was also the reason why \tcode{basic_strbuf} took so long to get deprecated with its \tcode{char *} access.
 
 With move semantics and \tcode{basic_string_view} there is no longer a reason to keep this pessimissation alive on \tcode{basic_stringbuf}.
+
+\added{This paper indirectly addresses CH 9 "... and more".}
 
 
 \chapter{Introduction}
@@ -57,6 +59,7 @@ On the other hand, there is no means to construct a \tcode{basic_string} and mov
 \chapter{Acknowledgements}
 \begin{itemize}
 \item Daniel Kr\"ugler encouraged me to pursue this track.
+\item \added{Alisdair Meredith for telling me to include context in the synopsis showing all overloads. That is the only change in this version, no semantic changes!}
 \end{itemize}
 
 
@@ -78,28 +81,42 @@ After experimentation I decided that substituting the \tcode{(basic_string<charT
 The following is relative to n4594.
 \section{27.8.2 Adjust synopsis of basic\_stringbuf [stringbuf]}
 Add a new constructor overload:
-\begin{insrt}
 \begin{codeblock}
-      explicit basic_stringbuf(
-        basic_string<charT, traits, Allocator>&& s,
-        ios_base::openmode which = ios_base::in | ios_base::out);
+    // \ref{stringbuf.cons}, constructors:
+    explicit basic_stringbuf(
+      ios_base::openmode which = ios_base::in | ios_base::out);
+    explicit basic_stringbuf(
+      const basic_string<charT, traits, Allocator>& str,
+      ios_base::openmode which = ios_base::in | ios_base::out);
 \end{codeblock}
-\end{insrt}
-
-Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
+\begin{addedblock}\begin{codeblock}
+    explicit basic_stringbuf(
+      basic_string<charT, traits, Allocator>&& s,
+      ios_base::openmode which = ios_base::in | ios_base::out);
+\end{codeblock}\end{addedblock}
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
+    basic_stringbuf(const basic_stringbuf& rhs) = delete;
+    basic_stringbuf(basic_stringbuf&& rhs);
 \end{codeblock}
 
+Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}. Add two overloads of the \tcode{str()} member function and add the \tcode{str_view()} member function.
 
-Add two overloads of the \tcode{str()} member function and add the \tcode{str_view()} member function:
-\begin{insrt}
 \begin{codeblock}
-void str(basic_string<charT, traits, Allocator>&& s);
-basic_string<charT,traits,Allocator> str() &&;
-basic_string_view<charT, traits> str_view() const;
+    // \ref{stringbuf.members}, get and set:
+    basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
-\end{insrt}
+\begin{addedblock}\begin{codeblock}
+    basic_string<charT,traits,Allocator> str() &&;
+    basic_string_view<charT, traits> str_view() const;
+\end{codeblock}\end{addedblock}
+\begin{codeblock}
+    void str(const basic_string<charT, traits, Allocator>& s);
+\end{codeblock}
+\begin{addedblock}
+\begin{codeblock}
+    void str(basic_string<charT, traits, Allocator>&& s);
+\end{codeblock}
+\end{addedblock}
 
 \subsection{27.8.2.1 basic\_stringbuf constructors [stringbuf.cons]}
 Add the following constructor specification:
@@ -198,35 +215,47 @@ Using the returned object after destruction or any modification of \tcode{*this}
 %% istream
 \section{27.8.3 Adjust synopsis of basic\_istringstream [istringstream]}
 Add a new constructor overload:
-\begin{insrt}
 \begin{codeblock}
-           explicit basic_istringstream(
-             basic_string<charT, traits, Allocator>&& str,
-             ios_base::openmode which = ios_base::in);
+    // \ref{istringstream.cons}, constructors:
+    explicit basic_istringstream(
+      ios_base::openmode which = ios_base::in);
+    explicit basic_istringstream(
+      const basic_string<charT, traits, Allocator>& str,
+      ios_base::openmode which = ios_base::in);
 \end{codeblock}
-\end{insrt}
-
-Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
+\begin{addedblock}
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
+    explicit basic_istringstream(
+      basic_string<charT, traits, Allocator>&& str,
+      ios_base::openmode which = ios_base::in);
 \end{codeblock}
-
-
-Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
-
-\begin{insrt}
+\end{addedblock}
 \begin{codeblock}
-void str(basic_string<charT, traits, Allocator>&& s);
-basic_string<charT,traits,Allocator> str() &&;
-basic_string_view<charT, traits> str_view() const;
+    basic_istringstream(const basic_istringstream& rhs) = delete;
+    basic_istringstream(basic_istringstream&& rhs);
 \end{codeblock}
-\end{insrt}
+
+
+Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}. Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+
+\begin{codeblock}
+    // \ref{istringstream.members}, members:
+    basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
+
+    basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
+    void str(const basic_string<charT, traits, Allocator>& s);
+\end{codeblock}
+\begin{addedblock}\begin{codeblock}
+    void str(basic_string<charT, traits, Allocator>&& s);
+    basic_string<charT,traits,Allocator> str() &&;
+    basic_string_view<charT, traits> str_view() const;
+\end{codeblock}\end{addedblock}
 
 \subsection{27.8.3.1 basic\_istringstream constructors [istringstream.cons]}
 Add the following constructor specification:
 
 
-\begin{insrt}
+\begin{addedblock}
 \begin{itemdecl}
 explicit basic_istringstream(
   const basic_string<charT, traits, Allocator>&& str,
@@ -236,7 +265,7 @@ explicit basic_istringstream(
 \pnum
 \effects Constructs an object of class \tcode{basic_istringstream<charT, traits>}, initializing the base class with \tcode{basic_istream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (27.8.2.1).
 \end{itemdescr}
-\end{insrt}
+\end{addedblock}
 
 
 \subsection{27.8.3.3 Member functions [istringstream.members]}
@@ -275,28 +304,42 @@ basic_string_view<charT, traits> str_view() const;
 
 \section{27.8.4 Adjust synopsis of basic\_ostringstream [ostringstream]}
 Add a new constructor overload:
-\begin{insrt}
 \begin{codeblock}
-           explicit basic_ostringstream(
-             basic_string<charT, traits, Allocator>&& str,
-             ios_base::openmode which = ios_base::out);
+    // \ref{ostringstream.cons}, constructors:
+    explicit basic_ostringstream(
+      ios_base::openmode which = ios_base::out);
+    explicit basic_ostringstream(
+      const basic_string<charT, traits, Allocator>& str,
+      ios_base::openmode which = ios_base::out);
 \end{codeblock}
-\end{insrt}
-
-Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
+\begin{addedblock}
 \begin{codeblock}
-basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
+    explicit basic_ostringstream(
+      basic_string<charT, traits, Allocator>&& str,
+      ios_base::openmode which = ios_base::out);
 \end{codeblock}
-
-
-Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
-\begin{insrt}
+\end{addedblock}
 \begin{codeblock}
-void str(basic_string<charT, traits, Allocator>&& s);
-basic_string<charT,traits,Allocator> str() &&;
-basic_string_view<charT, traits> str_view() const;
+    basic_ostringstream(const basic_ostringstream& rhs) = delete;
+    basic_ostringstream(basic_ostringstream&& rhs);
 \end{codeblock}
-\end{insrt}
+
+Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}. Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
+
+\begin{codeblock}
+    // \ref{ostringstream.members}, members:
+    basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
+
+    basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
+    void str(const basic_string<charT, traits, Allocator>& s);
+\end{codeblock}
+\begin{addedblock}
+\begin{codeblock}
+    void str(basic_string<charT, traits, Allocator>&& s);
+    basic_string<charT,traits,Allocator> str() &&;
+    basic_string_view<charT, traits> str_view() const;
+\end{codeblock}
+\end{addedblock}
 
 \subsection{27.8.4.1 basic\_ostringstream constructors [ostringstream.cons]}
 Add the following constructor specification:
@@ -346,27 +389,48 @@ basic_string_view<charT, traits> str_view() const;
 %%stringstream
 \section{27.8.5 Adjust synopsis of basic\_stringstream [stringstream]}
 Add a new constructor overload:
-\begin{insrt}
 \begin{codeblock}
-           explicit basic_stringstream(
-             basic_string<charT, traits, Allocator>&& str,
-             ios_base::openmode which = ios_base::in | ios_base::out);
+    // \ref{stringstream.cons}, constructors:
+    explicit basic_stringstream(
+      ios_base::openmode which = ios_base::out | ios_base::in);
+    explicit basic_stringstream(
+      const basic_string<charT, traits, Allocator>& str,
+      ios_base::openmode which = ios_base::out | ios_base::in);
 \end{codeblock}
-\end{insrt}
+\begin{addedblock}
+\begin{codeblock}
+    explicit basic_stringstream(
+      basic_string<charT, traits, Allocator>&& str,
+      ios_base::openmode which = ios_base::in | ios_base::out);
+\end{codeblock}
+\end{addedblock}
+\begin{codeblock}
+    basic_stringstream(const basic_stringstream& rhs) = delete;
+    basic_stringstream(basic_stringstream&& rhs);
+\end{codeblock}
 
-Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}.  
-\begin{codeblock}
-basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
-\end{codeblock}
+Change the \tcode{const}-overload of \tcode{str()} member function to add a reference qualification. This avoids ambiguities with the rvalue-ref overload of \tcode{str()}. Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
 
-Add an overload of the \tcode{str()} member function and add the \tcode{str_view()} member function:
-\begin{insrt}
 \begin{codeblock}
-void str(basic_string<charT, traits, Allocator>&& s);
-basic_string<charT,traits,Allocator> str() &&;
-basic_string_view<charT, traits> str_view() const;
+    // \ref{stringstream.members}, members:
+    basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
+
+    basic_string<charT,traits,Allocator> str() const @\ins{\&}@;
 \end{codeblock}
-\end{insrt}
+\begin{addedblock}
+\begin{codeblock}
+    basic_string<charT,traits,Allocator> str() &&;
+    basic_string_view<charT, traits> str_view() const;
+\end{codeblock}
+\end{addedblock}
+\begin{codeblock}
+    void str(const basic_string<charT, traits, Allocator>& str);
+\end{codeblock}
+\begin{addedblock}
+\begin{codeblock}
+    void str(basic_string<charT, traits, Allocator>&& s);
+\end{codeblock}
+\end{addedblock}
 
 \subsection{27.8.4.1 basic\_stringstream constructors [stringstream.cons]}
 Add the following constructor specification:
