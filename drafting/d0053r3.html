@@ -152,7 +152,7 @@ to a definition that also enabled buffering.
 <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3678.html">
 N3678 C++ Stream Guards</a>
 proposed a standard mechanism for batching operations on a stream.
-That batching may be implemented as mutexees, as buffering,
+That batching may be implemented as mutexes, as buffering,
 or some combination of both.
 It was the response to the Concurrency Study Group.
 A draft of that paper was reviewed in the Library Working Group,
@@ -221,7 +221,7 @@ For example,
 </p>
 <pre class="example"><code>{
   osyncstream bout(cout);
-  bout &lt;&lt; "Hello, " &lt;&lt; "World!" &lt;&lt; endl;
+  bout &lt;&lt; "Hello, " &lt;&lt; "World!" &lt;&lt; '\n';
 }</code></pre>
 
 
@@ -230,9 +230,9 @@ For example,
 <p>
 While it has been pointed out that the implementation should actually reside in the used stream
 buffer object, we believe the specification should hide that effect, because such a 
-stream buffer is not intended to be ever be used stand alone. Therefore, the specification
+stream buffer is not intended to be ever be used standalone. Therefore, the specification
 here only provides the basic_osyncstream class template and not any details on the 
-underlying stream buffer implementing the mechanics. I have an implementation, where the 
+underlying stream buffer implementing the mechanics. We have an implementation, where the 
 basic_osyncstream is more or less just a shell to the real meat in the stream buffer
 but that stream buffer is not meant to be exchanged or shared or anything.
 </p>
@@ -484,8 +484,8 @@ while a lock is held.
 <dd>
 
 <p><i>Effects:</i>
-The state necessary to perform <code>os.emit()</code> is moved to <code>*this</code>.
-<code>os.out = nullptr</code>
+First, the state necessary to perform <code>os.emit()</code> is moved to <code>*this</code>.
+Then <code>os.out = nullptr</code>.
 [<i>Note:</i>
 This disassociates <code>os</code> from its wrapped stream buffer ensuring 
 destruction of <code>os</code> produces no output.
@@ -496,9 +496,9 @@ The value returned by <code>this->rdbuf_wrapped()</code> is the value
 returned by <code>os.rdbuf_wrapped()</code> prior to calling this constructor. 
 Output stored in <code>*os.rdbuf()</code> prior to calling this constructor
 will be stored in <code>*this->rdbuf()</code> afterwards. 
-<code>os.rdbuf()->pbase() == os.rdbuf()->pptr()</code>
+Then <code>os.rdbuf()->pbase() == os.rdbuf()->pptr()</code>
  and
-<code>nullptr == os.rdbuf_wrapped()</code>
+<code>nullptr == os.rdbuf_wrapped()</code>.
 </p>
 
 </dd>
@@ -537,19 +537,19 @@ Calls <code>emit()</code>.
 <dd>
 
 <p><i>Effects:</i>
-Calls <code>emit()</code>. 
-The state necessary to perform <code>os.emit()</code> is moved to <code>*this</code>.
-<code>os.out=nullptr;</code>
+First, calls <code>this-&gt;emit()</code>. 
+Then the state necessary to perform <code>os.emit()</code> is moved to <code>*this</code>.
+Then <code>os.out&nbsp;=&nbsp;nullptr</code>.
 [<i>Note:</i>
 This disassociates <code>os</code> from its wrapped stream buffer ensuring 
 destruction of <code>os</code> produces no output.
 &mdash;<i>end note</i>]</p>
 
 <p><i>Postcondition:</i>
-<code>nullptr == os.rdbuf_wrapped()</code>. 
+Primarily, <code>nullptr == os.rdbuf_wrapped()</code>. 
 
-<code>rdbuf_wrapped()</code> returns the value previously returned by 
-<code>os.rdbuf_wrapped()</code>
+Also, <code>rdbuf_wrapped()</code> returns the value previously returned by 
+<code>os.rdbuf_wrapped()</code>.
 </p>
 
 </dd>
@@ -618,7 +618,7 @@ from operations on the underlying stream.
 </p>
 <pre class="example"><code>{
   osyncstream bout(cout);
-  bout &lt;&lt; "Hello, " &lt;&lt; "World!" &lt;&lt; endl;
+  bout &lt;&lt; "Hello, " &lt;&lt; "World!" &lt;&lt; '\n';
   try {
     bout.emit();
   } catch ( ... ) {
@@ -649,9 +649,9 @@ For example,
   bout1 &lt;&lt; "Hello, ";
   {
     osyncstream bout2(bout1.rdbuf_wrapped());
-    bout2 &lt;&lt; "Goodbye, " &lt;&lt; "Planet!" &lt;&lt; endl;
+    bout2 &lt;&lt; "Goodbye, " &lt;&lt; "Planet!" &lt;&lt; '\n';
   }
-  bout1 &lt;&lt; "World!" &lt;&lt; endl;
+  bout1 &lt;&lt; "World!" &lt;&lt; '\n';
 }</code></pre>
 <p>
 produces the <em>uninterleaved</em> output
@@ -705,6 +705,10 @@ Remove "may destroy mutex" notes.
 
 <li><p>
 Clarify osyncstream flush behavior in an example.
+</p></li>
+
+<li><p>
+Make minor editorial fixes.
 </p></li>
 
 </ul>
