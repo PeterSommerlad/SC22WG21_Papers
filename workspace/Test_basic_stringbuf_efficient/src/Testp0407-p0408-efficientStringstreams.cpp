@@ -31,43 +31,43 @@ void time_many_in_conversions(){
 void test_to_stringview_from_stringbuf(){
 	std::ostringstream out{};
 	out << "hello, world!\n";
-	auto sv=out.rdbuf()->str_view();
+	auto sv=out.rdbuf()->view();
 	ASSERT_EQUAL("hello, world!\n",sv);
 }
 
 void test_to_stringview_from_ostream(){
 	std::ostringstream out{};
 	out << "hello, world!\n";
-	auto sv=out.str_view();
+	auto sv=out.view();
 	ASSERT_EQUAL("hello, world!\n",sv);
 }
 void test_to_stringview_from_partially_read_written_stringstream(){
 	std::stringstream inout{"hello, "};
-	ASSERT_EQUAL("hello, ",inout.str_view());
+	ASSERT_EQUAL("hello, ",inout.view());
 	std::string s{};
 	inout >> s;
-	ASSERT_EQUAL("hello, ",inout.str_view());
+	ASSERT_EQUAL("hello, ",inout.view());
 	inout.seekp(0,std::ios::end);
 	inout << "world and more\n";
-	ASSERT_EQUAL("hello, world and more\n",inout.str_view());
+	ASSERT_EQUAL("hello, world and more\n",inout.view());
 }
 void test_to_stringview_from_istream(){
 	std::istringstream in{"42 43"};
-	ASSERT_EQUAL("42 43",in.str_view());
+	ASSERT_EQUAL("42 43",in.view());
 }
 void test_str_from_rvalue_moved_out(){
 	char const * const msg="xxxxx, world\n";
 	std::stringstream out{msg};
 	out << "hello";
-	std::string s{std::move(out).str()};
+	std::string s{out.pilfer()};
 	ASSERT_EQUAL("hello, world\n",s);
-	ASSERT_EQUAL(0,out.str_view().size());
+	ASSERT_EQUAL(0,out.view().size());
 }
 void test_str_from_rvalue_moved_out_output_only(){
 	char const * const msg="hello, world\n";
 	std::stringstream out{};
 	out << msg;
-	std::string s{std::move(out).str()};
+	std::string s{out.pilfer()};
 	ASSERT_EQUAL(msg,s);
 	ASSERT_EQUAL(0,out.str().size());
 }
@@ -75,7 +75,7 @@ void test_str_from_rvalue_moved_out_frombuf(){
 	char const * const msg="hello, world\n";
 	std::ostringstream out{};
 	out << msg;
-	std::string s{std::move(*out.rdbuf()).str()};
+	std::string s{(*out.rdbuf()).pilfer()};
 	ASSERT_EQUAL(msg,s);
 	ASSERT_EQUAL(0,out.str().size());
 }
@@ -86,9 +86,9 @@ void test_str_from_rvalue_moved_out_with_seek(){
 	out << msg;
 	out.seekp(0,std::ios::beg);
 	out << "hello";
-	std::string s{std::move(out).str()};
+	std::string s{out.pilfer()};
 	ASSERT_EQUAL("hello, world\n",s);
-	ASSERT_EQUAL(0,out.str_view().size());
+	ASSERT_EQUAL(0,out.view().size());
 }
 
 
