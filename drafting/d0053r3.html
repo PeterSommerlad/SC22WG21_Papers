@@ -19,6 +19,13 @@ ins {
   text-decoration: underline;
   color: #005100;
 }
+ul.tldr {
+  color: #FF0000;
+  background-color: #F9F9F9;
+  border: 1px solid #D1D1D1;
+  padding: 0.5em;
+  font-weight: 900;
+}
 
 p.example {
   margin: 2em;
@@ -226,6 +233,41 @@ For example,
 
 
 <h2><a name="Design">Design</a></h2>
+
+<p>
+Multiple discussions over and over again showed us that we didn't make a good job in 
+actually motivating the current design. Therefore, here we list a set of reasons or
+potential solutions that just do not work as well.
+</p>
+
+<ul class="tldr">
+<li>
+Why can I not just use cout, it should be thread-safe?
+<p stype="color:#00ff00">
+You won't get data races for cout, but that is not true for most other streams.
+In addition there is no guarantee that output from different thread appear in any sensible order.
+That is the main reason for this proposal.
+</p>
+<li>
+Why must osyncstream be an ostream, couldn't a simple proxy wrapper work?
+<p>
+To support all existing and user-defined output operators osyncstream must be a ostream subclass.
+</p>
+<li>
+Why aren't you using flush of the osyncstream to mean transfer the characters and flush the wrapped stream?
+<p>
+This could impose a performance loss, if no flushing of the underlying stream is required.
+Therefore, we need to separate the atomic transfer from the flushing of the underlying stream.
+The design decision is only to flush the underlying stream, if the osyncstream was flushed,
+and only once per atomic transfer of the character sequence.
+</p>
+<li>
+Why can't flush just transfer the characters and not flush the underlying stream?
+<p>
+There is no working way to access the wrapped stream from multiple threads in a safe way,
+even if it is just for flushing.
+<p>
+</ul>
 
 <p>
 While it has been pointed out that the implementation should actually reside in the used stream
