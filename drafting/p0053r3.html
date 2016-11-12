@@ -19,12 +19,17 @@ ins {
   text-decoration: underline;
   color: #005100;
 }
-ul.tldr {
-  color: #FF0000;
+
+dl.tldr {
   background-color: #F9F9F9;
   border: 1px solid #D1D1D1;
-  padding: 0.5em;
+}
+dt.question {
+  color: #CC0000;
   font-weight: 900;
+}
+dd.answer {
+  color: #008800;
 }
 
 p.example {
@@ -103,7 +108,7 @@ td {
 <h1>DRAFT C++ Synchronized Buffered Ostream</h1>
 
 <p>
-ISO/IEC JTC1 SC22 WG21 DRAFT D0053R3 - 2016-11-09
+ISO/IEC JTC1 SC22 WG21 p0053r3 - 2016-11-12
 </p>
 
 <p>
@@ -235,39 +240,66 @@ For example,
 <h2><a name="Design">Design</a></h2>
 
 <p>
-Multiple discussions over and over again showed us that we didn't make a good job in 
-actually motivating the current design. Therefore, here we list a set of reasons or
-potential solutions that just do not work as well.
+Here we list a set of objection to our proposal
+in the form of questions.
+We then give our reasons why other potential solutions
+do not work as well as our proposed solution.
 </p>
 
-<ul class="tldr">
-<li>
-Why can I not just use cout, it should be thread-safe?
-<p stype="color:#00ff00">
-You won't get data races for cout, but that is not true for most other streams.
-In addition there is no guarantee that output from different thread appear in any sensible order.
-That is the main reason for this proposal.
-</p>
-<li>
-Why must osyncstream be an ostream, couldn't a simple proxy wrapper work?
-<p>
-To support all existing and user-defined output operators osyncstream must be a ostream subclass.
-</p>
-<li>
-Why aren't you using flush of the osyncstream to mean transfer the characters and flush the wrapped stream?
-<p>
-This could impose a performance loss, if no flushing of the underlying stream is required.
-Therefore, we need to separate the atomic transfer from the flushing of the underlying stream.
-The design decision is only to flush the underlying stream, if the osyncstream was flushed,
+<dl class="tldr">
+
+<dt class="question">
+Why can I not just use <code>cout</code>?
+It should be thread-safe.
+</dt>
+<dd class="answer"><p>
+You will nott get data races for <code>cout</code>,
+but that is not true for most other streams.
+In addition there is no guarantee that
+output from different threads appears in any sensible order.
+Coherent output order is the main reason for this proposal.
+</p></dd>
+
+<dt class="question">
+Why must osyncstream be an <code>ostream</code>?
+Could a simple proxy wrapper work?
+</dt>
+<dd class="answer"><p>
+To support all existing and user-defined output operators,
+<code>osyncstream</code> must be an <code>ostream</code> subclass.
+</p></dd>
+
+<dt class="question">
+Can you make a flush of the <code>osyncstream</code>
+mean transfer the characters and flush the underlying stream?
+</dt>
+<dd class="answer"><p>
+No, because the point of the <code>osyncstream</code>
+is to collect text into an atomic unit.
+Flushes are often emitted in calls where the body is not visible,
+and hence unintentionally break up the text.
+Furthermore, there may be more than one flush
+within the lifetime of an <code>osyncstream</code>,
+which would impose a performance loss
+when an atomic unit of text needs only one flush.
+The design decision is only to flush the underlying stream,
+if the osyncstream was flushed,
 and only once per atomic transfer of the character sequence.
-</p>
-<li>
-Why can't flush just transfer the characters and not flush the underlying stream?
-<p>
-There is no working way to access the wrapped stream from multiple threads in a safe way,
-even if it is just for flushing.
-<p>
-</ul>
+</p></dd>
+
+<dt class="question">
+Can you flush just transfer the characters and not flush the underlying stream?
+</dt>
+<dd class="answer"><p>
+The flush intends an effect on visible to the user.
+So, we should preserve at least one flush.
+The flush may not be visible to the code around the <code>osyncstream</code>,
+and so its programmer cannot do a manual flush, because
+attempting to flush the underlying stream that is shared among 
+threads will introduce a data race.
+</p></dd>
+
+</dl>
 
 <p>
 While it has been pointed out that the implementation should actually reside in the used stream
