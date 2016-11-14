@@ -1,4 +1,5 @@
-/*
+/* -*- mode: c++; c-basic-offset: 2; tab-width: 2 -*-
+ *
  * globalstreambuflocks.cpp
  *
  *  Created on: 22.06.2016
