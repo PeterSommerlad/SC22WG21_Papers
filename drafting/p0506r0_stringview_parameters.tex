@@ -34,8 +34,8 @@
 %%%%%
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{d0506r0}
-\newcommand{\paperdate}{2016-11-09}
+\newcommand{\papernumber}{p0506r0}
+\newcommand{\paperdate}{2017-02-04}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -46,7 +46,7 @@
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
-\title{\papernumber{} - Resolve CH 9 - use string\_view for parameters instead of const string \&/const char *}
+\title{\papernumber{} - use string\_view for library function parameters instead of const string \&/const char *}
 \author{Peter Sommerlad}
 \date{\paperdate}                        % Activate to display a given date or no date
 \input{macros}
@@ -66,7 +66,7 @@ With \tcode{basic_string_view} there is no longer a reason to keep library APIs 
 
 \chapter{Introduction}
 
-This paper addresses CH 9:
+A draft of this paper was discussed in LEWG in Issaquah but it was considered to rushed to push this into C++17. However it addresses issue CH 9:
 
 "The standard library should provide string_view parameters instead or in addition for functions defined with \tcode{char const *} or \tcode{string const \&} as parameter types. Most notably in cases where both such overloads exist or where an internal copy is expected anyway.
 It might be doubted that the non-null termination of \tcode{string_view} could be an issue with functions that pass the \tcode{char *} down to OS functions, such as \tcode{fstream_buf::open()} etc and those should not provide it and favour generating a \tcode{std::string} temporary instead in that case. However, \tcode{std::path} demonstrates it is usable to have \tcode{string_view} overloads and there might be many places where it can be handy, or even better."
@@ -77,7 +77,7 @@ by providing changes for library sections 19, 20.9, 22 and 28. The "and more" pa
 
 \chapter{Acknowledgements}
 \begin{itemize}
-\item LEWG in Issaquah for proposing me to write this paper.
+\item LEWG in Issaquah for proposing me to write this paper, even when it can not make it into C++17.
 \end{itemize}
 
 
@@ -87,7 +87,9 @@ by providing changes for library sections 19, 20.9, 22 and 28. The "and more" pa
 \chapter{Impact on the Standard}
 Using string view as parameter type instead of overloading for char pointers and string references has the potential to significantly shorten the specification. Most notable this happens in the regex library, where we get from six overloads down to two, for example, for \tcode{regex_replace}.
 
-A separate paper p0408 specifies the application of \tcode{basic_string_view} for \tcode{basic_stringbuf} and string streams.
+In my opinion such a change for a new C++ standard is an important simplification and sidesteps current "pessimizations" due to extra string objects created when passed as arguments.
+
+A separate paper p0408 specifies the application of \tcode{basic_string_view} for \tcode{basic_stringbuf} and string streams to optimize access to their respective internal buffer.
 
 
 %\chapter{Technical Specifications}
