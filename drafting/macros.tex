@@ -35,6 +35,23 @@
 }
 
 %%--------------------------------------------------
+%% Grammar extraction.
+\def\gramSec[#1]#2{}
+
+\makeatletter
+\newcommand{\FlushAndPrintGrammar}{%
+\immediate\closeout\XTR@out%
+\immediate\openout\XTR@out=std-gram-dummy.tmp%
+\def\gramSec[##1]##2{\rSec1[##1]{##2}}%
+\input{std-gram.ext}%
+}
+\makeatother
+
+%%--------------------------------------------------
+%% Cross references.
+\newcommand{\addxref}[1]{\glossary[xrefindex]{#1}{(\ref{#1})}}
+
+%%--------------------------------------------------
 %% Sectioning macros.  
 % Each section has a depth, an automatically generated section 
 % number, a name, and a short tag.  The depth is an integer in 
@@ -54,7 +71,7 @@
       \or\let\s=\paragraph
       \or\let\s=\subparagraph
       \fi%
-\s[#3]{#3\hfill[#2]}\label{#2}}
+\s[#3]{#3\hfill[#2]}\label{#2}\addxref{#2}}
 
 % A convenience feature (mostly for the convenience of the Project
 % Editor, to make it easy to move around large blocks of text):
@@ -72,8 +89,6 @@
 \addtocounter{scratch}{\value{SectionDepthBase}}
 \Sec{\arabic{scratch}}[#2]{#3}}
 
-\newcommand{\synopsis}[1]{\textbf{#1}}
-
 %%--------------------------------------------------
 % Indexing
 
@@ -81,16 +96,57 @@
 \newcommand{\indextext}[1]{\index[generalindex]{#1}}
 \newcommand{\indexlibrary}[1]{\index[libraryindex]{#1}}
 \newcommand{\indexgram}[1]{\index[grammarindex]{#1}}
-\newcommand{\indeximpldef}[1]{\index[impldefindex]{#1}}
 
+% Collation helper: When building an index key, replace all macro definitions
+% in the key argument with a no-op for purposes of collation. 
+\newcommand{\nocode}[1]{#1}
+\newcommand{\idxmname}[1]{\_\_#1\_\_}
+\newcommand{\idxCpp}{C++}
+
+% \indeximpldef synthesizes a collation key from the argument; that is, an
+% invocation \indeximpldef{arg} emits an index entry `key@arg`, where `key`
+% is derived from `arg` by replacing the folowing list of commands with their
+% bare content. This allows, say, collating plain text and code.
+\newcommand{\indeximpldef}[1]{%
+\let\otextup\textup%
+\let\textup\nocode%
+\let\otcode\tcode%
+\let\tcode\nocode%
+\let\ogrammarterm\grammarterm%
+\let\grammarterm\nocode%
+\let\omname\mname%
+\let\mname\idxmname%
+\let\oCpp\Cpp%
+\let\Cpp\idxCpp
+\let\oBreakableUnderscore\BreakableUnderscore%  See the "underscore" package.
+\let\BreakableUnderscore\textunderscore%
+\edef\x{#1}%
+\let\tcode\otcode%
+\let\grammarterm\ogrammarterm%
+\let\mname\omname%
+\let\Cpp\oCpp%
+\let\BreakableUnderscore\oBreakableUnderscore%
+\index[impldefindex]{\x@#1}%
+\let\textup\otextup%
+}
+
+% These three commands use the "cooked" \indeximpldef command to emit index
+% entries; thus they only work for simple index entries that do not contain
+% special indexing instructions.
 \newcommand{\indexdefn}[1]{\indextext{#1}}
 \newcommand{\indexgrammar}[1]{\indextext{#1}\indexgram{#1}}
 \newcommand{\impldef}[1]{\indeximpldef{#1}implementation-defined}
+% \impldefplain passes the argument directly to the index, allowing you to
+% use special indexing instructions (!, @, |).
+\newcommand{\impldefplain}[1]{\index[impldefindex]{#1}implementation-defined}
 
 % appearance
 \newcommand{\idxcode}[1]{#1@\tcode{#1}}
 \newcommand{\idxhdr}[1]{#1@\tcode{<#1>}}
 \newcommand{\idxgram}[1]{#1@\textit{#1}}
+
+% class member library index
+\newcommand{\indexlibrarymember}[2]{\indexlibrary{\idxcode{#1}!\idxcode{#2}}\indexlibrary{\idxcode{#2}!\idxcode{#1}}}
 
 %%--------------------------------------------------
 % General code style
@@ -120,10 +176,7 @@
 \newcommand{\CppXI}{\Cpp 2011\xspace}
 \newcommand{\CppXIV}{\Cpp 2014\xspace}
 \newcommand{\opt}{{\ensuremath{_\mathit{opt}}}\xspace}
-\newcommand{\shl}{<{<}}
-\newcommand{\shr}{>{>}}
 \newcommand{\dcr}{-{-}}
-\newcommand{\exor}{\^{}}
 \newcommand{\bigoh}[1]{\ensuremath{\mathscr{O}(#1)}}
 
 % Make all tildes a little larger to avoid visual similarity with hyphens.
@@ -131,8 +184,8 @@
 \renewcommand{\tilde}{\textasciitilde}
 \renewcommand{\~}{\textasciitilde}
 \let\OldTextAsciiTilde\textasciitilde
-\renewcommand{\textasciitilde}{\protect\raisebox{-0.17ex}{\large\OldTextAsciiTilde}}
-%\renewcommand{\textasciitilde}{\protect\raisebox{-0.17ex}{\OldTextAsciiTilde}}
+\renewcommand{\textasciitilde}{\protect\raisebox{-0.17ex}{\larger\OldTextAsciiTilde}}
+\newcommand{\caret}{\char`\^}
 
 %%--------------------------------------------------
 %% States and operators
@@ -144,13 +197,6 @@
 \newcommand{\leftshift}[1]{\ensuremath{\, \mathsf{lshift}_#1 \,}}
 
 %% Notes and examples
-\newcommand{\EnterBlock}[1]{[\,\textit{#1:}\xspace}
-\newcommand{\ExitBlock}[1]{\textit{\,---\,end #1}\,]\xspace}
-\newcommand{\enternote}{\EnterBlock{Note}}
-\newcommand{\exitnote}{\ExitBlock{note}}
-\newcommand{\enterexample}{\EnterBlock{Example}}
-\newcommand{\exitexample}{\ExitBlock{example}}
-%newer versions, legacy above!
 \newcommand{\noteintro}[1]{[\,\textit{#1:}\space}
 \newcommand{\noteoutro}[1]{\textit{\,---\,end #1}\,]}
 \newenvironment{note}[1][Note]{\noteintro{#1}}{\noteoutro{note}\xspace}
@@ -163,14 +209,10 @@
 \newcommand{\requires}{\Fundesc{Requires}}
 \newcommand{\effects}{\Fundesc{Effects}}
 \newcommand{\postconditions}{\Fundesc{Postconditions}}
-\newcommand{\postcondition}{\Fundesc{Postcondition}}
-\newcommand{\preconditions}{\requires}
-\newcommand{\precondition}{\requires}
 \newcommand{\returns}{\Fundesc{Returns}}
 \newcommand{\throws}{\Fundesc{Throws}}
 \newcommand{\default}{\Fundesc{Default behavior}}
 \newcommand{\complexity}{\Fundesc{Complexity}}
-\newcommand{\remark}{\Fundesc{Remark}}
 \newcommand{\remarks}{\Fundesc{Remarks}}
 \newcommand{\realnote}{\Fundesc{Note}}
 \newcommand{\realnotes}{\Fundesc{Notes}}
@@ -188,7 +230,6 @@
 
 %% Cross reference
 \newcommand{\xref}{\textsc{See also:}\xspace}
-\newcommand{\xsee}{\textsc{See:}\xspace}
 
 %% NTBS, etc.
 \newcommand{\NTS}[1]{\textsc{#1}\xspace}
@@ -216,7 +257,7 @@
 \newcommand{\unspecuniqtype}{\UNSP{unspecified unique type}}
 \newcommand{\unspecalloctype}{\UNSP{unspecified allocator type}}
 
-\newcommand{\EXPLICIT}{\textit{\texttt{EXPLICIT}}}
+\newcommand{\EXPLICIT}{\textit{\texttt{EXPLICIT}\nocorr}}
 
 %% Manual insertion of italic corrections, for aligning in the presence
 %% of the above annotations.
@@ -231,12 +272,17 @@
 
 %% Double underscore
 \newcommand{\ungap}{\kern.5pt}
-\newcommand{\unun}{\_\ungap\_}
+\newcommand{\unun}{\textunderscore\ungap\textunderscore}
 \newcommand{\xname}[1]{\tcode{\unun\ungap#1}}
 \newcommand{\mname}[1]{\tcode{\unun\ungap#1\ungap\unun}}
 
+%% An elided code fragment, /* ... */, that is formatted as code.
+%% (By default, listings typeset comments as body text.)
+%% Produces 9 output characters.
+\newcommand{\commentellip}{\tcode{/* ...\ */}}
+
 %% Ranges
-\newcommand{\Range}[4]{\tcode{#1#3,~\brk{}#4#2}\xspace}
+\newcommand{\Range}[4]{\tcode{#1#3,\penalty2000{} #4#2}\xspace}
 \newcommand{\crange}[2]{\Range{[}{]}{#1}{#2}}
 \newcommand{\brange}[2]{\Range{(}{]}{#1}{#2}}
 \newcommand{\orange}[2]{\Range{(}{)}{#1}{#2}}
@@ -251,7 +297,7 @@
 \newcommand{\howwide}{\diffdef{How widely used}}
 
 %% Miscellaneous
-\newcommand{\uniquens}{\textrm{\textit{\textbf{unique}}}}
+\newcommand{\uniquens}{\placeholdernc{unique}}
 \newcommand{\stage}[1]{\item{\textbf{Stage #1:}}\xspace}
 \newcommand{\doccite}[1]{\textit{#1}\xspace}
 \newcommand{\cvqual}[1]{\textit{#1}}
@@ -283,7 +329,7 @@
 % italics.  Arbitrary TeX commands can be used if they're 
 % surrounded by @ signs.
 \newcommand{\CodeBlockSetup}{
- \lstset{escapechar=@}
+ \lstset{escapechar=@, aboveskip=\parskip, belowskip=0pt}
  \renewcommand{\tcode}[1]{\textup{\CodeStylex{##1}}}
  \renewcommand{\techterm}[1]{\textit{\CodeStylex{##1}}}
  \renewcommand{\term}[1]{\textit{##1}}
@@ -306,9 +352,9 @@
 
 %%--------------------------------------------------
 %% Indented text
-\newenvironment{indented}
-{\list{}{}\item\relax}
-{\endlist}
+\newenvironment{indented}[1][]
+{\begin{indenthelper}[#1]\item\relax}
+{\end{indenthelper}}
 
 %%--------------------------------------------------
 %% Library item descriptions
@@ -346,9 +392,9 @@
 
 \newenvironment{bnfbase}
  {
- \newcommand{\nontermdef}[1]{\nonterminal{##1}\indexgrammar{\idxgram{##1}}:}
+ \newcommand{\nontermdef}[1]{\nonterminal{##1\itcorr}\indexgrammar{\idxgram{##1}}\textnormal{:}}
  \newcommand{\terminal}[1]{{\BnfTermshape ##1}\xspace}
- \newcommand{\descr}[1]{\normalfont{##1}}
+ \newcommand{\descr}[1]{\textnormal{##1}}
  \newcommand{\bnfindentfirst}{\BnfIndent}
  \newcommand{\bnfindentinc}{\BnfInc}
  \newcommand{\bnfindentrest}{\BnfRest}
@@ -394,7 +440,7 @@
 {
  \begin{bnfbase}
  \BnfNontermshape
- \begin{indented}
+ \begin{indented}[before*=\setlength{\rightmargin}{-\leftmargin}]
 }
 {
  \end{indented}
@@ -419,29 +465,12 @@
 }
 
 % non-copied versions of bnf environments
-\newenvironment{ncbnftab}
-{
- \begin{bnftab}
-}
-{
- \end{bnftab}
-}
-
-\newenvironment{ncsimplebnf}
-{
- \begin{simplebnf}
-}
-{
- \end{simplebnf}
-}
-
-\newenvironment{ncbnf}
-{
- \begin{bnf}
-}
-{
- \end{bnf}
-}
+\let\ncbnftab\bnftab
+\let\endncbnftab\endbnftab
+\let\ncsimplebnf\simplebnf
+\let\endncsimplebnf\endsimplebnf
+\let\ncbnf\bnf
+\let\endncbnf\endbnf
 
 %%--------------------------------------------------
 %% Drawing environment
@@ -488,43 +517,35 @@
  \end{enumerate}
 }
 
-% enumerate with arabic numbers
-\newenvironment{enumeraten}
-{
- \renewcommand{\labelenumi}{\arabic{enumi})}
- \begin{enumerate}
-}
-{
- \end{enumerate}
-}
-
 %%--------------------------------------------------
 %% Definitions section
 % usage: \definition{name}{xref}
 %\newcommand{\definition}[2]{\rSec2[#2]{#1}}
 % for ISO format, use:
 \newcommand{\definition}[2]{%
+\addxref{#2}%
 \subsection[#1]{\hfill[#2]}\vspace{-.3\onelineskip}\label{#2}\textbf{#1}\\%
 }
 \newcommand{\definitionx}[2]{%
+\addxref{#2}%
 \subsubsection[#1]{\hfill[#2]}\vspace{-.3\onelineskip}\label{#2}\textbf{#1}\\%
 }
 \newcommand{\defncontext}[1]{\textlangle#1\textrangle}
  
- %% adopted from standard's layout.tex
- \newcounter{Paras}
-\counterwithin{Paras}{chapter}
-\counterwithin{Paras}{section}
-\counterwithin{Paras}{subsection}
-\counterwithin{Paras}{subsubsection}
-\counterwithin{Paras}{paragraph}
-\counterwithin{Paras}{subparagraph}
-
- \makeatletter
-\def\pnum{\addtocounter{Paras}{1}\noindent\llap{{%
-  \scriptsize\raisebox{.7ex}{\arabic{Paras}}}\hspace{\@totalleftmargin}\quad}}
-\makeatother
-
+% %% adopted from standard's layout.tex
+%\newcounter{Paras}
+%\counterwithin{Paras}{chapter}
+%\counterwithin{Paras}{section}
+%\counterwithin{Paras}{subsection}
+%\counterwithin{Paras}{subsubsection}
+%\counterwithin{Paras}{paragraph}
+%\counterwithin{Paras}{subparagraph}
+%
+% \makeatletter
+%\def\pnum{\addtocounter{Paras}{1}\noindent\llap{{%
+%  \scriptsize\raisebox{.7ex}{\arabic{Paras}}}\hspace{\@totalleftmargin}\quad}}
+%\makeatother
+%
 %% PS: add some helpers for coloring, assumes \usepackage{color}
 %% should no longer be used, since we have those macros already!
 \newcommand{\del}[1]{\removed{#1}}
