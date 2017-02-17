@@ -2,15 +2,56 @@
 \usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
 \geometry{a4paper}  % ... or a4paper or a5paper or ... 
 %\geometry{landscape}  % Activate for for rotated page geometry
-%\usepackage[parfill]{parskip}  % Activate to begin paragraphs with an empty line rather than an indent
-
-
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
 \usepackage[final]
            {listings}     % code listings
-\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{longtable}    % auto-breaking tables
+%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
 \usepackage{underscore}   % remove special status of '_' in ordinary text
-\usepackage{xspace}
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+%\usepackage{array}        % new column definitions for tables
 \usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+%\usepackage{microtype}
+%\usepackage{multicol}
+\usepackage{xspace}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+
+%%%% reuse all three from std.tex:
+\input{macros}
+\input{layout}
+\input{styles}
+
 \pagestyle{myheadings}
 
 
@@ -29,7 +70,6 @@
 \title{\papernumber{} - Efficient Access to basic\_stringbuf's Buffer}
 \author{Peter Sommerlad}
 \date{\paperdate}                        % Activate to display a given date or no date
-\input{macros}
 \setsecnumdepth{subsection}
 
 \begin{document}
@@ -103,9 +143,9 @@ Add a new constructor overload:
     // \ref{stringbuf.cons}, constructors:
     explicit basic_stringbuf(
       ios_base::openmode which = ios_base::in | ios_base::out);
-    @\ins{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc=Allocator>}@
     explicit basic_stringbuf(
-      const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& str,
+      const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
       ios_base::openmode which = ios_base::in | ios_base::out);
 \end{codeblock}
 \begin{addedblock}\begin{codeblock}
@@ -126,10 +166,10 @@ Add the \tcode{view()} member function obtaining a \tcode{string_view} to the un
 
 \begin{codeblock}
     // \ref{stringbuf.members}, get and set:
-    @\ins{template<class SAlloc=Allocator>}@
-    basic_string<charT,traits,@\ins{S}@Alloc@\del{ator}@> str(@\ins{const SAlloc\& sa=SAlloc()}@) const;
-    @\ins{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& s);
+    @\added{template<class SAlloc=Allocator>}@
+    basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
+    @\added{template<class SAlloc=Allocator>}@
+    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
@@ -142,9 +182,9 @@ Add the \tcode{view()} member function obtaining a \tcode{string_view} to the un
 \subsection{27.8.2.1 basic\_stringbuf constructors [stringbuf.cons]}
 Modify the following constructor specification:
 \begin{itemdecl}
-@\ins{template<class SAlloc=Allocator>}@
+@\added{template<class SAlloc=Allocator>}@
 explicit basic_stringbuf(
-  const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& str,
+  const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
   ios_base::openmode which = ios_base::in | ios_base::out);
 \end{itemdecl}
 
@@ -178,8 +218,8 @@ Note to editors: if p0407 is accepted the changes there for allocators apply her
 \subsection{27.8.2.3 Member functions [stringbuf.members]}
 Add an allocator parameter for the copied from string to allow having a different allocator than the underlying stream.
 \begin{codeblock}
-@\ins{template<class SAlloc=Allocator>}@
-basic_string<charT,traits,@\ins{S}@Alloc@\del{ator}@> str(@\ins{const SAlloc\& sa=SAlloc()}@) const;
+@\added{template<class SAlloc=Allocator>}@
+basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
 \end{codeblock}
 
 Change p1 to use plural for "\tcode{str(basic_string)} member functions" and refer to the allocator:
@@ -189,7 +229,7 @@ Change p1 to use plural for "\tcode{str(basic_string)} member functions" and ref
 \returns
 A
 \tcode{basic_string}
-object \ins{with allocator \tcode{sa} }whose content is equal to the
+object \added{with allocator \tcode{sa} }whose content is equal to the
 \tcode{basic_stringbuf}
 underlying character sequence.
 If the \tcode{basic_stringbuf} was created only in input mode, the resultant
@@ -200,12 +240,12 @@ contains the character sequence in the range \range{pbase()}{high_mark}, where
 \tcode{high_mark} represents the position one past the highest initialized character
 in the buffer. Characters can be initialized by writing to the stream, by constructing
 the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling 
-\ins{one of }
+\added{one of }
 the
-\tcode{str(basic_string)} member function\ins{s}. In the case of calling 
-\ins{one of }
+\tcode{str(basic_string)} member function\added{s}. In the case of calling 
+\added{one of }
 the
-\tcode{str(basic_string)} member function\ins{s}, all characters initialized prior to
+\tcode{str(basic_string)} member function\added{s}, all characters initialized prior to
 the call are now considered uninitialized (except for those characters re-initialized
 by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created
 in neither input nor output mode and a zero length \tcode{basic_string} is returned. 
@@ -237,7 +277,7 @@ basic_string<charT, traits, Allocator> pilfer();
 \returns A \tcode{basic_string} object moved from the \tcode{basic_stringbuf} underlying character sequence. If the \tcode{basic_stringbuf} was created only in input mode, \tcode{basic_string(eback(), egptr()-eback())}. If the \tcode{basic_stringbuf} was created with \tcode{which \& ios_base::out} being true then \tcode{basic_string(pbase(), high_mark-pbase())}, where \tcode{high_mark} represents the position one past the highest initialized character in the buffer. Characters can be initialized by writing to the stream, by constructing the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling one of the \tcode{str(basic_string)} member functions. In the case of calling one of the \tcode{str(basic_string)} member functions, all characters initialized prior to the call are now considered uninitialized (except for those characters re-initialized by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode and an empty \tcode{basic_string} is returned. 
 
 \pnum
-\postcondition The underlying character sequence is empty.
+\postconditions The underlying character sequence is empty.
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -248,9 +288,9 @@ basic_string_view<charT, traits> view() const;
 \returns A \tcode{basic_string_view} object referring to the \tcode{basic_stringbuf} underlying character sequence. If the \tcode{basic_stringbuf} was created only in input mode,  \tcode{basic_string_view(eback(), egptr()-eback())}. If the \tcode{basic_stringbuf} was created with \tcode{which \& ios_base::out} being true then \tcode{basic_string_view(pbase(), high_mark-pbase())}, where \tcode{high_mark} represents the position one past the highest initialized character in the buffer. Characters can be initialized by writing to the stream, by constructing the \tcode{basic_stringbuf} with a \tcode{basic_string}, or by calling one of the \tcode{str(basic_string)} member functions. In the case of calling one of the \tcode{str(basic_string)} member functions, all characters initialized prior to the call are now considered uninitialized (except for those characters re-initialized by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode and a \tcode{basic_string_view} referring to an empty range is returned. 
 
 \pnum
-\enternote
+\begin{note}
 Using the returned \tcode{basic_string_view} object after destruction or any modification of the character sequence underlying \tcode{*this}, such as output on the holding stream, will cause undefined behavior, because the internal string referred by the return value might have changed or re-allocated. 
-\exitnote
+\end{note}
 \end{itemdescr}
 
 \end{insrt}
@@ -261,9 +301,9 @@ Add a new constructor overload and change the one taking the string by copy to a
     // \ref{istringstream.cons}, constructors:
     explicit basic_istringstream(
       ios_base::openmode which = ios_base::in);
-    @\ins{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc=Allocator>}@
     explicit basic_istringstream(
-      const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& str,
+      const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
       ios_base::openmode which = ios_base::in);
 \end{codeblock}
 \begin{addedblock}
@@ -285,10 +325,10 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
     // \ref{istringstream.members}, members:
     basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
 
-    @\ins{template<class SAlloc=Allocator>}@
-    basic_string<charT,traits,@\del{Allocator}\ins{SAlloc}@> str(@\ins{const SAlloc\& sa=SAlloc()}@) const;
-    @\ins{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& s);
+    @\added{template<class SAlloc=Allocator>}@
+    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
+    @\added{template<class SAlloc=Allocator>}@
+    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
@@ -301,9 +341,9 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \subsection{27.8.3.1 basic\_istringstream constructors [istringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
-@\ins{template<class SAlloc=Allocator>}@
+@\added{template<class SAlloc=Allocator>}@
 explicit basic_istringstream(
-  const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& str,
+  const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
   ios_base::openmode which = ios_base::in);
 \end{itemdecl}
 
@@ -337,18 +377,18 @@ explicit basic_istringstream(
 \subsection{27.8.3.3 Member functions [istringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
-@\ins{template<class SAlloc=Allocator>}@
-basic_string<charT,traits,@\ins{S}@Alloc@\del{ator}@> str(@\ins{const SAlloc\& sa=SAlloc()}@) const;
+@\added{template<class SAlloc=Allocator>}@
+basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
 \returns
-\tcode{rdbuf()->str(\ins{sa})}.
+\tcode{rdbuf()->str(\added{sa})}.
 \end{itemdescr}
 
 \begin{itemdecl}
-    @\ins{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& s);
+    @\added{template<class SAlloc=Allocator>}@
+    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -393,9 +433,9 @@ Add a new constructor overload and change the one taking the string by copy to a
     // \ref{ostringstream.cons}, constructors:
     explicit basic_ostringstream(
       ios_base::openmode which = ios_base::out);
-    @\ins{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc=Allocator>}@
     explicit basic_ostringstream(
-      const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& str,
+      const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
       ios_base::openmode which = ios_base::out);
 \end{codeblock}
 \begin{addedblock}
@@ -417,10 +457,10 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
     // \ref{ostringstream.members}, members:
     basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
 
-    @\ins{template<class SAlloc=Allocator>}@
-    basic_string<charT,traits,@\del{Allocator}\ins{SAlloc}@> str(@\ins{const SAlloc\& sa=SAlloc()}@) const;
-    @\ins{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& s);
+    @\added{template<class SAlloc=Allocator>}@
+    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
+    @\added{template<class SAlloc=Allocator>}@
+    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
@@ -433,9 +473,9 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \subsection{27.8.4.1 basic\_ostringstream constructors [ostringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
-@\ins{template<class SAlloc=Allocator>}@
+@\added{template<class SAlloc=Allocator>}@
 explicit basic_ostringstream(
-  const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& str,
+  const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
   ios_base::openmode which = ios_base::out);
 \end{itemdecl}
 
@@ -466,18 +506,18 @@ explicit basic_ostringstream(
 \subsection{27.8.4.3 Member functions [ostringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
-@\ins{template<class SAlloc=Allocator>}@
-basic_string<charT,traits,@\ins{S}@Alloc@\del{ator}@> str(@\ins{const SAlloc\& sa=SAlloc()}@) const;
+@\added{template<class SAlloc=Allocator>}@
+basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
 \returns
-\tcode{rdbuf()->str(\ins{sa})}.
+\tcode{rdbuf()->str(\added{sa})}.
 \end{itemdescr}
 
 \begin{itemdecl}
-    @\ins{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& s);
+    @\added{template<class SAlloc=Allocator>}@
+    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -522,9 +562,9 @@ Add a new constructor overload and change the one taking the string by copy to a
     // \ref{stringstream.cons}, constructors:
     explicit basic_stringstream(
       ios_base::openmode which = ios_base::out | ios_base::in);
-    @\ins{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc=Allocator>}@
     explicit basic_stringstream(
-      const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& str,
+      const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
       ios_base::openmode which = ios_base::out | ios_base::in);
 \end{codeblock}
 \begin{addedblock}
@@ -546,10 +586,10 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
     // \ref{stringstream.members}, members:
     basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
 
-    @\ins{template<class SAlloc=Allocator>}@
-    basic_string<charT,traits,@\del{Allocator}\ins{SAlloc}@> str(@\ins{const SAlloc\& sa=SAlloc()}@) const;
-    @\ins{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& s);
+    @\added{template<class SAlloc=Allocator>}@
+    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
+    @\added{template<class SAlloc=Allocator>}@
+    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
@@ -562,9 +602,9 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \subsection{27.8.4.1 basic\_stringstream constructors [stringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
-@\ins{template<class SAlloc=Allocator>}@
+@\added{template<class SAlloc=Allocator>}@
 explicit basic_stringstream(
-  const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& str,
+  const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
   ios_base::openmode which = ios_base::out | ios_base::in);
 \end{itemdecl}
 
@@ -597,18 +637,18 @@ explicit basic_stringstream(
 \subsection{27.8.4.3 Member functions [stringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
-@\ins{template<class SAlloc=Allocator>}@
-basic_string<charT,traits,@\ins{S}@Alloc@\del{ator}@> str(@\ins{const SAlloc\& sa=SAlloc()}@) const;
+@\added{template<class SAlloc=Allocator>}@
+basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
 \returns
-\tcode{rdbuf()->str(\ins{sa})}.
+\tcode{rdbuf()->str(\added{sa})}.
 \end{itemdescr}
 
 \begin{itemdecl}
-    @\ins{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\ins{S}@Alloc@\del{ator}@>& s);
+    @\added{template<class SAlloc=Allocator>}@
+    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{itemdecl}
 
 \begin{itemdescr}

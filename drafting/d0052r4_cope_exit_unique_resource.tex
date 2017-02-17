@@ -56,8 +56,8 @@
 
 %%%%
 
-\newcommand{\papernumber}{P0052R3}
-\newcommand{\paperdate}{2017-02-06}
+\newcommand{\papernumber}{d0052r4}
+\newcommand{\paperdate}{2017-02-17}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -76,6 +76,12 @@ Audience: & LWG/LEWG\\\hline
 \end{tabular}
 
 \chapter{History}
+\section{Changes from P0052R3}
+\begin{itemize}
+\item Use lowercase p and r like most other papers
+\item Change example code to use C++17 constructor template argument deduction (Yes, I checked my code with GCC, found "bugs" in the standard and change my/Eric's implementation to actually work with it).
+\end{itemize}
+
 \section{Changes from P0052R2}
 \begin{itemize}
 \item Take into account class template ctor argument deduction. However, I recommend keeping the factories for LFTS 3 to allow for C++14 implementations. At the time of this writing, I do not have a working C++17 compliant compiler handy to run corresponding test cases without the factories. However, there is one factory function make_unique_checked that needs to stay, because it addresses a specific but seemingly common use-case.
@@ -175,62 +181,64 @@ While \tcode{std::unique_ptr} can be (mis-)used to keep track of general handle 
 
 \begin{codeblock}
 void demonstrate_unique_resource_with_stdio() {
-  const std::string filename = "hello.txt";
-  { auto file=make_unique_resource(::fopen(filename.c_str(),"w"),&::fclose);
-    ::fputs("Hello World!\n", file.get());
-    ASSERT(file.get()!= NULL);
-  }
-  { std::ifstream input { filename };
-    std::string line { };
-    getline(input, line);
-    ASSERT_EQUAL("Hello World!", line);
-    getline(input, line);
-    ASSERT(input.eof());
-  }
-  ::unlink(filename.c_str());
-  {
-    auto file = make_unique_resource_checked(::fopen("nonexistingfile.txt", "r"), 
-                (FILE*) NULL, &::fclose);
-    ASSERT_EQUAL((FILE*)NULL, file.get());
-  }
+	const std::string filename = "hello.txt";
+	{
+		unique_resource file(::fopen(filename.c_str(), "w"), &::fclose);
+		::fputs("Hello World!\n", file.get());
+		ASSERT(file.get()!= NULL);
+	}
+	{
+		std::ifstream input { filename };
+		std::string line { };
+		getline(input, line);
+		ASSERT_EQUAL("Hello World!", line);
+		getline(input, line);
+		ASSERT(input.eof());
+	}
+	::unlink(filename.c_str());
+	{
+		auto file = make_unique_resource_checked(::fopen("nonexistingfile.txt", "r"), (FILE*) NULL, &::fclose);
+		ASSERT_EQUAL((FILE*)NULL, file.get());
+	}
 }
 void demontrate_unique_resource_with_POSIX_IO() {
-  const std::string filename = "./hello1.txt";
-  { auto file=make_unique_resource(::open(filename.c_str(),
-                     O_CREAT|O_RDWR|O_TRUNC,0666), &::close);
-    ::write(file.get(), "Hello World!\n", 12u);
-    ASSERT(file.get() != -1);
-  }
-  { std::ifstream input { filename };
-    std::string line { };
-    getline(input, line);
-    ASSERT_EQUAL("Hello World!", line);
-    getline(input, line);
-    ASSERT(input.eof());
-  }
-  ::unlink(filename.c_str());
-  {
-    auto file = make_unique_resource_checked(::open("nonexistingfile.txt", 
-                       O_RDONLY), -1, &::close);
-    ASSERT_EQUAL(-1, file.get());
-  }
+	const std::string filename = "./hello2.txt";
+	{
+		unique_resource file(::open(filename.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666), &::close);
+
+		::write(file.get(), "Hello World2!\n", 13u);
+		ASSERT(file.get() != -1);
+	}
+	{
+		std::ifstream input { filename };
+		std::string line { };
+		getline(input, line);
+		ASSERT_EQUAL("Hello World2!", line);
+		getline(input, line);
+		ASSERT(input.eof());
+	}
+	::unlink(filename.c_str());
+	{
+		auto file = make_unique_resource_checked(::open("nonexistingfile.txt", O_RDONLY), -1, &::close);
+		ASSERT_EQUAL(-1, file.get());
+	}
 }\end{codeblock}
 
 We refer to Andrej Alexandrescu's well-known many presentations as a motivation for \tcode{scope_exit}, \tcode{scope_fail}, and \tcode{scope_success}. Here is a brief example on how to use the 3 proposed factories. 
 \begin{codeblock}
 void demo_scope_exit_fail_success(){
-  std::ostringstream out{};
-  auto lam=[&]{out << "called ";};
-  try{
-    auto v=make_scope_exit([&]{out << "always ";});
-    auto w=make_scope_success([&]{out << "not ";}); // not called
-    auto x=make_scope_fail(lam); // called
-    throw 42;
-  }catch(...){
-    auto y=make_scope_fail([&]{out << "not ";}); // not called
-    auto z=make_scope_success([&]{out << "handled";}); // called
-  }
-  ASSERT_EQUAL("called always handled",out.str());
+	std::ostringstream out{};
+	auto lam=[&]{out << "called ";};
+	try{
+		scope_exit v([&]{out << "always ";});
+		scope_success w([&]{out << "not ";}); // not called
+		scope_fail x(lam); // called
+		throw 42;
+	}catch(...){
+		scope_fail y([&]{out << "not ";}); // not called
+		scope_success z([&]{out << "handled";}); // called
+	}
+	ASSERT_EQUAL("called always handled",out.str());
 }
 \end{codeblock}
 
@@ -277,11 +285,11 @@ The following issues have been recommended by LWG already:
 \section{Open Issues (to be) Discussed by LEWG / LWG}
 Since a lot of the design changed due to Eric Niebler's implementation taking great effort to provide strong exception guarantee, another round through LEWG and LWG seems to be required.
 \begin{itemize}
-\item I need help to specify the potentially required constructur template argument deduction guides, but due to a lack of compatible compiler on my machine and lack of time, I am unable to provide that.
-I hope someone at Kona can help me get this in an acceptable shape for LFTS3.
+\item How do we specify deduction guides in the standard? Synopsis only? Should they be \tcode{explicit} (My gcc version doesn't allow that syntax yet)?
 \item which "callable" definition in the standard should be applied (call expression (as it is now) or via INVOKE (\tcode{is_callable_v<EF\&>}). 
 \emph{IMHO call expression is fine, since everything is about side-effects and we never return a useful value from any of the function objects.}
 \item Should we provide a non-explicit conversion operator to \tcode{R} in \tcode{unique_resource<R,D>} ? Last time people seem to have been strongly against, however, it would make the use of unique_resource much easier in contexts envisioned by author Andrew Sandoval. Please re-visit, since it is omitted here.
+\item It would be nice to get feedback on my adapted implementation, since I am not sure, my deduction guides will actually behave identical to the factory functions provided by Eric.
 \end{itemize}
 
 \newpage
@@ -370,6 +378,20 @@ make_unique_resource_checked(R&& r, S const& invalid, D&& d)
 noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
          is_nothrow_constructible_v<decay_t<D>, D>);
 
+// deduction guides
+template <class EF>
+scope_exit(EF &&ef) -> scope_exit<std::decay_t<EF>>;
+template <class EF>
+scope_fail(EF &&ef) -> scope_fail<std::decay_t<EF>>;
+template <class EF>
+scope_success(EF &&ef) -> scope_success<std::decay_t<EF>>;
+
+template<typename R, typename D>
+unique_resource(R &&r, D &&d) -> unique_resource<std::decay_t<R>, std::decay_t<D>>;
+
+
+
+
 // optional factory functions (should at least be present for LFTS3)
 template <class EF>
 scope_exit<decay_t<EF>> make_scope_exit(EF&& exit_function) ;
@@ -438,8 +460,8 @@ private:
 \begin{codeblock}
 void grow(vector<int>&v){
 	scope_success guard([]{ cout << "Good!" << endl; });
-	v.resize(1024);
-}
+	v.resize(1024); 
+} // outputs "Good!" unless resize() fails
 \end{codeblock}
 \end{example}
 \end{note}
@@ -608,8 +630,10 @@ void release() noexcept;
 %\rSec2[scope.make_scope_exit]{\tcode{\textit{scope_guard}} factory functions}
 \subsection {Scope guard factory functions [scope.make_scope_exit]}
 \begin{note}
+Should I specify the deduction guides here. Or should they go into the synopsis (only)?
+\end{note}
+\begin{note}
 These factory functions are meant for C++14 backward compatibility of this feature. 
-However, the ctor specifications of the classes might need some adjustment to make template argument deduction work correctly.
 \end{note}
 
 \pnum

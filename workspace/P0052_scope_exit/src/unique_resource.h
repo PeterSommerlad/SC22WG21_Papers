@@ -22,7 +22,7 @@ constexpr bool _is_nothrow_movable_v = _is_nothrow_movable<T>::value;
 
 // the following is never ODR used. it is only relevant for obtaining a noexcept value
 template<typename T>
-T for_noexcept_on_copy_construction(T const &t) noexcept(noexcept(T(t)))
+T for_noexcept_on_copy_construction(const T &t) noexcept(noexcept(T(t)))
 {
     return t;
 }
@@ -32,14 +32,14 @@ T for_noexcept_on_copy_construction(T const &t) noexcept(noexcept(T(t)))
 } // detail
 //namespace std{ // should come from there, but gcc has it not yet implemented today:
 }
-template<class T>
-constexpr auto is_reference_v=std::is_reference<T>::value;
-template<class T>
-constexpr auto is_nothrow_move_constructible_v=std::is_nothrow_move_constructible<T>::value;
-template<class T>
-constexpr auto is_copy_constructible_v=std::is_copy_constructible<T>::value;
-template<class T, class TT>
-constexpr auto is_nothrow_constructible_v=std::is_nothrow_constructible<T, TT>::value;
+//template<class T>
+//constexpr auto is_reference_v=std::is_reference<T>::value;
+//template<class T>
+//constexpr auto is_nothrow_move_constructible_v=std::is_nothrow_move_constructible<T>::value;
+//template<class T>
+//constexpr auto is_copy_constructible_v=std::is_copy_constructible<T>::value;
+//template<class T, class TT>
+//constexpr auto is_nothrow_constructible_v=std::is_nothrow_constructible<T, TT>::value;
 //}
 namespace experimental {
 
@@ -54,7 +54,7 @@ class unique_resource
                   std::is_copy_constructible_v<D>,
 				  "deleter must be notrhow_move_constructible or copy_constructible");
 
-    static unique_resource const &this_; // never ODR used! Just for getting no_except() expr
+	static const unique_resource &this_; // never ODR used! Just for getting no_except() expr
 
     detail::_box<R> resource;
     detail::_box<D> deleter;
@@ -182,8 +182,8 @@ public:
         return *get();
     }
 
-    unique_resource& operator=(unique_resource const &) = delete;
-    unique_resource(unique_resource const &) = delete;
+	unique_resource& operator=(const unique_resource &) = delete;
+	unique_resource(const unique_resource &) = delete;
 
 };
 
@@ -194,6 +194,8 @@ void swap(unique_resource<R, D> &lhs, unique_resource<R, D> &rhs)
 {
     lhs.swap(rhs);
 }
+template<typename R, typename D>
+unique_resource(R &&r, D &&d) -> unique_resource<std::decay_t<R>, std::decay_t<D>>;
 
 template<typename R, typename D>
 auto make_unique_resource(R &&r, D &&d)
@@ -203,6 +205,8 @@ auto make_unique_resource(R &&r, D &&d)
     return unique_resource<std::decay_t<R>, std::decay_t<D>>{
         std::forward<R>(r), std::forward<D>(d)};
 }
+template<typename R, typename D>
+unique_resource(std::reference_wrapper<R> r, D &&d) -> unique_resource<R &, std::decay_t<D>>; // should need to unwrap, but how?
 
 template<typename R, typename D>
 auto make_unique_resource(std::reference_wrapper<R> r, D &&d)
@@ -212,7 +216,7 @@ noexcept(noexcept(unique_resource<R &, std::decay_t<D>>{r.get(), std::forward<D>
 }
 
 template<typename R, typename D, typename S>
-auto make_unique_resource_checked(R &&r, S const &invalid, D &&d)
+auto make_unique_resource_checked(R &&r, const S &invalid, D &&d)
 noexcept(noexcept(make_unique_resource(std::forward<R>(r), std::forward<D>(d))))
 {
     bool must_release = bool(r == invalid);

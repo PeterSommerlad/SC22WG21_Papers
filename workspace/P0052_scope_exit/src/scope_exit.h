@@ -66,14 +66,43 @@ struct on_success_policy
 template<class EF, class Policy = detail::on_exit_policy>
 struct basic_scope_exit;
 
-template<class EF>
-using scope_exit = basic_scope_exit<EF, detail::on_exit_policy>;
+//PS: It would be nice if just the following would work in C++17
+//PS: however, we need a real class for template argument deduction
+//PS: and a deduction guide, because the ctors are partially instantiated
+//template<class EF>
+//using scope_exit = basic_scope_exit<EF, detail::on_exit_policy>;
 
 template<class EF>
-using scope_fail = basic_scope_exit<EF, detail::on_fail_policy>;
+struct scope_exit : basic_scope_exit<EF, detail::on_exit_policy>{
+	using basic_scope_exit<EF, detail::on_exit_policy>::basic_scope_exit;
+};
+
+template <class EF>
+scope_exit(EF &&ef) -> scope_exit<std::decay_t<EF>>;
+
+//template<class EF>
+//using scope_fail = basic_scope_exit<EF, detail::on_fail_policy>;
 
 template<class EF>
-using scope_success = basic_scope_exit<EF, detail::on_success_policy>;
+struct scope_fail : basic_scope_exit<EF, detail::on_fail_policy>{
+	using basic_scope_exit<EF, detail::on_fail_policy>::basic_scope_exit;
+};
+
+template <class EF>
+scope_fail(EF &&ef) -> scope_fail<std::decay_t<EF>>;
+
+//template<class EF>
+//using scope_success = basic_scope_exit<EF, detail::on_success_policy>;
+
+template<class EF>
+struct scope_success : basic_scope_exit<EF, detail::on_success_policy>{
+	using basic_scope_exit<EF,detail::on_success_policy>::basic_scope_exit;
+};
+
+template <class EF>
+scope_success(EF &&ef) -> scope_success<std::decay_t<EF>>;
+
+
 
 namespace detail{
 // DETAIL:
@@ -97,7 +126,7 @@ class basic_scope_exit :  Policy
 {
     detail::_box<EF> exit_function;
 
-    static auto _make_failsafe(std::true_type, void const *)
+	static auto _make_failsafe(std::true_type, const void *)
     {
         return detail::_empty_scope_exit{};
     }
@@ -123,8 +152,8 @@ public:
         if(this->should_execute())
             exit_function.get()();
     }
-    basic_scope_exit(basic_scope_exit const &) = delete;
-    basic_scope_exit &operator=(basic_scope_exit const &) = delete;
+	basic_scope_exit(const basic_scope_exit &) = delete;
+	basic_scope_exit &operator=(const basic_scope_exit &) = delete;
     basic_scope_exit &operator=(basic_scope_exit &&) = delete;
 
     using Policy::release;
@@ -159,6 +188,7 @@ noexcept(std::is_nothrow_constructible<std::decay_t<EF>, EF>::value)
 // end (c) Eric Niebler
 
 #if 0
+//PS: a too naive implementation
 template<typename EF>
 struct scope_exit {
 	// construction

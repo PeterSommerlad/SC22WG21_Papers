@@ -2,16 +2,55 @@
 \usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
 \geometry{a4paper}  % ... or a4paper or a5paper or ... 
 %\geometry{landscape}  % Activate for for rotated page geometry
-%\usepackage[parfill]{parskip}  % Activate to begin paragraphs with an empty line rather than an indent
-
-
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
 \usepackage[final]
            {listings}     % code listings
-\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{longtable}    % auto-breaking tables
+%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
 \usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+%\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+%\usepackage{microtype}
+%\usepackage{multicol}
 \usepackage{xspace}
-\usepackage[normalem]{ulem} % for insertion marks with \uline
-\usepackage{url}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+
+%%%% reuse all three from std.tex:
+\input{macros}
+\input{layout}
+\input{styles}
 
 \pagestyle{myheadings}
 
@@ -23,18 +62,18 @@
 \title{\papernumber{} - A strstream replacement using span\textless{}charT\textgreater{} as buffer}
 \author{Peter Sommerlad}
 \date{\paperdate}                % Activate to display a given date or no date
-\input{macros}
 \setsecnumdepth{subsection}
 
 \begin{document}
 \maketitle
+\begin{center}
 \begin{tabular}[t]{|l|l|}\hline 
-Document Number: \papernumber & (N2065 done right?)\\\hline
+Document Number:&  \papernumber \hfill (N2065 done right?)\\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
 Audience: & LWG/LEWG\\\hline
 \end{tabular}
-
+\end{center}
 \chapter{History}
 Streams have been the oldest part of the C++ standard library and especially strstreams that can use pre-allocated buffers have been deprecated for a long time now, waiting for a replacement. p0407 and p0408 provide the efficient access to the underlying buffer for stringstreams that strstream provided solving half of the problem that strstreams provide a solution for. The other half is using a fixed size pre-allocated buffer, e.g., allocated on the stack, that is used as the stream buffers internal storage.
 
