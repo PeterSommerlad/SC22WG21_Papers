@@ -1,3 +1,5 @@
+// -*- mode: c++; c-basic-offset: 2; tab-width: 2 -*-
+
 #include "globalstreambuflocks.h"
 #include "syncstream.h"
 #include "cute.h"
@@ -5,6 +7,15 @@
 #include "xml_listener.h"
 #include "cute_runner.h"
 #include <thread>
+
+using namespace std::experimental;
+
+template <class charT, class traits, class Allocator>
+std::basic_string<charT, traits>
+str(const basic_osyncstream<charT, traits, Allocator>& oss)
+{
+	return dynamic_cast<std::basic_stringbuf<charT, traits>*>(oss.rdbuf())->str();
+}
 
 void testlockmapsimple(){
 	auto const sz=detail__::thelocks.size();
@@ -66,7 +77,7 @@ void testNestedBufferedStream() {
 		osyncstream outer { outs };
 		outer << "hello ";
 		{
-			osyncstream inner { outer.rdbuf_wrapped() };
+			osyncstream inner { outer.get_wrapped() };
 			inner << "hello world\n";
 			ASSERT_EQUAL("", outs.str());
 			inner.emit();
@@ -97,10 +108,10 @@ void testSeekingWithPotentialMissingOutput(){
 		inner << "hello world\n";
 		ASSERT_EQUAL("", outer.str());
 		inner.seekp(0,std::ios::beg);
-		inner << "hi" << std::flush;
+		inner << "hi." << std::flush;
 	}
 	outer << "hello lawrence\n";
-	ASSERT_EQUAL("hillo world\nhello lawrence\n", outer.str());
+	ASSERT_EQUAL("hi.lo world\nhello lawrence\n", outer.str());
 
 }
 void ostreamsWithSharingStreambuf(){
@@ -141,9 +152,9 @@ void testMoveAssignment(){
 		{
 			osyncstream os1{dummy};
 			os1 << "welt\n";
-			ASSERT_EQUAL("welt\n",os1.rdbuf()->str());
+			ASSERT_EQUAL("welt\n",str(os1));
 			os1 = std::move(os);
-			ASSERT_EQUAL("hallo\n",os1.rdbuf()->str());
+			ASSERT_EQUAL("hallo\n",str(os1));
 			os1 << "world\n";
 		}
 		ASSERT_EQUAL("welt\n",dummy.str());
@@ -162,9 +173,9 @@ void testMemberSwap(){
 		{
 			osyncstream os1{dummy};
 			os1 << "welt\n";
-			ASSERT_EQUAL("welt\n",os1.rdbuf()->str());
+			ASSERT_EQUAL("welt\n",str(os1));
 			os1.swap(os);
-			ASSERT_EQUAL("hallo\n",os1.rdbuf()->str());
+			ASSERT_EQUAL("hallo\n",str(os1));
 			os1 << "world\n";
 		}
 		os.emit();
@@ -185,7 +196,8 @@ void manyThreadsOnSingleStream(){
 			outer2 << "2 main "<< i << " sz= "<<detail__::thelocks.size()<< '\n';
 			v.push_back(std::thread([i,&out,&out2]{
 				osyncstream o2{out2};
-				osyncstream{out} << "hello "<< i << std::endl;
+        std::string hello{"hello"};
+				osyncstream{out} << hello << ' ' << i << std::endl;
 				o2 << "2 hello "<< i << '\n';
 			}));
 			osyncstream{out} << "main " << i << " sz= "<<detail__::thelocks.size()<< '\n';
@@ -230,7 +242,7 @@ int main(int argc, char const *argv[]) {
 	runAllTests(argc, argv);
 	osyncstream outer { std::cout };
 	{
-		osyncstream inner { outer.rdbuf_wrapped() };
+		osyncstream inner { outer.get_wrapped() };
 		inner << "hello world";
 		inner << std::endl;
 	}

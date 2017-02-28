@@ -1,3 +1,5 @@
+// -*- mode: c++; c-basic-offset: 2; tab-width: 2 -*-
+
 #ifndef GLOBALSTREAMBUFLOCKS_H_
 #define GLOBALSTREAMBUFLOCKS_H_
 
