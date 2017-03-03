@@ -108,13 +108,14 @@ td {
 <h1>DRAFT C++ Synchronized Buffered Ostream</h1>
 
 <p>
-ISO/IEC JTC1 SC22 WG21 p0053r3 - 2016-11-12
+ISO/IEC JTC1 SC22 WG21 d0053r4 - 2017-03-02
 </p>
 
 <p>
 Lawrence Crowl, Lawrence@Crowl.org<br>
 Peter Sommerlad, Peter.Sommerlad@hsr.ch<br>
-Nicolai Josuttis
+Nicolai Josuttis<br>
+Pablo Halpern
 </p>
 
 <p>
@@ -123,16 +124,22 @@ Nicolai Josuttis
 <a href="#Design">Design</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#Feature">Feature Test</a><br>
 <a href="#Wording">Wording</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#contents">17.6.1.2 Headers [headers]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#input.output.general">27.1 General [input.output.general]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#iostream.forward">27.3 Forward declarations [iostream.forward]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream">27.12 Synchronized output stream [syncstream]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.overview">27.12.1 Overview [syncstream.overview]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.osyncstream">27.12.2 Class template <code>basic_osyncstream</code> [syncstream.osyncstream]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#synstream.osyncstream.ctor">27.12.2.1 Constructor [syncstream.osyncstream.ctor]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#synstream.osyncstream.dtor">27.12.2.2 Destructor [synstream.osyncstream.dtor]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#synstream.osyncstream.assign">27.12.2.3 Assignment [synstream.osyncstream.assign]</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.osyncstream.mfun">27.12.2.4 Member Functions [syncstream.osyncstream.mfun]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#contents">Headers [headers]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#input.output.general">General [input.output.general]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#iostream.forward">Forward declarations [iostream.forward]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream">Synchronized output stream [syncstream]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.overview">Overview [syncstream.overview]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.syncbuf">Class template <code>basic_syncbuf</code> [syncstream.syncbuf]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.sycnbuf.ctor"><code>basic_syncbuf</code> constructors [syncstream.syncbuf.ctor]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.sycnbuf.dtor"><code>basic_syncbuf</code> destructor [syncstream.syncbuf.dtor]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.sycnbuf.assign"><code>basic_syncbuf</code> assign and swap [syncstream.syncbuf.assign]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.syncbuf.mfun"><code>basic_syncbuf</code> member functions [syncstream.syncbuf.mfun]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.syncbuf.virtuals"><code>basic_syncbuf</code> overridden virtual functions [syncstream.syncbuf.virtuals]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.osyncstream">Class template <code>basic_osyncstream</code> [syncstream.osyncstream]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#synstream.osyncstream.ctor"><code>osyncstream</code> Constructor [syncstream.osyncstream.ctor]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#synstream.osyncstream.dtor"><code>osyncstream</code> Destructor [synstream.osyncstream.dtor]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#synstream.osyncstream.assign"><code>osyncstream</code> Assignment [synstream.osyncstream.assign]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#syncstream.osyncstream.mfun"><code>osyncstream</code> Member Functions [syncstream.osyncstream.mfun]</a><br>
 <a href="#implementation">Implementation</a><br>
 <a href="#Revisions">Revisions</a><br>
 <a href="#References">References</a><br>
@@ -299,6 +306,24 @@ attempting to flush the underlying stream that is shared among
 threads will introduce a data race.
 </p></dd>
 
+<dt class="question">
+Why do you specify basic_synbuf? LWG and LEWG thought you wouldn't need it.</dt>
+<dd class="answer"><p>
+Users use the streambuf interface. 
+Without access to the basic_syncbuf they would not be able call emit() on the underlying 
+streambuf responsible the synchronization. Ask Pablo Halpern if you need more to be convinced.
+</p></dd>
+
+<dt class="question">
+Where will the required lock/mutex be put? Will it be in every streambuf object changing the ABI?</dt>
+<dd class="answer"><p>
+That is one of the reasons, why this must be put into the standard library. 
+It is possible to implement with a global map from streambuf* to mutexes as the example code does,
+however, existing standard library implementations might have already a space for the mutexes
+(not breaking their ABI), 
+because cout/cerr seem to require one and those might be the most important ones to wrap.
+</p></dd>
+
 </dl>
 
 <p>
@@ -351,11 +376,12 @@ for testing existence of the feature.
 <h2><a name="Wording">Wording</a></h2>
 
 <p>
-This wording is relative to N4594.
+This wording is relative to the current C++(17) working draft, but doesn't use section numbers.
+This allows its integration into the Concurrency TS 2 accordingly.
 </p>
 
-<h3><a name="contents">17.6.1.2 Headers [headers]</a></h3>
-<p>Add a new entry to table 14 &mdash; C++ library headers :
+<h3><a name="contents">Headers [headers]</a></h3>
+<p>Add a new entry to table &mdash; C++ library headers :
 
 <blockquote class=stdins>
 <table>
@@ -366,23 +392,23 @@ This wording is relative to N4594.
 </blockquote>
 
 
-<h3><a name="input.output.general">27.1 General [input.output.general]</a></h3>
+<h3><a name="input.output.general">General [input.output.general]</a></h3>
 
 <p>
-Add a new row to table 129 &mdash; Input/output library summary.
+Add a new row to table &mdash; Input/output library summary.
 </p>
 
 <blockquote class=stdins>
 <table>
 <tr>
-<td>27.12</td>
+<td>xx.12</td>
 <td>Synchronized output streams</td>
 <td>&lt;syncstream&gt;</td>
 </tr>
 </table>
 </blockquote>
 
-<h3><a name="iostream.forward">27.3 Forward declarations [iostream.forward]</a></h3>
+<h3><a name="iostream.forward">Forward declarations [iostream.forward]</a></h3>
 
 <p>
 Add the following forward declarations to the synopsis of &lt;iosfwd&gt;
@@ -390,7 +416,15 @@ in the <code>namespace std</code>.
 </p>
 
 <blockquote class="stdins">
-<pre><code>template &lt;class charT,
+<pre><code>
+template &lt;class charT,
+          class traits = char_traits&lt;charT&gt;,
+          class Allocator = allocator&lt;charT&gt;&gt;
+  class basic_syncbuf;
+using syncbuf  = basic_syncbuf&lt;char&gt;;
+using wsyncbuf = basic_syncbuf&lt;wchar_t&gt;;
+
+template &lt;class charT,
           class traits = char_traits&lt;charT&gt;,
           class Allocator = allocator&lt;charT&gt; &gt;
   class basic_osyncstream;
@@ -400,14 +434,14 @@ typedef basic_osyncstream&lt;wchar_t&gt; wosyncstream;
 </blockquote>
 
 
-<h3><a name="syncstream">27.12 Synchronized output stream [syncstream]</a></h3>
+<h3><a name="syncstream">Synchronized output stream [syncstream]</a></h3>
 
 <p>
 Add a new section with the following subsections.
 </p>
 
 
-<h3><a name="syncstream.overview">27.12.1 Overview [syncstream.overview]</a></h3>
+<h4><a name="syncstream.overview">Overview [syncstream.overview]</a></h4>
 
 <blockquote class="stdins">
 <p>
@@ -432,15 +466,330 @@ Add a synopsis for header <code>&lt;syncstream&gt;</code>.
 </p>
 
 <blockquote class="stdins">
-<pre><code>template &lt;class charT,
+<pre><code>
+template &lt;class charT,
+          class traits = char_traits&lt;charT&gt;,
+          class Allocator = allocator&lt;charT&gt;&gt;
+  class basic_syncbuf;
+template &lt;class charT,
           class traits,
           class Allocator&gt;
   class basic_osyncstream;
 </code></pre>
 </blockquote>
 
+<h4><a name="syncstream.syncbuf">Class template <code>basic_syncbuf</code> [syncstream.syncbuf]</a></h4>
 
-<h3><a name="syncstream.osyncstream">27.12.2 Class template <code>basic_osyncstream</code> [syncstream.osyncstream]</a></h3>
+<blockquote class="stdins">
+<pre><code>template &lt;class charT,
+          class traits = char_traits&lt;charT&gt;,
+          class Allocator = allocator&lt;charT&gt;&gt;
+class basic_syncbuf
+  : public std::basic_streambuf&lt;charT, traits, Allocator&gt; {
+
+public:
+  using char_type      = charT;
+  using int_type       = typename traits::int_type;
+  using pos_type       = typename traits::pos_type;
+  using off_type       = typename traits::off_type;
+  using traits_type    = traits;
+  using allocator_type = Allocator;
+
+  using streambuf_type = basic_streambuf&lt;charT,traits&gt;;
+
+  explicit
+  basic_syncbuf(streambuf_type* obuf = nullptr)
+  : basic_syncbuf(obuf,Allocator{});
+  basic_syncbuf(streambuf_type* obuf,
+                Allocator const &amp;allocator);
+  basic_syncbuf(basic_syncbuf&amp;&amp; other);
+  ~basic_syncbuf();
+
+  basic_syncbuf&amp; operator=(basic_syncbuf&amp;&amp; rhs);
+  void swap(basic_syncbuf &amp;other);
+
+  bool emit();
+  streambuf_type* get_wrapped()   const noexcept;
+  allocator_type  get_allocator() const noexcept;
+
+protected:
+  int sync() override;
+
+private:
+  streambuf_type *wrapped;  // <em>exposition only</em>
+};
+
+template &lt;class charT, class traits, class Allocator&gt;
+inline void swap(basic_syncbuf&lt;charT,traits,Allocator&gt;&amp; a,
+                 basic_syncbuf&lt;charT,traits,Allocator&gt;&amp; b);
+</code></pre>
+</blockquote>
+<!-- removed from above:
+  int_type overflow(int_type c = traits::eof()) override;
+-->
+<h4><a name="syncstream.sycnbuf.ctor"><code>basic_syncbuf</code> constructors [syncstream.syncbuf.ctor]</a></h4>
+
+<blockquote class="stdins">
+<dl>
+<dt>
+<code>explicit
+basic_syncbuf(streambuf_type* obuf = nullptr,
+              Allocator const &amp;allocator = Allocator());</code>
+</dt>
+<dd>
+
+<p><i>Effects:</i>
+Constructs the <code>basic_syncbuf</code> object and
+sets <code>wrapped</code> to <code>obuf</code>
+which will be the final destination of characters inserted into the stream.
+</p>
+
+<p><i>Remarks:</i>
+If <code>obuf == nullptr</code>, output operations on 
+<code>*this</code> will fail.
+A copy of <code>allocator</code> is used to allocate memory 
+for internal buffers.
+</p>
+
+<p>
+<i>Throws:</i>
+Nothing unless constructing a mutex or allocating memory throws.
+</p>
+
+<p>
+[<i>Note:</i> Subsequent calls to <code>emit()</code> might result in
+member functions being called on the user-provided stream buffer 
+while a lock is held.
+&mdash;<i>end note</i>]
+</p>
+
+<p><i>Postconditions:</i>
+<code>get_wrapped() == obuf &amp;&amp; get_allocator() == allocator.</code>.
+</p>
+</dd>
+
+<dt>
+<code>basic_syncbuf(basic_syncbuf&amp;&amp; other);</code>
+</dt>
+<dd>
+
+<p><i>Effects:</i> If <code>other.get_wrapped() == nullptr</code>, equivalent
+to <code>basic_syncbuf(nullptr, other.get_allocator())</code>
+otherwise the state necessary to perform <code>other.emit()</code> is moved
+to <code>*this</code>.
+</p>
+
+<p><i>Postconditions:</i>
+The value returned by <code>this->get_wrapped()</code> is the value 
+returned by <code>other.get_wrapped()</code> prior to calling this constructor. 
+Output stored in <code>other</code> prior to calling this constructor
+will be stored in <code>*this</code> afterwards. 
+<code>other.rdbuf()->pbase() == other.rdbuf()->pptr()</code>
+and <code>other.get_wrapped() == nullptr</code>
+</p>
+
+<p>
+[<i>Note:</i>
+This constructor disassociates <code>other</code> from its wrapped stream buffer 
+ensuring destruction of <code>other</code> produces no output.
+&mdash;<i>end note</i>]
+</p>
+</dd>
+</dl>
+</blockquote>
+
+<h4><a name="syncstream.sycnbuf.dtor"><code>basic_syncbuf</code> destructor [syncstream.syncbuf.dtor]</a></h4>
+
+<blockquote class="stdins">
+
+<dl>
+<dt>
+<code>~basic_syncbuf();</code>
+</dt>
+<dd>
+
+<p><i>Effects:</i> Calls <code>this->emit()</code>.
+</p>
+    
+<p><i>Throws:</i> Nothing. If an exception is thrown while writing to the
+wrapped buffer, that exception is caught and ignored.
+</p>
+</dd>
+</dl>
+</blockquote>
+
+<h4><a name="syncstream.sycnbuf.assign"><code>basic_syncbuf</code> assign and swap [syncstream.syncbuf.assign]</a></h4>
+
+<blockquote class="stdins">
+<dl>
+<dt>
+<code>basic_syncbuf&amp; operator=(basic_syncbuf&amp;&amp; rhs);</code>
+</dt>
+<dd>
+
+<p><i>Effects:</i>
+Calls <code>this->emit()</code>. If <code>rhs.get_wrapped() != nullptr</code>,
+the state necessary to perform <code>rhs.emit()</code> is moved
+to <code>*this</code>.
+</p>  
+
+<p><i>Returns:</i> <code>*this</code>.</p>
+
+<p><i>Postconditions:</i>
+<code>other.get_wrapped() == nullptr.</code> If
+<code>allocator_traits&lt;Allocator&gt;::propagate_on_container_move_assignment::value == true</code>,
+then <code>this->get_allocator() == other.get_allocator()</code>;
+otherwise the allocator is unchanged.
+</p>
+
+<p>
+[<i>Note:</i>
+This assignment operator disassociates <code>other</code> from its wrapped stream
+buffer ensuring destruction of <code>other</code> produces no output.
+&mdash;<i>end note</i>]
+</p>
+</dd>
+
+<dt>
+<code>void swap(basic_syncbuf&amp; other);</code>
+</dt>
+<dd>
+
+<p><i>Preconditions:</i>
+<code>this->get_allocator() == other.get_allocator()</code>.
+</p>
+
+<p><i>Effects:</i> Exchanges the state of <code>*this</code> and
+<code>other</code>.
+</p>
+</dd>
+
+<dt>
+<code>template &lt;class charT, class traits, class Allocator&gt;
+&nbsp;&nbsp;void swap(basic_syncbuf&lt;charT,traits,Allocator&gt;&amp; a,
+                      basic_syncbuf&lt;charT,traits,Allocator&gt;&amp; b);
+</code>
+</dt>
+<dd>
+<p><i>Effects:</i> As if by <code>a.swap(b)</code>.
+</p>
+</dd>
+</dl>
+</blockquote>
+    
+<h4><a name="syncstream.syncbuf.mfun"><code>basic_syncbuf</code> member functions [syncstream.syncbuf.mfun]</a></h4>
+
+<blockquote class="stdins">
+<dl>
+
+<dt>
+<code>bool emit();</code>
+</dt>
+<dd>
+
+<p><i>Effects:</i>
+Atomically transfers the contents of the internal buffer
+to the stream buffer <code>*wrapped</code>,
+so that they appear in the output stream as a contiguous sequence of characters.
+If and only if a call was made to <code>this->sync()</code>,&nbsp;  
+<code>wrapped->pubsync()</code> is called.
+</p>
+
+<p><i>Returns:</i> true if <code>wrapped != nullptr</code>, all of the
+buffered characters were successfully transferred, and the call
+to <code>wrapped->pubsync()</code> (if any) succeeded; otherwise false.
+</p>
+     
+<p><i>Synchronization:</i>
+All <code>emit()</code> calls transferring characters 
+to the same stream buffer object
+appear to execute in a total order consistent with <i>happens-before</i> 
+where each <code>emit()</code> call <i>synchronizes-with</i> subsequent 
+<code>emit()</code> calls in that total order.
+</p>
+
+<p><i>Remarks:</i>
+May call member functions of <code>wrapped</code> while holding a lock
+uniquely associated with <code>wrapped</code>.
+</p>
+</dd>
+
+<dt>
+<code>streambuf_type* get_wrapped() const noexcept;</code>
+</dt>
+<dd>
+<p><i>Returns:</i>
+<code>wrapped</code>.
+</p>
+</dd>
+
+<dt>
+<code>allocator_type get_allocator() const noexcept;</code>
+</dt>
+<dd>
+<p><i>Returns:</i>
+A copy of the allocator set in the constructor or from assignment.
+</p>
+</dd>
+</dl>
+</blockquote>
+
+<h4><a name="syncstream.syncbuf.virtuals"><code>basic_syncbuf</code> overridden virtual functions [syncstream.syncbuf.virtuals]</a></h4>
+
+<blockquote class="stdins">
+<dl>
+<dt>
+<code>int sync() override;</code>
+</dt>
+
+<dd>
+<p><i>Effects:</i>
+Record the fact that user desires that the wrapped buffer be flushed.
+The actual flush is delayed until a call to <code>emit()</code>.
+<p>
+
+<p><i>Returns:</i> 0.
+</dd>  
+<!--
+<dt>
+<code>int_type overflow(int_type c = traits::eof()) override;</code>
+</dt>
+
+<dd>
+
+<p>
+<i>Effects:</i> Appends the character designated by c to the output sequence,
+if possible, in one of the following ways (in order):
+</p>
+<ul class="dash">
+<li>
+  If <code>wrapper == nullptr</code>, signals failure by
+  returning <code>traits::eof()</code>.
+</li>
+<li>
+  If <code>traits::eq_int_type(c, traits::eof())</code> returns false and if
+  either the output sequence has a write position available or the function
+  makes a write position available by allocating storage. The function
+  then calls <code>sputc(c)</code> and signals success by returning c.
+</li>
+<li>
+  If <code>traits::eq_int_type(c, traits::eof())</code> returns true, there is
+  no character to append. Signals success by returning a value other than
+  <code>traits::eof()</code>.
+</li>
+</ul>
+
+<p>
+<i>Returns:</i> <code>traits::eof()</code> to indicate failure.
+</p>
+</dd>
+-->
+
+</dl>
+</blockquote>
+
+
+<h3><a name="syncstream.osyncstream">Class template <code>basic_osyncstream</code> [syncstream.osyncstream]</a></h3>
 
 <blockquote class="stdins">
 <pre><code>template &lt;class charT,
@@ -450,25 +799,29 @@ class basic_osyncstream
   : public basic_ostream&lt;charT,traits&gt;
 {
 public:
-  typedef charT                     char_type;
-  typedef traits                    traits_type;
-  typedef typename traits::int_type int_type;
-  typedef typename traits::pos_type pos_type;
-  typedef typename traits::off_type off_type;
-  typedef Allocator                 allocator_type;
-  typedef basic_streambuf&lt;charT,traits&gt; streambuf_type;
+  using char_type      = charT;
+  using int_type       = typename traits::int_type;
+  using pos_type       = typename traits::pos_type;
+  using off_type       = typename traits::off_type;
+  using traits_type    = traits;
+  using allocator_type = Allocator;
+  using streambuf_type = basic_streambuf&lt;charT,traits&gt;;
+  using syncbuf_type   = basic_syncbuf&lt;charT,traits, Allocator&gt;;
 
-  explicit basic_osyncstream(streambuf_type *obuf,
-                             Allocator const &amp;allocator = Allocator());
-  explicit basic_osyncstream(basic_ostream&lt;charT,traits&gt; &amp;os,
-                             Allocator const &amp;allocator = Allocator());
+  explicit basic_osyncstream(streambuf_type *obuf)
+  :basic_osyncstream(obuf, Allocator{});
+  explicit basic_osyncstream(basic_ostream&lt;charT,traits&gt; &amp;os)
+  :basic_osyncstream(os,Allocator{});
+  basic_osyncstream(streambuf_type *obuf, Allocator const &amp;allocator);
+  basic_osyncstream(basic_ostream&lt;charT,traits&gt; &amp;os, Allocator const &amp;allocator);
   basic_osyncstream(basic_osyncstream&amp;&amp;);
   ~basic_osyncstream();
   basic_osyncstream&amp; operator=(basic_osyncstream&amp;&amp;);
   void emit();
-  streambuf_type* rdbuf_wrapped() const noexcept;
+  streambuf_type* get_wrapped() const noexcept;
+  syncbuf_type*   rdbuf() const noexcept override { return &amp;sb ; }
 private:
-  streambuf_type *out; // <i>exposition only</i>
+  syncbuf_type sb; // <i>exposition only</i>
 };
 </code></pre>
 
@@ -506,19 +859,20 @@ Use a temporary object for streaming within a single statement.
 </blockquote>
 
 
-<h3><a name="synstream.osyncstream.ctor">27.12.2.1 Constructor [syncstream.osyncstream.ctor]</a></h3>
+<h4><a name="synstream.osyncstream.ctor"><code>osyncstream</code> Constructor [syncstream.osyncstream.ctor]</a></h4>
 
 <blockquote class="stdins">
 
 <dl>
 <dt>
-<code>explicit basic_osyncstream(streambuf_type *buf, Allocator const &amp;allocator = Allocator());</code>
+<code>basic_osyncstream(streambuf_type *buf, Allocator const &amp;allocator);</code>
 </dt>
 <dd>
 
 <p><i>Effects:</i>
-Stores the stream buffer pointer <code>buf</code>
-which will be the final destination of characters in <code>out</code>. 
+Initializes <code>sb</code> from <code>buf</code> and <code>allocator</code> and initializes
+the base class with <code>basic_ostream(&amp;sb)</code>.
+<!--which will be the final destination of characters in <code>out</code>. 
 If 
 the stored stream buffer pointer 
  <code>out == nullptr</code>
@@ -530,6 +884,7 @@ for the stream's own internal buffer, if any.
 
 <p>
 Constructs a stream buffer object [stream.buffers].
+-->
 </p>
 <p>
 [<i>Note:</i>
@@ -541,11 +896,11 @@ while a lock is held.
 </p>
 
 <p><i>Postconditions:</i>
-<code>out == buf</code>
+<code>get_wrapped() == buf</code>
 </p>
 
 <dt>
-<code>explicit basic_osyncstream(basic_ostream&lt;charT,traits&gt;&amp; os, Allocator const &amp;allocator=Allocator());</code>
+<code>basic_osyncstream(basic_ostream&lt;charT,traits&gt;&amp; os, Allocator const &amp;allocator);</code>
 </dt>
 <dd>
 <p><i>Effects:</i>
@@ -553,26 +908,27 @@ while a lock is held.
 </dd>
 
 <dt>
-<code>basic_osyncstream(basic_osyncstream&amp;&amp; os);</code>
+<code>basic_osyncstream(basic_osyncstream&amp;&amp; other);</code>
 </dt>
 <dd>
 
 <p><i>Effects:</i>
-First, the state necessary to perform <code>os.emit()</code> is moved to <code>*this</code>.
+Move constructs from <code>other</code>. This is accomplished by
+move constructing the base class, and the contained <code>basic_syncbuf sb</code>.
+Next <code>basic_ostream&lt;charT, traits&gt;::set_rdbuf(&amp;sb)</code> is called
+to install the <code>basic_syncbuf sb</code>. <!-- almost directly from Pablo -->
+
+<!--First, the state necessary to perform <code>os.emit()</code> is moved to <code>*this</code>.
 Then <code>os.out = nullptr</code>.
 [<i>Note:</i>
 This disassociates <code>os</code> from its wrapped stream buffer ensuring 
 destruction of <code>os</code> produces no output.
 &mdash;<i>end note</i>]
-</p>
+</p>-->
 <p><i>Postconditions:</i>
-The value returned by <code>this->rdbuf_wrapped()</code> is the value 
-returned by <code>os.rdbuf_wrapped()</code> prior to calling this constructor. 
-Output stored in <code>*os.rdbuf()</code> prior to calling this constructor
-will be stored in <code>*this->rdbuf()</code> afterwards. 
-Then <code>os.rdbuf()->pbase() == os.rdbuf()->pptr()</code>
- and
-<code>nullptr == os.rdbuf_wrapped()</code>.
+The value returned by <code>this->get_wrapped()</code> is the value 
+returned by <code>os.get_wrapped()</code> prior to calling this constructor. 
+<code>nullptr == os.get_wrapped()</code>.-->
 </p>
 
 </dd>
@@ -582,7 +938,7 @@ Then <code>os.rdbuf()->pbase() == os.rdbuf()->pptr()</code>
 </blockquote>
 
 
-<h3><a name="synstream.osyncstream.dtor">27.12.2.2 Destructor [synstream.osyncstream.dtor]</a></h3>
+<h4><a name="synstream.osyncstream.dtor"><code>osyncstream</code> Destructor [synstream.osyncstream.dtor]</a></h4>
 
 <blockquote class="stdins">
 
@@ -599,31 +955,30 @@ Calls <code>emit()</code>.
 </dl>
 
 </blockquote>
-<h3><a name="synstream.osyncstream.assign">27.12.2.3 Assignment [synstream.osyncstream.assign]</a></h3>
+<h4><a name="synstream.osyncstream.assign"><code>osyncstream</code> Assignment [synstream.osyncstream.assign]</a></h4>
 
 <blockquote class="stdins">
 
 <dl>
 
 <dt>
-<code>basic_osyncstream& operator=(basic_osyncstream&amp;&amp; os);</code>
+<code>basic_osyncstream& operator=(basic_osyncstream&amp;&amp; other);</code>
 </dt>
 <dd>
 
 <p><i>Effects:</i>
 First, calls <code>this-&gt;emit()</code>. 
-Then the state necessary to perform <code>os.emit()</code> is moved to <code>*this</code>.
-Then <code>os.out&nbsp;=&nbsp;nullptr</code>.
+Move assigns <code>sb</code> from <code>other.sb</code>.
 [<i>Note:</i>
-This disassociates <code>os</code> from its wrapped stream buffer ensuring 
-destruction of <code>os</code> produces no output.
+This disassociates <code>other</code> from its wrapped stream buffer ensuring 
+destruction of <code>other</code> produces no output.
 &mdash;<i>end note</i>]</p>
 
 <p><i>Postcondition:</i>
-Primarily, <code>nullptr == os.rdbuf_wrapped()</code>. 
+Primarily, <code>nullptr == other.get_wrapped()</code>. 
 
-Also, <code>rdbuf_wrapped()</code> returns the value previously returned by 
-<code>os.rdbuf_wrapped()</code>.
+Also, <code>get_wrapped()</code> returns the value previously returned by 
+<code>other.get_wrapped()</code>.
 </p>
 
 </dd>
@@ -633,7 +988,7 @@ Also, <code>rdbuf_wrapped()</code> returns the value previously returned by
 
 
 
-<h3><a name="syncstream.osyncstream.mfun">27.12.2.4 Member Functions [syncstream.osyncstream.mfun]</a></h3>
+<h4><a name="syncstream.osyncstream.mfun"><code>osyncstream</code> Member Functions [syncstream.osyncstream.mfun]</a></h4>
 
 <blockquote class="stdins">
 
@@ -643,6 +998,9 @@ Also, <code>rdbuf_wrapped()</code> returns the value previously returned by
 <dd>
 
 <p><i>Effects:</i>
+Calls <code>sb.emit()</code>. If this call returns <code>false</code>,
+calls <code>setstate(ios::badbit)</code>.
+<!--
 Transfers the contents of the internal stream buffer
 to the stream buffer <code>*out</code>,
 so that they appear in the output stream as a contiguous sequence of characters.
@@ -650,15 +1008,18 @@ If and only if a flush was requested on <code>*this</code>,&nbsp;
 <code>out->pubsync()</code> is called on the stream buffer obtained in the constructor. 
 A failure in transferring the characters or flushing calls, such as <code>out</code>
 having the value <code>nullptr</code>, result in <code>setstate(ios::badbit)</code>.
+-->
 </p>
-
+<!--
 [<i>Note:</i>
 A flush on a <code>basic_osyncstream</code>
 does not flush the <code>basic_osyncstream</code> to the stream buffer,
 but rather flushes the stream buffer
 after transfering the contents of the <code>basic_osyncstream</code>
 to the stream buffer.
+-->
 [<i>Example:</i>
+A flush on a <code>basic_osyncstream</code> does not flush immediately:
 <pre class="example"><code>{
   osyncstream bout(cout);
   bout &lt;&lt; "Hello," &lt;&lt; '\n'; // no flush
@@ -670,9 +1031,11 @@ to the stream buffer.
 </pre>
 <p>
 &mdash;<i>end example</i>]
+<!--
 &mdash;<i>end note</i>]
+-->
 </p>
-
+<!--
 <p><i>Synchronization:</i>
 All <code>emit()</code> calls transferring characters 
 to the same 
@@ -685,6 +1048,7 @@ where each <code>emit()</code> call <i>synchronizes-with</i> subsequent
 May hold a lock uniquely associated with the underlying 
 stream buffer object obtained in the constructor while transferring characters.
 </p>
+-->
 <p>
 [<i>Example:</i>
 The function <code>emit()</code> can be used to catch exceptions 
@@ -706,15 +1070,15 @@ from operations on the underlying stream.
 
 </dd>
 
-<dt><code>streambuf_type* rdbuf_wrapped() const noexcept;</code></dt>
+<dt><code>streambuf_type* get_wrapped() const noexcept;</code></dt>
 <dd>
 
 <p><i>Returns:</i>
-<code>out</code>
+<code>sb.get_wrapped()</code>
 </p>
 
 <p>[<i>Example:</i>
-Obtaining the wrapped stream buffer with <code>rdbuf_wrapped()</code> 
+Obtaining the wrapped stream buffer with <code>get_wrapped()</code> 
 allows wrapping it again with an <code>osyncstream</code>.
 For example,
 </p>
@@ -722,7 +1086,7 @@ For example,
   osyncstream bout1(cout);
   bout1 &lt;&lt; "Hello, ";
   {
-    osyncstream bout2(bout1.rdbuf_wrapped());
+    osyncstream bout2(bout1.get_wrapped());
     bout2 &lt;&lt; "Goodbye, " &lt;&lt; "Planet!" &lt;&lt; '\n';
   }
   bout1 &lt;&lt; "World!" &lt;&lt; '\n';
@@ -761,6 +1125,23 @@ most of the mechanics stuck in the basic_osyncstream.
 
 
 <h2><a name="Revisions">Revisions</a></h2>
+<p>
+This paper revises
+<a href="http://www.open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0053r3.html">
+P0053R3 C++ Synchronized Buffered Ostream</a>
+</p>
+<ul>
+
+<li><p>
+Takes input from Pablo Halpern and re-instantiate the stream buffer that performs the synchronization.
+</p></li>
+
+<li><p>
+Split the constructors with a defaulted allocator parameter to one single-argument one being explicit
+and one non-explicit taking 2 arguments.
+</p></li>
+</ul>
+
 
 <p>
 This paper revises
