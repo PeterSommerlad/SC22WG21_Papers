@@ -1,0 +1,368 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}  % Activate to begin paragraphs with an empty line rather than an indent
+
+%\usepackage[final]
+%           {listings}     % code listings
+%\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{xspace}
+%\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+%%%%% from std.tex:
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{longtable}    % auto-breaking tables
+\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{parskip}      % handle non-indented paragraphs "properly"
+\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{amsmath}      % additional math symbols
+\usepackage{mathrsfs}     % mathscr font
+\usepackage{microtype}
+\usepackage{multicol}
+\usepackage{xspace}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage[pdftex, final]{graphicx}
+\input{macros}
+\input{styles}
+\input{layout}
+%%%%%
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{d0616r0}
+\newcommand{\paperdate}{2017-03-01}
+
+%\definecolor{insertcolor}{rgb}{0,0.5,0.25}
+%\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
+%\newcommand{\ins}[1]{\textcolor{insertcolor}{\underline{#1}}}
+%
+%\newenvironment{insrt}{\color{insertcolor}}{\color{black}}
+
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - de-pessimize legacy {<numeric>} algorithms with std::move}
+\author{Peter Sommerlad}
+\date{\paperdate}                        % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number:& \papernumber  \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++\\\hline 
+Audience: & LWG/LEWG\\\hline
+Target: & C++20\\\hline
+\end{tabular}
+
+\chapter{Motivation}
+LWG issue 2055 says
+\begin{quote}
+2055. std::move in std::accumulate and other algorithms
+
+Section: 26.8 [numeric.ops] Status: LEWG Submitter: Chris Jefferson Opened: 2011-01-01 Last modified: 2016-02-10
+
+Discussion:
+
+The C++0x draft says std::accumulate uses: \tcode{acc = binary_op(acc, *i)}.
+
+Eelis van der Weegen has pointed out, on the libstdc++ mailing list, that using \tcode{acc = binary_op(std::move(acc), *i)} can lead to massive improvements (particularly, it means accumulating strings is linear rather than quadratic).
+
+Consider the simple case, accumulating a bunch of strings of length 1 (the same argument holds for other length buffers). For strings s and t, s+t takes time length(s)+length(t), as you have to copy both s and t into a new buffer.
+
+So in accumulating n strings, step i adds a string of length i-1 to a string of length 1, so takes time i.
+
+Therefore the total time taken is: 1+2+3+...+n = O(n2)
+
+\tcode{std::move(s)+t}, for a "good" implementation, is amortized time length(t), like vector, just copy t onto the end of the buffer. So the total time taken is:
+
+1+1+1+...+1 (n times) = O(n). This is the same as push_back on a vector.
+
+I'm trying to decide if this implementation might already be allowed. I suspect it might not be (although I can't imagine any sensible code it would break). There are other algorithms which could benefit similarly (\tcode{inner_product}, \tcode{partial_sum} and \tcode{adjacent_difference} are the most obvious).
+
+Is there any general wording for "you can use rvalues of temporaries"?
+
+The reflector discussion starting with message c++std-lib-29763 came to the conclusion that above example is not covered by the "as-if" rules and that enabling this behaviour would seem quite useful.
+
+[ 2011 Bloomington ]
+
+Moved to NAD Future. This would be a larger change than we would consider for a simple TC.
+
+Proposed resolution:
+\end{quote}
+
+LEWG looked a that issue in Kona 2017 and for me it seems like another "the standardization people didn't eat their own dog food" and it was missed in the library specification when C++11 got move support to actually make use of it in those places. Titus Winters even claimed, if the proposed change is made and it changes the semantics of existing code due to different overload resolution then the users who implement such types get what they deserve.
+
+For accumulate and partial_sum we have (potentially parallel) replacement algorithms in C++17 (reduce, inclusive_scan) that don't share the problem. However, there might be people who want the sequential evaluation guarantee of accumulate and who would pay the oversight in its specification that passes an lvalue to its binary operator or operator+. 
+
+It is important to note that \tcode{inner_product} and \tcode{adjacent_difference} were not renamed to make them parallel, but overloaded. There the specification of the semantics is actually suffering of the lack of \tcode{std::move(acc)}, even so they try to make use of move of the temporary value. 
+
+TODO: Measure performance difference for accumulation of std::string.
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item LEWG in Kona for inspiring me to write this paper.
+\item Howard Hinnant for "being OK" with the change and telling me that he wasn't brave enough for C++11 at the time to change it, when it would not have been a potentially breaking change for pathological cases.
+\end{itemize}
+
+\chapter{Impact}
+As stated in the quoted issue, there is a clear benefit for some value types who can implement the binary operator more efficient, if passed an rvalue reference by avoiding copying internal state. However, there might be pathological user-defined types where a different overload is selected (taking an rvalue-reference vs. taking a reference/value) and that different overload has a different semantics to the previously chosen one.
+
+When discussing the issue 2055 in LEWG it seems that such pathological cases would get what they deserve, where all sane types might get a performance benefit from such a change. However, it might change semantics of such pathological programs in potentially subtle ways.
+
+OTOH, one can argue it is only relevant for accumulating std::strings and none of the other algorithms it is relevant. However, considering applying them to the implementation of an unbound integral type (BigNum) or rational numbers constructed from BigNums, or other mathematical entities (vectors, matrices) as elements in the algorithms it could be a non-trivial performance benefit to move from the immediately re-assigned accumulator variable.
+
+That leaves us with the following options with respect to LWG issue 2055:
+\begin{enumerate}
+\item Do nothing. This leaves the existing performance deficit for these algorithms on value types that could benefit from move.
+\item Apply std::move only for types provided by the standard library (std::string), where the implementation controls/guarantees sane semantics on move, leaving out user-defined value types for the accumulator variable. (personally, I have no idea on how to specify it)
+\item Apply the proposed changes with the chance of breaking existing code for pathological cases, but giving an immediate performance boost for those who use accumulate for string and string-like types.
+\end{enumerate}
+
+
+\chapter{Changes}
+The following changes are suggested to [numeric.ops] for the respective algorithms, each completely given to provide full context 
+(ignore the missing references, which come from directly copying the latex from the standard). No other algorithms in the standard are specified based on a local lvalue that gets reassigned after being fed into an operation.
+
+
+\rSec2[accumulate]{Accumulate}
+
+\indexlibrary{\idxcode{accumulate}}%
+\begin{itemdecl}
+template <class InputIterator, class T>
+  T accumulate(InputIterator first, InputIterator last, T init);
+template <class InputIterator, class T, class BinaryOperation>
+  T accumulate(InputIterator first, InputIterator last, T init,
+               BinaryOperation binary_op);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires
+\tcode{T} shall meet the requirements of \tcode{CopyConstructible} (Table~\ref{tab:copyconstructible})
+and \tcode{CopyAssignable} (Table~\ref{tab:copyassignable}) types.
+In the range
+\crange{first}{last},
+\tcode{binary_op}
+shall neither modify elements nor invalidate iterators or subranges.\footnote{The use of fully closed ranges is intentional.}
+
+\pnum
+\effects
+Computes its result by initializing the accumulator
+\tcode{acc}
+with the initial value
+\tcode{init}
+and then modifies it with
+\tcode{acc = }\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{ + *i}
+or
+\tcode{acc = binary_op(}\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{, *i)}
+for every iterator
+\tcode{i}
+in the range \range{first}{last}
+in order.\footnote{\tcode{accumulate}
+is similar to the APL reduction operator and Common Lisp reduce function, but
+it avoids the difficulty of defining the result of reduction on an empty
+sequence by always requiring an initial value.}
+\end{itemdescr}
+
+
+\rSec2[inner.product]{Inner product}
+
+\indexlibrary{\idxcode{inner_product}}%
+\begin{itemdecl}
+template <class InputIterator1, class InputIterator2, class T>
+  T inner_product(InputIterator1 first1, InputIterator1 last1,
+                  InputIterator2 first2, T init);
+template <class ExecutionPolicy, class InputIterator1, class InputIterator2, class T>
+  T inner_product(ExecutionPolicy&& exec,
+                  InputIterator1 first1, InputIterator1 last1,
+                  InputIterator2 first2, T init);
+
+template <class InputIterator1, class InputIterator2, class T,
+          class BinaryOperation1, class BinaryOperation2>
+  T inner_product(InputIterator1 first1, InputIterator1 last1,
+                  InputIterator2 first2, T init,
+                  BinaryOperation1 binary_op1,
+                  BinaryOperation2 binary_op2);
+template <class ExecutionPolicy, class InputIterator1, class InputIterator2, class T,
+          class BinaryOperation1, class BinaryOperation2>
+  T inner_product(ExecutionPolicy&& exec,
+                  InputIterator1 first1, InputIterator1 last1,
+                  InputIterator2 first2, T init,
+                  BinaryOperation1 binary_op1,
+                  BinaryOperation2 binary_op2);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires
+\tcode{T} shall meet the requirements of \tcode{CopyConstructible} (Table~\ref{tab:copyconstructible})
+and \tcode{CopyAssignable} (Table~\ref{tab:copyassignable}) types.
+In the ranges
+\crange{first1}{last1}
+and
+\crange{first2}{first2 + (last1 - first1)}
+\tcode{binary_op1}
+and
+\tcode{binary_op2}
+shall neither modify elements nor invalidate iterators or subranges.\footnote{The use of fully closed ranges is intentional.}
+
+\pnum
+\effects
+Computes its result by initializing the accumulator
+\tcode{acc}
+with the initial value
+\tcode{init}
+and then modifying it with
+\tcode{acc = }\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{ + (*i1) * (*i2)}
+or
+\tcode{acc = binary_op1(}\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{, binary_op2(*i1, *i2))}
+for every iterator
+\tcode{i1}
+in the range \range{first1}{last1}
+and iterator
+\tcode{i2}
+in the range
+\range{first2}{first2 + (last1 - first1)}
+in order.
+\end{itemdescr}
+
+\rSec2[partial.sum]{Partial sum}
+
+\indexlibrary{\idxcode{partial_sum}}%
+\begin{itemdecl}
+template <class InputIterator, class OutputIterator>
+  OutputIterator partial_sum(
+    InputIterator first, InputIterator last,
+    OutputIterator result);
+template <class InputIterator, class OutputIterator, class BinaryOperation>
+  OutputIterator partial_sum(
+    InputIterator first, InputIterator last,
+    OutputIterator result, BinaryOperation binary_op);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires
+\tcode{InputIterator}'s value type shall be constructible from the type of \tcode{*first}.
+The result of the expression \tcode{}\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{ + *i} 
+or \tcode{binary_op(}\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{, *i)} shall be
+implicitly convertible to \tcode{InputIterator}'s value type. \tcode{acc}
+shall be writable~(\ref{iterator.requirements.general}) to the \tcode{result} output iterator.
+In the ranges
+\crange{first}{last}
+and
+\crange{result}{result + (last - first)}
+\tcode{binary_op}
+shall neither modify elements nor invalidate iterators or subranges.\footnote{The use of fully closed ranges is intentional.
+}
+
+\pnum
+\effects For a non-empty range,
+the function creates an accumulator \tcode{acc} whose type is \tcode{InputIterator}'s
+value type, initializes it with \tcode{*first},
+and assigns the result to \tcode{*result}. For every iterator \tcode{i} in \range{first + 1}{last}
+in order, \tcode{acc} is then modified by \tcode{acc = }\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{ + *i} or \tcode{acc = binary_op(}\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{, *i)}
+and the result is assigned to \tcode{*(result + (i - first))}.
+
+\pnum
+\returns
+\tcode{result + (last - first)}.
+
+\pnum
+\complexity
+Exactly
+\tcode{(last - first) - 1}
+applications of
+the binary operation.
+
+\pnum
+\remarks
+\tcode{result}
+may be equal to
+\tcode{first}.
+\end{itemdescr}
+
+\rSec2[adjacent.difference]{Adjacent difference}
+
+\indexlibrary{\idxcode{adjacent_difference}}%
+\begin{itemdecl}
+template <class InputIterator, class OutputIterator>
+  OutputIterator
+    adjacent_difference(InputIterator first, InputIterator last,
+                        OutputIterator result);
+template <class ExecutionPolicy, class InputIterator, class OutputIterator>
+  OutputIterator
+    adjacent_difference(ExecutionPolicy&& exec,
+                        InputIterator first, InputIterator last,
+                        OutputIterator result);
+
+template <class InputIterator, class OutputIterator, class BinaryOperation>
+  OutputIterator
+    adjacent_difference(InputIterator first, InputIterator last,
+                        OutputIterator result,
+                        BinaryOperation binary_op);
+template <class ExecutionPolicy, class InputIterator, class OutputIterator, class BinaryOperation>
+  OutputIterator
+    adjacent_difference(ExecutionPolicy&& exec,
+                        InputIterator first, InputIterator last,
+                        OutputIterator result,
+                        BinaryOperation binary_op);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires
+\tcode{InputIterator}'s value type shall be \tcode{MoveAssignable} (Table~\ref{tab:moveassignable})
+and shall be constructible from the type of \tcode{*first}. \tcode{acc} shall be
+writable~(\ref{iterator.requirements.general}) to the \tcode{result} output iterator. The result of the expression \tcode{val - }\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}
+or \tcode{binary_op(val, }\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{)} shall be writable to the \tcode{result} output iterator.
+In the ranges
+\crange{first}{last}
+and
+\crange{result}{result + (last - first)},
+\tcode{binary_op}
+shall neither modify elements nor invalidate iterators or
+subranges.\footnote{The use of fully closed ranges is intentional.}
+
+\pnum
+\effects For a non-empty range,
+the function creates an accumulator \tcode{acc} whose type is \tcode{InputIterator}'s
+value type, initializes it with \tcode{*first},
+and assigns the result to \tcode{*result}. For every iterator \tcode{i} in \range{first + 1}{last}
+in order, creates an object \tcode{val} whose type is \tcode{InputIterator}'s value type, initializes it
+with \tcode{*i}, computes \tcode{val - }\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{} 
+or \tcode{binary_op(val, }\added{\tcode{std::move(}}\tcode{acc}\added{\tcode{)}}\tcode{)}, assigns the result
+to \tcode{*(result + (i - first))}, and move assigns from \tcode{val} to \tcode{acc}.
+
+\pnum
+\returns
+\tcode{result + (last - first)}.
+
+\pnum
+\complexity
+Exactly
+\tcode{(last - first) - 1}
+applications of
+the binary operation.
+
+\pnum
+\remarks
+\tcode{result}
+may be equal to
+\tcode{first}.
+\end{itemdescr}
+
+
+
+
+\end{document}
