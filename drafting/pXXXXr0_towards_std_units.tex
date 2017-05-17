@@ -1,0 +1,119 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}  % Activate to begin paragraphs with an empty line rather than an indent
+
+%\usepackage[final]
+%           {listings}     % code listings
+%\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{xspace}
+%\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+%%%%% from std.tex:
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{longtable}    % auto-breaking tables
+\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+\usepackage{parskip}      % handle non-indented paragraphs "properly"
+\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{color}        % define colors for strikeouts and underlines
+\usepackage{amsmath}      % additional math symbols
+\usepackage{mathrsfs}     % mathscr font
+\usepackage{microtype}
+\usepackage{multicol}
+\usepackage{xspace}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage[pdftex, final]{graphicx}
+\input{macros}
+\input{styles}
+\input{layout}
+%%%%%
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{dXXXXr0}
+\newcommand{\paperdate}{2017-05-19}
+
+%\definecolor{insertcolor}{rgb}{0,0.5,0.25}
+%\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
+%\newcommand{\ins}[1]{\textcolor{insertcolor}{\underline{#1}}}
+%
+%\newenvironment{insrt}{\color{insertcolor}}{\color{black}}
+
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - Towards std::units}
+\author{Peter Sommerlad}
+\date{\paperdate}                        % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number:& \papernumber  \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++\\\hline 
+Audience: & LWG/LEWG\\\hline
+Target: & C++20\\\hline
+\end{tabular}
+
+\chapter{Motivation}
+
+\chapter{Acknowledgements}
+\begin{itemize}
+\item All people who inspired me to work on this, because they created and used units libraries.
+\item C++now 2017 participants who worked on this during the "library in a week" workshop: Billy Baker, Charles Wilson, Daniel Pfeifer, Dave Jenkins, Manuel Bergler, Morris Hafner, Nicolas Holthaus, Peter Bindels, Steven Watanabe, Tuan Tran.
+\end{itemize}
+
+\chapter{Components and Relationships}
+
+\begin{description}
+\item [Dimension] 7 physical base dimensions (length, mass, time, current, temperature, amount of substance, luminous intensity), combined, user-defined, special dimensionless (e.g., angles)
+\item [Unit] unit of measurement for a given dimension (m,kg,s,A,K,mol,cd) , can be scaled (kilo, micro), 
+\item [Quantity] a measurement in a given unit, convertible to other quantity of same dimension
+\item [Units System] A set of dimensions and units useful for a domain, e.g., SI units. Combines UDL-suffixes for the units, formatting/IO for quantities, conversions
+\item [Conversion] A rule/computation to convert a quantity in one unit into a corresponding quantity of the same dimension in another unit, potentially from another unit system.
+\end{description}
+
+
+\section{Dimensions and Dimensional Analysis}
+
+\subsection{Operational Combinations}
+
+\section{Units}
+
+\section{Quantities}
+
+\section{Units Systems}
+
+
+\chapter{Specification}
+
+
+\rSec2[bla]{Bla}
+
+\indexlibrary{\idxcode{bla}}%
+\begin{itemdecl}
+bla
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\requires
+bla
+
+\pnum
+\effects
+bla
+\end{itemdescr}
+
+
+
+\end{document}
