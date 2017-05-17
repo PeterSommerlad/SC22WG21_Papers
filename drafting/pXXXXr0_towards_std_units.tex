@@ -77,7 +77,7 @@ Target: & C++20\\\hline
 \begin{description}
 \item [Dimension] 7 physical base dimensions (length, mass, time, current, temperature, amount of substance, luminous intensity), combined, user-defined, special dimensionless (e.g., angles)
 \item [Unit] unit of measurement for a given dimension (m,kg,s,A,K,mol,cd) , can be scaled (kilo, micro), 
-\item [Quantity] a measurement in a given unit, convertible to other quantity of same dimension
+\item [Quantity] a measurement in a given unit, convertible to other quantity of same dimension, that is what one computes with, must be as efficient as the underlying numerical type
 \item [Units System] A set of dimensions and units useful for a domain, e.g., SI units. Combines UDL-suffixes for the units, formatting/IO for quantities, conversions
 \item [Conversion] A rule/computation to convert a quantity in one unit into a corresponding quantity of the same dimension in another unit, potentially from another unit system.
 \end{description}
@@ -93,6 +93,7 @@ Target: & C++20\\\hline
 
 \section{Units Systems}
 
+\section{Math functions for quantities}
 
 \chapter{Specification}
 
