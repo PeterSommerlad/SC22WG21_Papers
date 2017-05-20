@@ -37,8 +37,8 @@
 %%%%%
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{dXXXXr0}
-\newcommand{\paperdate}{2017-05-19}
+\newcommand{\papernumber}{p0647r0}
+\newcommand{\paperdate}{2017-05-20}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -93,7 +93,7 @@ namespace std {
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
-    static constexpr long double value = static_cast<long double>(num)/den; 
+    static constexpr long double value{ static_cast<long double>(num)/den }; 
     template<typename R>   
     explicit constexpr operator R() const noexcept { 
         return static_cast<R>(num)/static_cast<R>(den);
