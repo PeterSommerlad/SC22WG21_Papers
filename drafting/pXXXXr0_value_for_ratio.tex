@@ -66,13 +66,16 @@ Target: & C++20\\\hline
 
 \chapter{Motivation}
 
-Preparing for standardizing units and using std::ratio for keeping track of fractions often one needs to get the quotient as a floating point number. Doing that manually means adding a cast before doing the division. This is tedious and it would be nice to just access the value, as one can do with std::integral_constant. I believe that omission is just a historical accident, because it was not possible to do compile-time computation with floating point values when it was conceived. There are some options on how to access the fraction as a compile-time entity. I chose to make the double conversion implicit (to be discussed) and provide a most accurate access using long double either through the value member, call operator or by static_cast. 
+Preparing for standardizing units and using std::ratio for keeping track of fractions often one needs to get the quotient as a floating point number or as a number of a type underlying a quantity, e.g., a fixpoint type. Doing that manually means adding a cast before doing the division. This is tedious and it would be nice to just access the value, as one can do with std::integral_constant. I believe that omission is just a historical accident, because it was not possible to do compile-time computation with floating point values when ratio was invented. There are some options on how to access the fraction as a compile-time entity. I chose to make the value member a long double and provide a templatized explicit conversion operator for accessing the fraction.
 
 \chapter{Acknowledgements}
 \begin{itemize}
 \item Authors of N2661: Howard Hinnant, Walter Brown, Jeff Garland, Marc Paterno.
+\item Members of the LiaW workshop "Towards Units" at C++Now 2017: Billy Baker, Charles Wilson, Daniel Pfeifer, Dave Jenkins, Manuel Bergler, Morris Hafner, Nicolas Holthaus, Peter Bindels, Steven Watanabe, Tuan Tran.
+
 \end{itemize}
 
+\newpage
 \chapter{Changes Proposed}
 Modify section 23.26.3 by inserting floating point access to the fractional value represented.
 \rSec2[ratio.ratio]{Class template \tcode{ratio}}
@@ -90,11 +93,11 @@ namespace std {
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
-    static constexpr long double value = static_cast<long double>(num)/den;    
-    explicit constexpr operator long double() const noexcept { return value; }
-    constexpr operator double() const noexcept { return value; }
-    explicit constexpr operator float() const noexcept { return value; }
-    constexpr long double operator()() const noexcept { return value; } 
+    static constexpr long double value = static_cast<long double>(num)/den; 
+    template<typename R>   
+    explicit constexpr operator R() const noexcept { 
+        return static_cast<R>(num)/static_cast<R>(den);
+    }
 \end{codeblock}
 \end{addedblock}
 \begin{codeblock}
