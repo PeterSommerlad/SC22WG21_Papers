@@ -19,9 +19,12 @@ class basic_syncbuf : public basic_stringbuf<charT, traits, Allocator> {
 	using base = basic_stringbuf<charT, traits, Allocator>;
 
 	bool                           needs_flush=false; // exposition only
+	bool                           flush_immediate=false;
 	basic_streambuf<charT,traits> *wrapped;
 	detail__::spmx                 mxptr;
 	Allocator                      alloc;
+
+
 
 public:
 	typedef charT                     char_type;
@@ -32,6 +35,20 @@ public:
 	typedef Allocator                 allocator_type;
 
   typedef basic_streambuf<charT,traits> streambuf_type;
+
+  template <class charT1, class traits1
+  ,class Allocator1>
+  friend
+  	basic_ostream<charT1,traits1>&
+  	immediateflush(basic_ostream<charT1,traits1>&out);
+
+  template <class charT1, class traits1
+  ,class Allocator1>
+  friend
+  	basic_ostream<charT1,traits1>&
+  	noimmediateflush(basic_ostream<charT1,traits1>&out);
+
+
 
 	explicit
 	basic_syncbuf(streambuf_type* obuf = nullptr,
@@ -109,7 +126,16 @@ public:
 	}
 
 protected:
-	int sync() override { needs_flush = true; return 0; }
+	int_type sync() override {
+		if(flush_immediate) {
+			if (emit()){
+				return 0;
+			}
+			return traits::eof();
+		}
+		needs_flush = true;
+		return 0;
+	}
   int_type overflow(int_type c = traits::eof()) override {
     if (nullptr == wrapped)
       return traits::eof();
@@ -117,6 +143,31 @@ protected:
       return base::overflow(c); 
   }
 };
+
+template <class charT, class traits = char_traits<charT>
+,class Allocator=allocator<charT>>
+	basic_ostream<charT,traits>&
+	immediateflush(basic_ostream<charT,traits>&out){ // doesn't work along with Allocator awareness!!!
+		auto syncbuf=dynamic_cast<basic_syncbuf<charT,traits,Allocator>*>(out.rdbuf());
+		if (syncbuf){
+			syncbuf->flush_immediate=true;
+		}
+		return out;
+	}
+
+template <class charT, class traits = char_traits<charT>
+,class Allocator=allocator<charT>>
+	basic_ostream<charT,traits>&
+	noimmediateflush(basic_ostream<charT,traits>&out){ // doesn't work along with Allocator awareness!!!
+		auto syncbuf=dynamic_cast<basic_syncbuf<charT,traits,Allocator>*>(out.rdbuf());
+		if (syncbuf){
+			syncbuf->flush_immediate=false;
+		}
+		return out;
+	}
+
+
+
 
 template <class charT, class traits, class Allocator>
 inline void swap(basic_syncbuf<charT,traits,Allocator>& a,
@@ -156,8 +207,8 @@ public:
 		: mybuf{outbuf,a} { this->rdbuf(&mybuf); }
 
 	basic_osyncstream(basic_osyncstream&& other) // can not be noexcept
-		: mybuf{std::move(other.mybuf)}
-		, basic_ostream<charT, traits>{std::move(other)}
+		: basic_ostream<charT, traits>{std::move(other)}
+		, mybuf{std::move(other.mybuf)}
 	{
 		assert(this->rdbuf()==nullptr); // sanity check. base move ctor doesn't xfer streambuf ptr
 		this->rdbuf(&mybuf);
@@ -199,6 +250,8 @@ public:
 		}
 	}
 };
+
+
 
 using osyncstream = basic_osyncstream<char>;
 using wosyncstream = basic_osyncstream<wchar_t>;

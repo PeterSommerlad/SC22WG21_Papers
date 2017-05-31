@@ -214,6 +214,25 @@ void trigger_assert_in_ctor(){
 //	osyncstream sync(noout); // should abort
 }
 
+void testmanipforimmedieateflush(){
+	std::ostringstream outer { };
+	{
+		osyncstream inner { outer };
+		inner << std::experimental::immediateflush;
+		inner << "hello world";
+		inner << std::endl;
+		outer << "within ";
+		inner << std::experimental::noimmediateflush;
+		inner << "hello world 2"<< std::endl;
+		ASSERT_EQUAL("hello world\nwithin ", outer.str());
+	}
+	outer << "hello lawrence\n";
+	ASSERT_EQUAL("hello world\nwithin hello world 2\nhello lawrence\n", outer.str());
+
+
+
+}
+
 
 
 
@@ -233,6 +252,7 @@ void runAllTests(int argc, char const *argv[]) {
 	s.push_back(CUTE(testMoveAssignment));
 	s.push_back(CUTE(manyThreadsOnSingleStream));
 	s.push_back(CUTE(testMemberSwap));
+	s.push_back(CUTE(testmanipforimmedieateflush));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<> > lis(xmlfile.out);
 	cute::makeRunner(lis, argc, argv)(s, "AllTests");
