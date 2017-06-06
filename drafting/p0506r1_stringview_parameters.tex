@@ -24,32 +24,36 @@
 \usepackage{color}        % define colors for strikeouts and underlines
 \usepackage{amsmath}      % additional math symbols
 \usepackage{mathrsfs}     % mathscr font
-\usepackage{microtype}
+\usepackage[final]{microtype}
 \usepackage{multicol}
 \usepackage{xspace}
 \usepackage{lmodern}
 \usepackage[T1]{fontenc}
 \usepackage[pdftex, final]{graphicx}
+\usepackage{enumitem}
 
 %%%%%
+
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0506r0}
-\newcommand{\paperdate}{2017-02-04}
+\newcommand{\papernumber}{p0506r1}
+\newcommand{\paperdate}{2017-06-06}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
-%\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
-%\newcommand{\ins}[1]{\textcolor{insertcolor}{\underline{#1}}}
+%\newcommand{\removed}[1]{\textcolor{red}{\sout{#1}}}
+%\newcommand{\added}[1]{\textcolor{insertcolor}{\underline{#1}}}
 %
 %\newenvironment{insrt}{\color{insertcolor}}{\color{black}}
 
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+\input{macros}
+\input{styles}
+\input{layout}
 
 \title{\papernumber{} - use string\_view for library function parameters instead of const string \&/const char *}
 \author{Peter Sommerlad}
 \date{\paperdate}                        % Activate to display a given date or no date
-\input{macros}
 \setsecnumdepth{subsection}
 
 \begin{document}
@@ -59,7 +63,7 @@ Document Number:& \papernumber  \\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
 Audience: & LWG/LEWG\\\hline
-\end{tabular}
+\end{tabular} 
 
 \chapter{Motivation}
 With \tcode{basic_string_view} there is no longer a reason to keep library APIs that have overloads taking \tcode{std::string const \&} and \tcode{char const *} parameter types. Both should be replaced by a single version taking a std::string_view.
@@ -73,11 +77,22 @@ It might be doubted that the non-null termination of \tcode{string_view} could b
 
 Proposed change: "Provide the overloads for \tcode{std::regex}, the exception classes, \tcode{std::bitset}, \tcode{std::locale} and more."
 
-by providing changes for library sections 19, 20.9, 22 and 28. The "and more" part is in 27.7.1/27.7.6 with respect to the quoted output manipulator and the application of string view to string streams is given in p0408.
+by providing changes for library sections 22, 23.9, 25 and 31. The "and more" part is in 30.7.1/30.7.6 with respect to the quoted output manipulator and the application of string view to string streams is given in p0408.
 
 \chapter{Acknowledgements}
 \begin{itemize}
 \item LEWG in Issaquah for proposing me to write this paper, even when it can not make it into C++17.
+\end{itemize}
+
+\chapter{Changes from previous versions}
+
+\section{p0506r0} 
+\begin{itemize}
+\item removed unnecessary Allocator template parameter
+\item change layout in regex adaptation to see changes easier piecewise judgement
+\item adjust latex to most current std.tex macros
+\item adjust to new standard chapter numbering
+\item make \tcode{regex_search} allocator aware again by taking the allocator from a string parameter.
 \end{itemize}
 
 
@@ -95,7 +110,7 @@ A separate paper p0408 specifies the application of \tcode{basic_string_view} fo
 %\chapter{Technical Specifications}
 The following is relative to the CD/current working draft.
 
-\section{19.2 {Exception classes} [std.exceptions]}
+\section{22.2 {Exception classes} [std.exceptions]}
 For all subclasses of std::exception, std::logic_error, and std::runtime_error specified in section 19.2 apply the following changes respectively by replacing \emph{\tcode{std_exception}} with the corresponding class and \emph{\tcode{base_exception}} by its respective base class:
 
 
@@ -105,9 +120,9 @@ For all subclasses of std::exception, std::logic_error, and std::runtime_error s
 namespace std {
   class @\emph{std_exception}@ : public @\emph{base_exception}@ {
   public:
-    @\ins{explicit std_exception(string_view what_arg);}@
-    @\del{explicit std_exception(const string \& what_arg);}@
-    @\del{explicit std_exception(const char* what_arg);}@
+    @\added{explicit std_exception(string_view what_arg);}@
+    @\removed{explicit std_exception(const string \& what_arg);}@
+    @\removed{explicit std_exception(const char* what_arg);}@
   };
 }
 \end{codeblock}
@@ -118,8 +133,8 @@ The class
 
 %%%%%%%%%\indexlibrary{\idxcode{std_exception}!constructor}%
 \begin{itemdecl}
-@\del{std_exception(const string\& what_arg);}@
-@\ins{std_exception(string_view what_arg);}@
+@\removed{std_exception(const string\& what_arg);}@
+@\added{std_exception(string_view what_arg);}@
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -129,9 +144,9 @@ Constructs an object of class
 \emph{\tcode{std_exception}}.
 
 \pnum
-\postcondition
-\del{\tcode{strcmp(what(), what_arg.c_str()) == 0}.\\}
-\ins{\tcode{what_arg.compare(what()) == 0}.}
+\postconditions
+\removed{\tcode{strcmp(what(), what_arg.c_str()) == 0}.\\}
+\added{\tcode{what_arg.compare(what()) == 0}.}
 \end{itemdescr}
 
 \begin{removedblock}
@@ -147,13 +162,13 @@ Constructs an object of class
 \tcode{std_exception}.
 
 \pnum
-\postcondition
+\postconditions
 \tcode{strcmp(what(), what_arg) == 0}.
 \end{itemdescr}
 \end{removedblock}
 
 %%%%%%%%%%
-\section{ 20.9 Class template \tcode{bitset}  [template.bitset]}%
+\section{ 23.9 Class template \tcode{bitset}  [template.bitset]}%
 
 Note to the reviewers: It should be considered if this new constructor could be made constexpr.
 
@@ -202,7 +217,7 @@ namespace std {
         };
 \end{codeblock}
 
-In 20.9.1 replace p3 to p7 defining the two removed constructors by the following:
+In 23.9.1 replace p3 to p7 defining the two removed constructors by the following:
 
 %%%%%%%%%\indexlibrary{\idxcode{bitset}!constructor}%
 \begin{addedblock}
@@ -262,7 +277,7 @@ If \tcode{M < N}, remaining bit positions are initialized to zero.
 \end{addedblock}
 
 %%%%%%%%
-\section{22.3 Locale}
+\section{25.3 Locale}
 The following things could be adapted:
 \begin{itemize}
 \item locale's ctors 
@@ -291,10 +306,10 @@ namespace std {
     // construct/copy/destroy:
     locale() noexcept;
     locale(const locale& other) noexcept;
-    @\del{explicit locale(const char* std_name);}@
-    explicit locale(@\del{const }@string@\ins{_view}\del{\&}@ std_name);
-    @\del{locale(const locale\& other, const char* std_name, category);}@
-    locale(const locale& other, @\del{const }@string@\ins{_view}\del{\&}@ std_name, category);
+    @\removed{explicit locale(const char* std_name);}@
+    explicit locale(@\removed{const }@string@\added{_view}\removed{\&}@ std_name);
+    @\removed{locale(const locale\& other, const char* std_name, category);}@
+    locale(const locale& other, @\removed{const }@string@\added{_view}\removed{\&}@ std_name, category);
     template <class Facet> locale(const locale& other, Facet* f);
     locale(const locale& other, const locale& one, category);
     ~locale();                  // not virtual
@@ -307,9 +322,9 @@ namespace std {
     bool operator==(const locale& other) const;
     bool operator!=(const locale& other) const;
 
-    template <class charT, class traits@del{, class Allocator}@>
-      bool operator()(@\del{const }@basic_string@\ins{_view}@<charT,traits@\del{,Allocator}@>@\del{\&}@ s1,
-                      @\del{const }@basic_string@\ins{_view}@<charT,traits@\del{,Allocator}@>@\del{\&}@ s2) const;
+    template <class charT, class traits@\removed{, class Allocator}@>
+      bool operator()(@\removed{const }@basic_string@\added{_view}@<charT,traits@\removed{,Allocator}@>@\removed{\&}@ s1,
+                      @\removed{const }@basic_string@\added{_view}@<charT,traits@\removed{,Allocator}@>@\removed{\&}@ s2) const;
 
     // global locale objects:
     static       locale  global(const locale&);
@@ -318,7 +333,7 @@ namespace std {
 }
 \end{codeblock}
 
-\subsection{22.3.1.1.2 Class \tcode{locale::facet} [locale.facet]}
+\subsection{25.3.1.1.2 Class \tcode{locale::facet} [locale.facet]}
 Change p4 as follows:
 
 \pnum
@@ -326,13 +341,13 @@ For some standard facets a standard
 ``$\ldots$\tcode{_byname}''
 class, derived from it, implements the virtual function semantics
 equivalent to that facet of the locale constructed by
-\tcode{locale(\del{const char*}\ins{string_view})}
+\tcode{locale(\removed{const char*}\added{string_view})}
 with the same name.
 Each such facet provides a constructor that takes a
-\tcode{\del{const char*}\ins{string_view}}
+\tcode{\removed{const char*}\added{string_view}}
 argument, which names the locale, and a \tcode{refs}
 argument, which is passed to the base class constructor.
-\del{Each such facet also provides a constructor that takes a
+\removed{Each such facet also provides a constructor that takes a
 \tcode{string} argument \tcode{str} and a \tcode{refs}
 argument, which has the same effect as calling the first constructor with the
 two arguments \tcode{str.c_str()} and \tcode{refs}.}
@@ -346,7 +361,7 @@ Change p4 to p11 as follows. Note: since locale must store the passed string_vie
 
 %%%\indexlibrary{\idxcode{locale}!constructor}%
 \begin{itemdecl}
-explicit locale(@\del{const char*}\ins{string_view}@ std_name);
+explicit locale(@\removed{const char*}\added{string_view}@ std_name);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -359,11 +374,11 @@ with that name.
 \pnum
 \throws
 \tcode{runtime_error}
-if the argument is not valid, or is \del{null}\ins{constructed from \tcode{nullptr}}.
+if the argument is not valid, or is \removed{null}\added{constructed from \tcode{nullptr}}.
 
 \pnum
 \remarks
-The set of valid string argument values is \tcode{"C"}, \tcode{""},
+The set of valid string argument values is \tcode{"C"\added{sv}}, \tcode{""\added{sv}},
 and any \impldef{locale names} values.
 \end{itemdescr}
 
@@ -381,7 +396,7 @@ explicit locale(const string& std_name);
 
 %%%\indexlibrary{\idxcode{locale}!constructor}%
 \begin{itemdecl}
-locale(const locale& other, @\del{const char*}\ins{string_view}@ std_name, category);
+locale(const locale& other, @\removed{const char*}\added{string_view}@ std_name, category);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -397,7 +412,7 @@ argument, which instead implement the same semantics as
 \pnum
 \throws
 \tcode{runtime_error}
-if the argument is not valid, or is  \del{null}\ins{constructed from \tcode{nullptr}}.
+if the argument is not valid, or is  \removed{null}\added{constructed from \tcode{nullptr}}.
 
 \pnum
 \remarks
@@ -417,7 +432,7 @@ locale(const locale& other, const string& std_name, category cat);
 \end{itemdescr}
 \end{removedblock}
 
-\subsection{23.3.1.3 \tcode{locale} members [locale.members]}
+\subsection{25.3.1.3 \tcode{locale} members [locale.members]}
 Change p5 as follows:
 
 %%\indexlibrarymember{locale}{name}%
@@ -434,20 +449,20 @@ if it has one; otherwise, the string \tcode{"*"}.
 If
 \tcode{*this}
 has a name, then
-\tcode{locale(name()\del{.\brk{}c\textunderscore{}str()})}
+\tcode{locale(name()\removed{.\brk{}c\textunderscore{}str()})}
 is equivalent to
 \tcode{*this}.
 Details of the contents of the resulting string are otherwise \impldef{return value of \tcode{locale::name}}.
 \end{itemdescr}
 
-\subsection{23.3.1.4 \tcode{locale} operators [locale.operators]}
+\subsection{25.3.1.4 \tcode{locale} operators [locale.operators]}
 Change the definition of \tcode{operator()} p3-p5 as follows:
 
 %\indexlibrarymember{locale}{operator()}%
 \begin{itemdecl}
 template <class charT, class traits@del{, class Allocator}@>
-  bool operator()(@\del{const }@basic_string@\ins{_view}@<charT,traits@\del{,Allocator}@>@\del{\&}@ s1,
-                  @\del{const }@basic_string@\ins{_view}@<charT,traits@\del{,Allocator}@>@\del{\&}@ s2) const;
+  bool operator()(@\removed{const }@basic_string@\added{_view}@<charT,traits@\removed{,Allocator}@>@\removed{\&}@ s1,
+                  @\removed{const }@basic_string@\added{_view}@<charT,traits@\removed{,Allocator}@>@\removed{\&}@ s2) const;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -474,20 +489,20 @@ use_facet< collate<charT> >(*this).compare
 \end{codeblock}
 \end{itemdescr}
 
-\subsection{22.3.3.2.2 string conversions [conversions.string]}
+\subsection{25.3.3.2.2 string conversions [conversions.string]}
 While there is potential to remove some of the overloads of \tcode{wstring_convert}'s member functions, I refrain from proposing a change, because I feel not be able to judge the potential impact. At least the reduction from 4 to 3 overloads each, seems to be achievable.
 
 \subsection{ ``$\ldots$\tcode{_byname}'' class templates }
 For each of the following class templates referred in the following as \tcode{xxx_byname} with its corresponding base class template referred to as \tcode{xxx_base}
 \begin{itemize}
-\item \tcode{ctype_byname} (22.4.1.2 [locale.ctype.byname])
-\item \tcode{codecvt_byname} (22.4.1.5 [locale.codecvt.byname])
-\item \tcode{numpunct_byname} (22.4.3.2 [locale.numpunct.byname])
-\item \tcode{collate_byname} (22.4.4.2 [locale.collate.byname])
-\item \tcode{time_get_byname} (22.4.5.2 [locale.time.get.byname])
-\item \tcode{time_put_byname} (22.4.5.4 [locale.time.put.byname])
-\item \tcode{moneypunct_byname} (22.4.6.4 [locale.moneypunct.byname])
-\item \tcode{messages_byname} (22.4.7.2 [locale.messages.byname])
+\item \tcode{ctype_byname} (25.4.1.2 [locale.ctype.byname])
+\item \tcode{codecvt_byname} (25.4.1.5 [locale.codecvt.byname])
+\item \tcode{numpunct_byname} (25.4.3.2 [locale.numpunct.byname])
+\item \tcode{collate_byname} (25.4.4.2 [locale.collate.byname])
+\item \tcode{time_get_byname} (25.4.5.2 [locale.time.get.byname])
+\item \tcode{time_put_byname} (25.4.5.4 [locale.time.put.byname])
+\item \tcode{moneypunct_byname} (25.4.6.4 [locale.moneypunct.byname])
+\item \tcode{messages_byname} (25.4.7.2 [locale.messages.byname])
 \end{itemize}
 replace the overloaded explicit constructors as follows
 
@@ -497,8 +512,8 @@ namespace std {
   class xxx_byname : public xxx_base {
   public:
     // other members, if any
-    @\del{explicit xxx_byname(const char*, size_t refs = 0);}@
-    explicit xxx_byname(@\del{const }@string@\ins{_view}\del{\&}@, size_t refs = 0);
+    @\removed{explicit xxx_byname(const char*, size_t refs = 0);}@
+    explicit xxx_byname(@\removed{const }@string@\added{_view}\removed{\&}@, size_t refs = 0);
   protected:
    ~xxx_byname();
   };
@@ -506,7 +521,7 @@ namespace std {
 \end{codeblock}
 
 %%%%%%%%%
-\section{27.7.1 Overview [iostream.format.overview]}
+\section{30.7.1 Overview [iostream.format.overview]}
 Change the header \tcode{<iomanip>}'s synopsis as follows:
 
 \begin{codeblock}
@@ -530,8 +545,8 @@ namespace std {
 \end{codeblock}
 \end{removedblock}
 \begin{codeblock}
-  template <class charT, class traits@\del{, class Allocator}@>
-    @\textit{T12}@ quoted(@\del{const }@basic_string@\ins{_view}@<charT, traits@\del{, Allocator}@>@\del{\&}@ s,
+  template <class charT, class traits@\removed{, class Allocator}@>
+    @\textit{T12}@ quoted(@\removed{const }@basic_string@\added{_view}@<charT, traits@\removed{, Allocator}@>@\removed{\&}@ s,
     @\itcorr@           charT delim = charT('"'), charT escape = charT('\\'));
 
   template <class charT, class traits, class Allocator>
@@ -539,7 +554,7 @@ namespace std {
     @\itcorr@           charT delim = charT('"'), charT escape = charT('\\'));
 }
 \end{codeblock}
-\subsection{27.7.6 Quoted manipulators[quoted.manip]}
+\subsection{30.7.6 Quoted manipulators[quoted.manip]}
 Change the specification for the output manipulator as follows:
 \begin{removedblock}
 \begin{itemdecl}
@@ -548,18 +563,18 @@ template <class charT>
 \end{itemdecl}
 \end{removedblock}
 \begin{itemdecl}
-template <class charT, class traits@\del{, class Allocator}@>
-  @\unspec@ quoted(@\del{const }@basic_string@\ins{_view}@<charT, traits@\del{, Allocator}@>@\del{\&}@ s,
+template <class charT, class traits@\removed{, class Allocator}@>
+  @\unspec@ quoted(@\removed{const }@basic_string@\added{_view}@<charT, traits@\removed{, Allocator}@>@\removed{\&}@ s,
   @\itcorr@                   charT delim = charT('"'), charT escape = charT('\\'));
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \returns An object of unspecified type such that if \tcode{out} is an instance
-of \tcode{basic_ostream} \del{with member type \tcode{char_type} the same as
-\tcode{charT} and }with member type \tcode{traits_type}, which \del{in the second
+of \tcode{basic_ostream} \removed{with member type \tcode{char_type} the same as
+\tcode{charT} and }with member type \tcode{traits_type}, which \removed{in the second
 form }is the same as \tcode{traits}, then the expression
-\tcode{out \shl\ quoted(s, delim, escape)}
+\tcode{out << quoted(s, delim, escape)}
 behaves as a formatted output function~(\ref{ostream.formatted.reqmts})
 of \tcode{out}. This forms a character sequence \tcode{seq}, initially
 consisting of the following elements:
@@ -575,30 +590,30 @@ Then padding is determined for \tcode{seq} as described
 in~\ref{ostream.formatted.reqmts}, \tcode{seq} is inserted as if by calling
 \tcode{out.rdbuf()->sputn(seq, n)}, where \tcode{n} is the larger of
 \tcode{out.width()} and \tcode{x}, and \tcode{out.width(0)} is called.
-The expression \tcode{out \shl\ quoted(s, delim, escape)} shall have type
+The expression \tcode{out << quoted(s, delim, escape)} shall have type
 \tcode{basic_ostream<charT, traits>\&} and value \tcode{out}.
 \end{itemdescr}
 
 
 %%%%%%%%%%%%%%%%%
-\section{ 28 Regular Expression library  [re]}%
+\section{ 31 Regular Expression library  [re]}%
 Changes here get a bit more involved, so it might not be wise to adopt this for C++17, unless there is implementation experience. However, I try my best to go ahead with it. 
 
 My analysis brought up the following areas that could be simplified by using \tcode{string_view} instead of 2 or more overloads with \tcode{char const *} and \tcode{basic_string<C,T,A> const \&}:
 \begin{itemize}
-\item 28.4. and 28.9.2 \tcode{sub_match} comparison operators (including \tcode{char} only, 3 overloads to 1 overload)
-\item 28.4 and 28.11.2 \tcode{regex_match} constructor overloads
-\item 28.4 and 28.11.3 \tcode{regex_search} overloads
-\item 28.4 and 28.11.4 \tcode{regex_replace} overloads
-\item 28.8 \tcode{basic_regex} constructor overloads, \tcode{operator=()} and \tcode{assign()} overloads
-\item 28.10 \tcode{match_results::format()} overloads
+\item 31.4. and 31.9.2 \tcode{sub_match} comparison operators (including \tcode{char} only, 3 overloads to 1 overload)
+\item 31.4 and 31.11.2 \tcode{regex_match} constructor overloads
+\item 31.4 and 31.11.3 \tcode{regex_search} overloads
+\item 31.4 and 31.11.4 \tcode{regex_replace} overloads
+\item 31.8 \tcode{basic_regex} constructor overloads, \tcode{operator=()} and \tcode{assign()} overloads
+\item 31.10 \tcode{match_results::format()} overloads
 \end{itemize}
 
 
-\subsection{28.4 Header \tcode{<regex>} synopsis [re.syn]}
+\subsection{31.4 Header \tcode{<regex>} synopsis [re.syn]}
 In the namespace std of the header synopsis, apply the following marked changes. Note, unchanged parts are deliberately omitted to keep this paper of a manageable size.
 
-Adjust the declarations of the free function sub_match comparison operators after the comment \tcode{// 28.9.2 sub_match non-member operators:} as follows.
+Adjust the declarations of the free function sub_match comparison operators after the comment \tcode{// 31.9.2 sub_match non-member operators:} as follows.
 
 For each comparison operator function template taking a \tcode{basic_string} by const reference as one of its parameter types, replace it with one taking a \tcode{basic_string_view} parameter in the same position instead. Remove all comparison operator function taking a \tcode{typename iterator_traits<BiIter>::value_type const*} parameter. The latter will be subsumed by the new string_view overloads. There is no change to the free comparison operator function templates taking a \tcode{typename iterator_traits<BiIter>::value_type const \&}. This should result in the following changes:
 
@@ -773,7 +788,7 @@ For each comparison operator function template taking a \tcode{basic_string} by 
 \end{codeblock}
 \end{removedblock}
 
-In the code section following the comment \tcode{// 28.11.2 function template regex_match} apply the following changes:
+In the code section following the comment \tcode{// 31.11.2 function template regex_match} apply the following changes:
 
 \begin{codeblock}
   template <class BidirectionalIterator, class Allocator,
@@ -856,7 +871,7 @@ In the code section following the comment \tcode{// 28.11.2 function template re
 \end{codeblock}
 \end{removedblock}
 
-In the code section following the comment \tcode{// 28.11.3 function template regex_search} apply the following changes:
+In the code section following the comment \tcode{// 31.11.3 function template regex_search} apply the following changes:
 \begin{codeblock}
   template <class BidirectionalIterator, class Allocator,
       class charT, class traits>
@@ -926,7 +941,21 @@ In the code section following the comment \tcode{// 28.11.3 function template re
                       regex_constants::match_flag_type = 
                         regex_constants::match_default) = delete;
 \end{codeblock}
-In the code section following the comment \tcode{// 28.11.4 function template regex_replace} apply the following changes (Note, that here we might use a feature, specifying the allocator for the returned string to be given by the string's allocator. We might consider only replacing the character pointer versions):
+In the code section following the comment \tcode{// 31.11.4 function template regex_replace} apply the following changes (Note, that here we might use a feature, specifying the allocator for the returned string to be given by the string's allocator. We might consider only replacing the character pointer versions):
+\begin{addedblock}
+\begin{codeblock}
+  template <class OutputIterator, class BidirectionalIterator,
+      class traits, class charT, class ST>
+    OutputIterator 
+    regex_replace(OutputIterator out,
+                  BidirectionalIterator first, BidirectionalIterator last,
+                  const basic_regex<charT, traits>& e,
+                  basic_string_view<charT, ST> fmt,
+                  regex_constants::match_flag_type flags =
+                    regex_constants::match_default);
+\end{codeblock}
+\end{addedblock}
+\begin{removedblock}
 \begin{codeblock}
   template <class OutputIterator, class BidirectionalIterator,
       class traits, class charT, class ST, class SA>
@@ -947,21 +976,24 @@ In the code section following the comment \tcode{// 28.11.4 function template re
                   regex_constants::match_flag_type flags =
                     regex_constants::match_default);
 \end{codeblock}
+\end{removedblock}
 \begin{addedblock}
 \begin{codeblock}                        
-  template <class traits, class charT, class ST, 
-      class FST, class FSA>
-    basic_string<charT, ST>
-    regex_replace(basic_string_view<charT, ST> s,
+  template <class traits, class charT, class ST, class SA,
+      class FST>
+    basic_string<charT, ST, SA>
+    regex_replace(const basic_string<charT, ST, SA>& s,
                   const basic_regex<charT, traits>& e,
-                  const basic_string<charT, FST, FSA>& fmt,
+                  basic_string_view<charT, FST> fmt,
                   regex_constants::match_flag_type flags =
-                    regex_constants::match_default);
-  template <class traits, class charT, class ST>
+                    regex_constants::match_default); // optional to allow specifying allocator
+                    
+  template <class traits, class charT, class ST, 
+      class FST>
     basic_string<charT, ST>
     regex_replace(basic_string_view<charT, ST> s,
                   const basic_regex<charT, traits>& e,
-                  const charT* fmt,
+                  basic_string_view<charT, FST> fmt,
                   regex_constants::match_flag_type flags =
                     regex_constants::match_default);
 \end{codeblock}
@@ -1001,9 +1033,9 @@ In the code section following the comment \tcode{// 28.11.4 function template re
 \end{codeblock}
 \end{removedblock}
 
-\subsection{28.8 Class template \tcode{basic_regex} [re.regex]}
+\subsection{31.8 Class template \tcode{basic_regex} [re.regex]}
 
-In the class definition in p3 apply the following changes after the comment \tcode{//28.8.2, construct/copy/destroy}:
+In the class definition in p3 apply the following changes after the comment \tcode{//31.8.2, construct/copy/destroy}:
 
 \begin{codeblock}
     basic_regex();
@@ -1019,8 +1051,8 @@ In the class definition in p3 apply the following changes after the comment \tco
     basic_regex(const charT* p, size_t len, flag_type f = regex_constants::ECMAScript);
     basic_regex(const basic_regex&);
     basic_regex(basic_regex&&) noexcept;
-    template <class ST@\del{, class SA}@>
-      explicit basic_regex(@\del{const }@basic_string@\ins{_view}@<charT, ST@\del{, SA}@>@\del{\&}@ p, 
+    template <class ST@\removed{, class SA}@>
+      explicit basic_regex(@\removed{const }@basic_string@\added{_view}@<charT, ST@\removed{, SA}@>@\removed{\&}@ p, 
                            flag_type f = regex_constants::ECMAScript);
     template <class ForwardIterator>
       basic_regex(ForwardIterator first, ForwardIterator last, 
@@ -1030,12 +1062,12 @@ In the class definition in p3 apply the following changes after the comment \tco
     ~basic_regex();
     basic_regex& operator=(const basic_regex&);
     basic_regex& operator=(basic_regex&&) noexcept;
-    @\del{basic_regex\& operator=(const charT* ptr);}@
+    @\removed{basic_regex\& operator=(const charT* ptr);}@
     basic_regex& operator=(initializer_list<charT> il);
-    template <class ST@\del{, class SA}@>
-      basic_regex& operator=(@\del{const }@basic_string@\ins{_view}@<charT, ST@\del{, SA}@>@\del{\&}@ p);
+    template <class ST@\removed{, class SA}@>
+      basic_regex& operator=(@\removed{const }@basic_string@\added{_view}@<charT, ST@\removed{, SA}@>@\removed{\&}@ p);
 
-    // 28.8.3, assign:
+    // 31.8.3, assign:
     basic_regex& assign(const basic_regex& that);
     basic_regex& assign(basic_regex&& that) noexcept;
 \end{codeblock}
@@ -1047,8 +1079,8 @@ In the class definition in p3 apply the following changes after the comment \tco
 \end{removedblock}
 \begin{codeblock}                          
     basic_regex& assign(const charT* p, size_t len, flag_type f);
-    template <class string_traits@\del{, class A}@>
-      basic_regex& assign(@\del{const }@basic_string@\ins{_view}@<charT, string_traits@\del{, A}@>@\del{\&}@ s,
+    template <class string_traits@\removed{, class A}@>
+      basic_regex& assign(@\removed{const }@basic_string@\added{_view}@<charT, string_traits@\removed{, A}@>@\removed{\&}@ s,
                           flag_type f = regex_constants::ECMAScript);
     template <class InputIterator>
       basic_regex& assign(InputIterator first, InputIterator last,
@@ -1057,14 +1089,14 @@ In the class definition in p3 apply the following changes after the comment \tco
                         flag_type = regex_constants::ECMAScript);
 \end{codeblock}
 
-\subsection{28.8.2 \tcode{basic_regex} constructors[re.regex.construct]}
+\subsection{31.8.2 \tcode{basic_regex} constructors[re.regex.construct]}
 
 strike p2 to p5 defining the \tcode{charT} pointer constructor overload. 
 Change p14 to p16 as follows:
 
 \begin{itemdecl}
-template <class ST@\del{, class SA}@>
-  explicit basic_regex(@\del{const }@basic_string@\ins{_view}@<charT, ST@\del{, SA}@>@\del{\&} s,
+template <class ST@\removed{, class SA}@>
+  explicit basic_regex(@\removed{const }@basic_string@\added{_view}@<charT, ST@\removed{, SA}@>@\removed{\&} s,
                        flag_type f = regex_constants::ECMAScript);
 \end{itemdecl}
 
@@ -1084,7 +1116,7 @@ flags specified in \tcode{f}.
 within the expression.
 \end{itemdescr}
 
-\subsection{28.8.3 \tcode{basic_regex} assign[re.regex.assign]}
+\subsection{31.8.3 \tcode{basic_regex} assign[re.regex.assign]}
 Strike p5 and p6 defining operator= for \tcode{charT} pointer and replace p8 as follows:
 \begin{removedblock}
 \begin{itemdecl}
@@ -1101,8 +1133,8 @@ basic_regex& operator=(const charT* ptr);
 \end{removedblock}
 
 \begin{itemdecl}
-template <class ST@\del{, class SA}@>
-  basic_regex& operator=(@\del{const }@basic_string@\ins{_view}@<charT, ST@\del{, SA}@>@\del{\&} p); 
+template <class ST@\removed{, class SA}@>
+  basic_regex& operator=(@\removed{const }@basic_string@\added{_view}@<charT, ST@\removed{, SA}@>@\removed{\&} p); 
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1110,7 +1142,7 @@ template <class ST@\del{, class SA}@>
 \effects Returns \tcode{assign(p)}.
 \end{itemdescr}
 
-Strike p13 and modify p15-18 as follows (note we keep the charT pointer, lenth assign function overload):
+Strike p13 and modify p15-18 as follows (note we keep the charT pointer, length assign function overload):
 \begin{removedblock}
 \begin{itemdecl}
 basic_regex& assign(const charT* ptr, flag_type f = regex_constants::ECMAScript); 
@@ -1134,8 +1166,8 @@ basic_regex& assign(const charT* ptr, size_t len,
 
 %%%%%%%%%\indexlibrarymember{basic_regex}{assign}%
 \begin{itemdecl}
-template <class string_traits@\del{, class A}@>
-  basic_regex& assign(@\del{const }@basic_string@\ins{_view}@<charT, string_traits@\del{, A}@>@\del{\&}@ s,
+template <class string_traits@\removed{, class A}@>
+  basic_regex& assign(@\removed{const }@basic_string@\added{_view}@<charT, string_traits@\removed{, A}@>@\removed{\&}@ s,
                       flag_type f = regex_constants::ECMAScript); 
 \end{itemdecl}
 
@@ -1147,7 +1179,7 @@ template <class string_traits@\del{, class A}@>
 \returns  \tcode{*this}.
 
 \pnum
-\effects  Assigns the regular expression contained in the string \ins{view}
+\effects  Assigns the regular expression contained in the string \added{view}
 \tcode{s}, interpreted according the flags specified in \tcode{f}. 
 If an exception is thrown, \tcode{*this} is unchanged.  
 
@@ -1158,7 +1190,7 @@ If no exception is thrown,
 returns the number of marked sub-expressions within the expression.
 \end{itemdescr}
 
-\section{28.9 Class template \tcode{sub_match} [re.submatch]}
+\section{31.9 Class template \tcode{sub_match} [re.submatch]}
 Change the member function compare overloads to take a \tcode{string_view} instead of a pointer or string const reference. For convenience I suggest adding a type alias for that as follows.
 \begin{codeblock}
 namespace std {
@@ -1171,7 +1203,7 @@ namespace std {
              typename iterator_traits<BidirectionalIterator>::difference_type;
      using iterator        = BidirectionalIterator;
      using string_type     = basic_string<value_type>;
-     @\ins{using string_view_type     = basic_string_view<value_type>;}@
+     @\added{using string_view_type     = basic_string_view<value_type>;}@
 
      bool matched;
 
@@ -1182,16 +1214,16 @@ namespace std {
      string_type str() const;
 
      int compare(const sub_match& s) const;
-     int compare(@\del{const }@string_@\ins{view_}@type@\del{\&}@ s) const;
-     @\del{int compare(const value_type* s) const;}@
+     int compare(@\removed{const }@string_@\added{view_}@type@\removed{\&}@ s) const;
+     @\removed{int compare(const value_type* s) const;}@
   }; 
 }
 \end{codeblock}
-\subsection{28.9.1 \tcode{sub_match} members [re.submatch.members]}
+\subsection{31.9.1 \tcode{sub_match} members [re.submatch.members]}
 Change p6 as follows and strike p7:
 
 \begin{itemdecl}
-int compare(@\del{const }@string_@\ins{view_}@type@\del{\&}@ s) const;
+int compare(@\removed{const }@string_@\added{view_}@type@\removed{\&}@ s) const;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1209,7 +1241,7 @@ int compare(const value_type* s) const;
 \end{itemdescr}
 \end{removedblock}
 
-\subsection{28.9.2 \tcode{sub_match} non-member operators [re.submatch.op]}
+\subsection{31.9.2 \tcode{sub_match} non-member operators [re.submatch.op]}
 Change the section as follows:
 
 %%%%%%%%\indexlibrarymember{sub_match}{operator==}%
@@ -1867,8 +1899,8 @@ template <class charT, class ST, class BiIter>
 \pnum\returns  \tcode{(os <{}< m.str())}.
 \end{itemdescr}
 
-\section{28.10 Class template \tcode{match_results} [re.results]}
-Change the code in the class template after the comment \tcode{//28.10.5, format:} as follows. (Note, I propose a slight semantic change to the existing format returning a string. In the original version this would take the allocator type from the passed in fmt parameter instead of the default allocator, which is used with the character pointer version):
+\section{31.10 Class template \tcode{match_results} [re.results]}
+Change the code in the class template after the comment \tcode{//31.10.5, format:} as follows. (Note, I propose a slight semantic change to the existing format returning a string. In the original version this would take the allocator type from the passed in fmt parameter instead of the default allocator, which is used with the character pointer version):
 
 \begin{removedblock}
 \begin{codeblock}
@@ -1881,15 +1913,15 @@ Change the code in the class template after the comment \tcode{//28.10.5, format
 \end{codeblock}
 \end{removedblock}
 \begin{codeblock}
-     template <class OutputIter, class ST@\del{, class SA}@>
+     template <class OutputIter, class ST@\removed{, class SA}@>
        OutputIter
        format(OutputIter out,
-              @\del{const }@basic_string@\ins{_view}@<char_type, ST@\del{, SA}@>@\del{\&}@ fmt,
+              @\removed{const }@basic_string@\added{_view}@<char_type, ST@\removed{, SA}@>@\removed{\&}@ fmt,
               regex_constants::match_flag_type flags =
                 regex_constants::format_default) const;
-     template <class ST@\del{, class SA}@>
-      @\del{basic_string<char_type, ST, SA>}\ins{string_type}@
-      format(@\del{const }@basic_string@\ins{_view}@<char_type, ST@\del{, SA}@>@\del{\&}@ fmt,
+     template <class ST@\removed{, class SA}@>
+      @\removed{basic_string<char_type, ST, SA>}\added{string_type}@
+      format(@\removed{const }@basic_string@\added{_view}@<char_type, ST@\removed{, SA}@>@\removed{\&}@ fmt,
              regex_constants::match_flag_type flags =
                regex_constants::format_default) const;
 \end{codeblock}
@@ -1904,12 +1936,13 @@ Change the code in the class template after the comment \tcode{//28.10.5, format
 \end{codeblock}
 \end{removedblock}
 
-\subsection{28.10.5 \tcode{match_results} formatting [re.results.form]}
+\subsection{31.10.5 \tcode{match_results} formatting [re.results.form]}
+I suggest that we lose the option to specify the allocator indirectly by the string type used.
 Change p4 to p10 as follows:
 \begin{itemdecl}
-template <class OutputIter, class ST@\del{, class SA}@>
+template <class OutputIter, class ST@\removed{, class SA}@>
   OutputIter format(OutputIter out,
-              @\del{const }@basic_string@\ins{_view}@<char_type, ST@\del{, SA}@>@\del{\&}@ fmt,
+              @\removed{const }@basic_string@\added{_view}@<char_type, ST@\removed{, SA}@>@\removed{\&}@ fmt,
                     regex_constants::match_flag_type flags =
                       regex_constants::format_default) const;
 \end{itemdecl}
@@ -1924,9 +1957,9 @@ return format(out, fmt.data(), fmt.data() + fmt.size(), flags);
 
 %%%%%%%\indexlibrarymember{match_results}{format}%
 \begin{itemdecl}
-template <class ST@\del{, class SA}@>
-  @\del{basic_string<char_type, ST, SA>}\ins{string_type}@
-  format(@\del{const }@basic_string@\ins{_view}@<char_type, ST@\del{, SA}@>@\del{\&}@ fmt,
+template <class ST@\removed{, class SA}@>
+  @\removed{basic_string<char_type, ST, SA>}\added{string_type}@
+  format(@\removed{const }@basic_string@\added{_view}@<char_type, ST@\removed{, SA}@>@\removed{\&}@ fmt,
          regex_constants::match_flag_type flags =
            regex_constants::format_default) const;
 \end{itemdecl}
@@ -1937,7 +1970,7 @@ template <class ST@\del{, class SA}@>
 
 \pnum
 \effects
-Constructs an empty string \tcode{result} of type \del{\tcode{basic_string<char_type, ST, SA>}}\ins{\tcode{string_type}} and
+Constructs an empty string \tcode{result} of type \removed{\tcode{basic_string<char_type, ST, SA>}}\added{\tcode{string_type}} and
 calls:
 \begin{codeblock}
 format(back_inserter(result), fmt, flags);
@@ -1973,9 +2006,9 @@ format(back_inserter(result),
 \end{itemdescr}
 \end{removedblock}
 
-\section{28.11 Regular expression algorithms [re.alg]}
+\section{31.11 Regular expression algorithms [re.alg]}
 Adjust the changed function apis from the synopsis accordingly.
-\subsection{28.11.2 \tcode{regex_match}[re.alg.match]}
+\subsection{31.11.2 \tcode{regex_match}[re.alg.match]}
 Change p5 to p8 as follows:
 
 \begin{removedblock}
@@ -2066,7 +2099,7 @@ template <class ST, class charT, class traits>
 \returns  \tcode{regex_match(s.begin(), s.end(), e, flags)}.
 \end{itemdescr}
 
-\subsection{28.11.3 \tcode{regex_search}[re.alg.search]}
+\subsection{31.11.3 \tcode{regex_search}[re.alg.search]}
 Change p4 to p5 and p7 to p8 as follows:
 %%%%%\indexlibrary{\idxcode{regex_search}}%
 \begin{removedblock}
@@ -2168,18 +2201,18 @@ template <class ST, class charT, class traits>
 \pnum\returns  \tcode{regex_search(s.begin(), s.end(), e, flags)}.
 \end{itemdescr}
 
-\subsection{28.11.4 \tcode{regex_replace}[re.alg.replace]}
+\subsection{31.11.4 \tcode{regex_replace}[re.alg.replace]}
 Change the section as follows:
 
 %%%%\indexlibrary{\idxcode{regex_replace}}%
 \begin{itemdecl}
 template <class OutputIterator, class BidirectionalIterator,
-    class traits, class charT, class ST@\del{, class SA}@>
+    class traits, class charT, class ST@\removed{, class SA}@>
   OutputIterator 
   regex_replace(OutputIterator out,
                 BidirectionalIterator first, BidirectionalIterator last,
                 const basic_regex<charT, traits>& e,
-                @\del{const }@basic_string@\ins{_view}@<charT, ST@\del{, SA}@>@\del{\&}@ fmt,
+                @\removed{const }@basic_string@\added{_view}@<charT, ST@\removed{, SA}@>@\removed{\&}@ fmt,
                 regex_constants::match_flag_type flags =
                   regex_constants::match_default);
 \end{itemdecl}
@@ -2250,11 +2283,11 @@ is non-zero, then only the first match found is replaced.
 
 %%%%\indexlibrary{\idxcode{regex_replace}}%
 \begin{itemdecl}
-template <class traits, class charT, class ST, @del{class SA,}@ class FST@\del{, class FSA}@>
-  basic_string<charT, ST@\del{, SA}@>
-  regex_replace(@\del{const }@basic_string@\ins{_view}@<charT, ST@\del{, SA}@>@\del{\&}@ s,
+template <class traits, class charT, class ST, class SA, class FST@\removed{, class FSA}@>
+  basic_string<charT, ST, SA>
+  regex_replace(const basic_string<charT, ST, SA>& s,
                 const basic_regex<charT, traits>& e,
-                @\del{const }@basic_string@\ins{_view}@<charT, FST@\del{, FSA}@>@\del{\&}@ fmt,
+                @\removed{const }@basic_string@\added{_view}@<charT, FST@\removed{, FSA}@>@\removed{\&}@ fmt,
                 regex_constants::match_flag_type flags =
                   regex_constants::match_default); 
 \end{itemdecl}
@@ -2271,7 +2304,7 @@ template <class traits, class charT, class ST, class SA>
 \end{removedblock}
 \begin{itemdescr}
 \pnum\effects  Constructs an empty string \tcode{result} of
-type \tcode{basic_string<charT, ST}\del{\tcode}{, SA}}\tcode{>} and calls: 
+type \tcode{basic_string<charT, ST , SA>} and calls: 
 \begin{codeblock}
 regex_replace(back_inserter(result), s.begin(), s.end(), e, fmt, flags);
 \end{codeblock}
@@ -2279,16 +2312,18 @@ regex_replace(back_inserter(result), s.begin(), s.end(), e, fmt, flags);
 \pnum
 \returns\ \tcode{result}.
 \end{itemdescr}
-\begin{removedblock}
 %%%%\indexlibrary{\idxcode{regex_replace}}%
 \begin{itemdecl}
-template <class traits, class charT, class ST, class SA>
+template <class traits, class charT, class ST, class @\removed{SA}\added{FST}@>
   basic_string<charT>
-  regex_replace(const charT* s,
+  regex_replace(@\removed{const }\added{basic_string_view<}@charT@\added{,ST>}\removed{*}@ s,
                 const basic_regex<charT, traits>& e,
-                const basic_string<charT, ST, SA>& fmt,
+                @\removed{const }@basic_string@\added{_view}@<charT, @\added{FST}\removed{ST, SA}@>@\removed{\&}@ fmt,
                 regex_constants::match_flag_type flags =
                   regex_constants::match_default);
+\end{itemdecl}
+\begin{removedblock}
+\begin{itemdecl}
 template <class traits, class charT>
   basic_string<charT>
   regex_replace(const charT* s,
@@ -2297,11 +2332,12 @@ template <class traits, class charT>
                 regex_constants::match_flag_type flags =
                   regex_constants::match_default);
 \end{itemdecl}
+\end{removedblock}
 
 \begin{itemdescr}
 \pnum
 \effects  Constructs an empty string \tcode{result} of
-type \tcode{basic_string<charT>} and calls: 
+type \tcode{basic_string<charT}\added{\tcode{,ST}}\tcode{>} and calls: 
 \begin{codeblock}
 regex_replace(back_inserter(result),
               s, s + char_traits<charT>::length(s), e, fmt, flags);
@@ -2311,7 +2347,6 @@ regex_replace(back_inserter(result),
 \returns\ \tcode{result}.
 \end{itemdescr}
 
-\end{removedblock}
 
 
 \end{document}
