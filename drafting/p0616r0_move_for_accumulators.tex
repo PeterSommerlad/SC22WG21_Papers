@@ -37,8 +37,8 @@
 %%%%%
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{d0616r0}
-\newcommand{\paperdate}{2017-03-01}
+\newcommand{\papernumber}{p0616r0}
+\newcommand{\paperdate}{2017-06-06}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -102,11 +102,11 @@ Proposed resolution:
 
 LEWG looked a that issue in Kona 2017 and for me it seems like another "the standardization people didn't eat their own dog food" and it was missed in the library specification when C++11 got move support to actually make use of it in those places. Titus Winters even claimed, if the proposed change is made and it changes the semantics of existing code due to different overload resolution then the users who implement such types get what they deserve.
 
-For accumulate and partial_sum we have (potentially parallel) replacement algorithms in C++17 (reduce, inclusive_scan) that don't share the problem. However, there might be people who want the sequential evaluation guarantee of accumulate and who would pay the oversight in its specification that passes an lvalue to its binary operator or operator+. 
+For \tcode{accumulate} and \tcode{partial_sum} we have (potentially parallel) replacement algorithms in C++17 (\tcode{reduce}, \tcode{inclusive_scan}) that don't share the problem. However, there might be people who want the sequential evaluation guarantee of \tcode{accumulate} and who would pay the oversight in its specification that passes an lvalue to its binary operator function or \tcode{operator+}. 
 
-It is important to note that \tcode{inner_product} and \tcode{adjacent_difference} were not renamed to make them parallel, but overloaded. There the specification of the semantics is actually suffering of the lack of \tcode{std::move(acc)}, even so they try to make use of move of the temporary value. 
+It is important to note that \tcode{inner_product} and \tcode{adjacent_difference} were not renamed to make them parallel, but overloaded. Their specification of semantics is actually suffering of the lack of \tcode{std::move(acc)}, even so they try to make use of move of the temporary value. 
 
-TODO: Measure performance difference for accumulation of std::string.
+A very simple measurement program showing the difference of using accumulate with strings with or without move show a significant improvement for that case (150 to over 200 times faster with concatenating 10000 short strings, with the additional potential of pre-allocating the whole string size up front when using move). See the appendix for the demo program derived from libstdc++'s implementation of accumulate.
 
 \chapter{Acknowledgements}
 \begin{itemize}
@@ -362,7 +362,57 @@ may be equal to
 \tcode{first}.
 \end{itemdescr}
 
+\newpage
+\chapter{Appendix: A very simple string example}
 
-
-
+\begin{codeblock}
+#include <iostream>
+#include <string>
+#include <numeric>
+#include <chrono>
+#include <vector>
+namespace experimental {
+using namespace std;
+template<typename _InputIterator, typename _Tp>
+inline _Tp accumulate(_InputIterator __first, _InputIterator __last, _Tp __init){
+    for (; __first != __last; ++__first)
+	__init = std::move(__init) + *__first;
+    return __init;
+}
+template<typename _InputIterator, typename _Tp, typename _BinaryOperation>
+inline _Tp accumulate(_InputIterator __first, _InputIterator __last, _Tp __init,
+	       _BinaryOperation __binary_op){
+    for (; __first != __last; ++__first)
+	__init = __binary_op(std::move(__init), *__first);
+    return __init;
+}
+}
+template <typename F>
+std::chrono::microseconds time_n_calls(size_t n, F&& fun){
+	std::chrono::high_resolution_clock clock{};
+	auto start=clock.now();
+	while(n-->0){
+		fun();
+	}
+	return std::chrono::duration_cast<std::chrono::microseconds>(clock.now()-start);
+}
+int main() {
+    using namespace std;
+    std::vector<std::string> v(10000,"hello"s);
+    auto tcopy=time_n_calls(10,[&v]{
+		std::string s{"start"};
+		//s.reserve(s.size()+v.size()*v.at(0).size()); //useless
+		return accumulate(begin(v),end(v),s);});
+    cout << "microseconds:"<<tcopy.count() << endl;
+    auto tmove=time_n_calls(10,[&v]{
+		std::string s{"start"};
+		s.reserve(s.size()+v.size()*v.at(0).size()); // pre-allocation saves more
+		return ::experimental::accumulate(begin(v),end(v),std::move(s));});
+    cout << "microseconds:"<<tmove.count() << endl;
+    cout << "speedup:" << tcopy.count()/double(tmove.count())<<endl;
+    // not available yet:
+    //	auto tpar=time_n_calls(10,[\&v]{return std::reduce(begin(v),end(v),"start"s);});
+    //	cout << "microseconds:"<<tmove.count() << endl;
+}
+\end{codeblock}
 \end{document}
