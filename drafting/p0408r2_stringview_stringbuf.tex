@@ -21,7 +21,7 @@
 \usepackage{color}        % define colors for strikeouts and underlines
 %\usepackage{amsmath}      % additional math symbols
 %\usepackage{mathrsfs}     % mathscr font
-%\usepackage{microtype}
+\usepackage[final]{microtype}
 %\usepackage{multicol}
 \usepackage{xspace}
 %\usepackage{lmodern}
@@ -55,8 +55,8 @@
 \pagestyle{myheadings}
 
 
-\newcommand{\papernumber}{p0408r1}
-\newcommand{\paperdate}{2017-02-03}
+\newcommand{\papernumber}{p0408r2}
+\newcommand{\paperdate}{2017-06-07}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -98,6 +98,12 @@ On the other hand, there is no means to construct a \tcode{basic_string} and mov
 
 \section{History}
 Discussed in LEWG Issaquah. Answering some questions and raising more. Reflected in this paper.
+\subsection{Changes from r1}
+\begin{itemize}
+\item reflected new section numbers from the std. now relative to the current working draft.
+\item implementation is now working with gcc 7. (not relevant for this paper)
+\end{itemize}
+
 \subsection{Changes from r0}
 \begin{itemize}
 \item Added more context to synopsis sections to see all overloads (Thanks Alisdair).
@@ -110,7 +116,8 @@ Discussed in LEWG Issaquah. Answering some questions and raising more. Reflected
 \chapter{Acknowledgements}
 \begin{itemize}
 \item Daniel Kr\"ugler encouraged me to pursue this track.
-\item \added{Alisdair Meredith for telling me to include context in the synopsis showing all overloads. That is the only change in this version, no semantic changes!}
+\item Alisdair Meredith for telling me to include context in the synopsis showing all overloads. That is the only change in this version, no semantic changes!
+\item Jonathan Wakely to show me the \tcode{\#undef _GLIBCXX_EXTERN_TEMPLATE}
 \end{itemize}
 
 
@@ -120,10 +127,15 @@ Discussed in LEWG Issaquah. Answering some questions and raising more. Reflected
 \chapter{Impact on the Standard}
 This is an extension to the API of \tcode{basic_stringbuf}, \tcode{basic_stringstream}, \tcode{basic_istringstream}, and \tcode{basic_ostringstream} class templates.
 
-\added{This paper addresses both Library Fundamentals TS 3 and C++Next (2020?). 
-When added to the standard draft section [depr.str.strstreams] should be removed from it.}
+This paper addresses both Library Fundamentals TS 3 and C++Next (2020?). 
+When added to the standard draft with p0448, section [depr.str.strstreams] should be removed.
 \chapter{Design Decisions}
 After experimentation I decided that substituting the \tcode{(basic_string<charT,traits,Allocator const \&)} constructors in favor of passing a \tcode{basic_string_view} would lead to ambiguities with the new move-from-string constructors.
+\section{Open Issues}
+\begin{itemize}
+\item Should pilfer() be rvalue-ref qualified to denote the "destruction" of the underlying buffer? LEWG in Issaquah didn't think so, but I'd like to ask again.
+\end{itemize}
+
 \section{Open Issues discussed by LEWG in Issquah}
 \begin{itemize}
 \item Is the name of the \tcode{str_view()} member function ok? No. Renamed to \tcode{view()}
@@ -137,7 +149,7 @@ The following is relative to n4604.
 
 Remove section on \tcode{char*} streams [depr.str.strstreams] and all its subsections from appendix D.
 
-\section{27.8.2 Adjust synopsis of basic\_stringbuf [stringbuf]}
+\section{30.8.2 Adjust synopsis of basic\_stringbuf [stringbuf]}
 Add a new constructor overload:
 \begin{codeblock}
     // \ref{stringbuf.cons}, constructors:
@@ -179,7 +191,7 @@ Add the \tcode{view()} member function obtaining a \tcode{string_view} to the un
 \end{codeblock}
 \end{addedblock}
 
-\subsection{27.8.2.1 basic\_stringbuf constructors [stringbuf.cons]}
+\subsection{30.8.2.1 basic\_stringbuf constructors [stringbuf.cons]}
 Modify the following constructor specification:
 \begin{itemdecl}
 @\added{template<class SAlloc=Allocator>}@
@@ -209,13 +221,13 @@ Add the following constructor specification:
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} (27.6.3.1), and initializing \tcode{mode} with \tcode{which}. Then calls \tcode{str(std::move(s))}.
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} (30.6.3.1), and initializing \tcode{mode} with \tcode{which}. Then calls \tcode{str(std::move(s))}.
 \end{itemdescr}
 \end{insrt}
 
 Note to editors: if p0407 is accepted the changes there for allocators apply here as well. However, different allocators for \tcode{s} and the \tcode{basic_stringbuf} will result in a copy instead of a move.
 
-\subsection{27.8.2.3 Member functions [stringbuf.members]}
+\subsection{30.8.2.3 Member functions [stringbuf.members]}
 Add an allocator parameter for the copied from string to allow having a different allocator than the underlying stream.
 \begin{codeblock}
 @\added{template<class SAlloc=Allocator>}@
@@ -295,7 +307,7 @@ Using the returned \tcode{basic_string_view} object after destruction or any mod
 
 \end{insrt}
 %% istream
-\section{27.8.3 Adjust synopsis of basic\_istringstream [istringstream]}
+\section{30.8.3 Adjust synopsis of basic\_istringstream [istringstream]}
 Add a new constructor overload and change the one taking the string by copy to allow a different allocator for the copied from string:
 \begin{codeblock}
     // \ref{istringstream.cons}, constructors:
@@ -338,7 +350,7 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \end{codeblock}
 \end{addedblock}
 
-\subsection{27.8.3.1 basic\_istringstream constructors [istringstream.cons]}
+\subsection{30.8.3.1 basic\_istringstream constructors [istringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
 @\added{template<class SAlloc=Allocator>}@
@@ -369,12 +381,12 @@ explicit basic_istringstream(
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_istringstream<charT, traits>}, initializing the base class with \tcode{basic_istream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (27.8.2.1).
+\effects Constructs an object of class \tcode{basic_istringstream<charT, traits>}, initializing the base class with \tcode{basic_istream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::in))} (30.8.2.1).
 \end{itemdescr}
 \end{addedblock}
 
 
-\subsection{27.8.3.3 Member functions [istringstream.members]}
+\subsection{30.8.3.3 Member functions [istringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
 @\added{template<class SAlloc=Allocator>}@
@@ -427,7 +439,7 @@ basic_string_view<charT, traits> view() const;
 
 %%ostream
 
-\section{27.8.4 Adjust synopsis of basic\_ostringstream [ostringstream]}
+\section{30.8.4 Adjust synopsis of basic\_ostringstream [ostringstream]}
 Add a new constructor overload and change the one taking the string by copy to allow a different allocator for the copied from string:
 \begin{codeblock}
     // \ref{ostringstream.cons}, constructors:
@@ -470,7 +482,7 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \end{codeblock}
 \end{addedblock}
 
-\subsection{27.8.4.1 basic\_ostringstream constructors [ostringstream.cons]}
+\subsection{30.8.4.1 basic\_ostringstream constructors [ostringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
 @\added{template<class SAlloc=Allocator>}@
@@ -499,11 +511,11 @@ explicit basic_ostringstream(
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_ostringstream<charT, traits>}, initializing the base class with \tcode{basic_ostream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::out))} (27.8.2.1).
+\effects Constructs an object of class \tcode{basic_ostringstream<charT, traits>}, initializing the base class with \tcode{basic_ostream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which | ios_base::out))} (30.8.2.1).
 \end{itemdescr}
 \end{insrt}
 
-\subsection{27.8.4.3 Member functions [ostringstream.members]}
+\subsection{30.8.4.3 Member functions [ostringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
 @\added{template<class SAlloc=Allocator>}@
@@ -556,7 +568,7 @@ basic_string_view<charT, traits> view() const;
 
 
 %%stringstream
-\section{27.8.5 Adjust synopsis of basic\_stringstream [stringstream]}
+\section{30.8.5 Adjust synopsis of basic\_stringstream [stringstream]}
 Add a new constructor overload and change the one taking the string by copy to allow a different allocator for the copied from string:
 \begin{codeblock}
     // \ref{stringstream.cons}, constructors:
@@ -599,7 +611,7 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \end{codeblock}
 \end{addedblock}
 
-\subsection{27.8.4.1 basic\_stringstream constructors [stringstream.cons]}
+\subsection{30.8.4.1 basic\_stringstream constructors [stringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
 @\added{template<class SAlloc=Allocator>}@
@@ -630,11 +642,11 @@ explicit basic_stringstream(
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_stringstream<charT, traits>}, initializing the base class with \tcode{basic_stream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which))} (27.8.2.1).
+\effects Constructs an object of class \tcode{basic_stringstream<charT, traits>}, initializing the base class with \tcode{basic_stream(\&sb)} and initializing \tcode{sb} with \tcode{basic_stringbuf<charT, traits, Allocator>(std::move(str), which))} (30.8.2.1).
 \end{itemdescr}
 \end{insrt}
 
-\subsection{27.8.4.3 Member functions [stringstream.members]}
+\subsection{30.8.4.3 Member functions [stringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
 @\added{template<class SAlloc=Allocator>}@
