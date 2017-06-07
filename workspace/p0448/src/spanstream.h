@@ -34,29 +34,28 @@ template<typename _CharT, typename _Traits = std::char_traits<_CharT> >
 class basic_spanstream;
 
 /// Class for @c char memory buffers.
-typedef basic_spanbuf<char> spanbuf;
+using spanbuf = basic_spanbuf<char>;
 
 /// Class for @c char input memory streams.
-typedef basic_ispanstream<char> ispanstream;
+using ispanstream = basic_ispanstream<char>;
 
 /// Class for @c char output memory streams.
-typedef basic_ospanstream<char> ospanstream;
+using ospanstream = basic_ospanstream<char>;
 
 /// Class for @c char mixed input and output memory streams.
-typedef basic_spanstream<char> spanstream;
+using spanstream = basic_spanstream<char>;
 
 /// Class for @c wchar_t memory buffers.
-typedef basic_spanbuf<wchar_t> wspanbuf;
+using wspanbuf = basic_spanbuf<wchar_t>;
 
 /// Class for @c wchar_t input memory streams.
-typedef basic_ispanstream<wchar_t> wispanstream;
+using wispanstream = basic_ispanstream<wchar_t>;
 
 /// Class for @c wchar_t output memory streams.
-typedef basic_ospanstream<wchar_t> wospanstream;
+using wospanstream = basic_ospanstream<wchar_t>;
 
 /// Class for @c wchar_t mixed input and output memory streams.
-typedef basic_spanstream<wchar_t> wspanstream;
-
+using wspanstream = basic_spanstream<wchar_t>;
 }
 }
 
@@ -126,7 +125,7 @@ public:
 		_M_spanbuf_init(__mode);
 	}
 
-	basic_spanbuf(basic_spanbuf const &) =default;
+	basic_spanbuf(basic_spanbuf const &) =delete;
 
 	// TODO: could move-enable the spanbuf but it is dangerous, because of the 
 	// non-managed memory area.
@@ -148,7 +147,7 @@ public:
 		this->swap(__rhs);
 		return *this;
 	}
-
+    // do we need that elaborated swap?
 	void swap(basic_spanbuf& __rhs) noexcept {
 		__xfer_bufptrs const __l_st {*this, std::__addressof(__rhs)};
 		__xfer_bufptrs const __r_st {__rhs, this};

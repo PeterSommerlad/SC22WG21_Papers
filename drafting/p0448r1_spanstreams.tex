@@ -21,7 +21,7 @@
 \usepackage{color}        % define colors for strikeouts and underlines
 %\usepackage{amsmath}      % additional math symbols
 %\usepackage{mathrsfs}     % mathscr font
-%\usepackage{microtype}
+\usepackage[final]{microtype}
 %\usepackage{multicol}
 \usepackage{xspace}
 %\usepackage{lmodern}
@@ -54,8 +54,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0448r0}
-\newcommand{\paperdate}{2016-10-14}
+\newcommand{\papernumber}{p0448r1}
+\newcommand{\paperdate}{2017-06-07}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -81,6 +81,15 @@ A combination of external-fixed and internal-growing buffer allocation that strs
 
 There had been a proposal for the pre-allocated external memory buffer streams in N2065 but that went nowhere. Today, with \tcode{span<T>} we actually have a library type representing such buffers views we can use for specifying (and implementing) such streams. They can be used in areas where dynamic (re-)allocation of stringstreams is not acceptable but the burden of caring for a pre-existing buffer during the lifetime of the stream is manageable. 
 
+\section{Changes from p0448r0}
+\begin{itemize}
+\item provide explanation why non-copy-ability, while technically feasible, is an OK thing.
+\item remove wrong Allocator template parameter (we never allocate anything).
+\item adhere to new section numbering of the standard.
+\item tried to clarify lifetime and threading issues.
+\end{itemize}
+
+
 \chapter{Introduction}
 This paper proposes a class template \tcode{basic_spanbuf} and the corresponding stream class templates to enable the use of streams on externally provided memory buffers. No ownership or re-allocation support is given. For those features we have string-based streams.
 
@@ -89,6 +98,7 @@ This paper proposes a class template \tcode{basic_spanbuf} and the corresponding
 \item Thanks to those ISO C++ meeting members attending the Oulu meeting encouring me to write this proposal. I believe Neil and Pablo have been among them, but can't remember who else.
 \item Thanks go to Jonathan Wakely who pointed the problem of \tcode{strstream} out to me and to Neil Macintosh to provide the span library type specification.
 \item Thanks to Felix Morgner for proofreading.
+\item Thanks to Kona LEWG small group discussion suggesting some clarifications and Thomas K\"oppe for allowing me to use using type aliases instead of \tcode{typedef}.
 \end{itemize}
 
 \chapter{Motivation}
@@ -125,46 +135,59 @@ ASSERT_EQUAL("102030",output); // initialization guaranteed NUL termination
 \chapter{Impact on the Standard}
 This is an extension to the standard library to enable deletion of the deprecated \tcode{strstream} classes by providing \tcode{basic_spanbuf}, \tcode{basic_spanstream}, \tcode{basic_ispanstream}, and \tcode{basic_ospanstream} class templates that take an object of type \tcode{span<charT>} which provides an external buffer to be used by the stream. 
 
+It also proposes to remove the deprecated strstreams [depr.str.strstreams] assuming p0407 is also included in the standard.
+
 \chapter{Design Decisions}
 \section{General Principles}
-\section{Open Issues to be Discussed by LEWG / LWG}
+The design follows from the principles of the iostream library. If discussed a person knowledgable about iostream's implementation is favorable, because of its many legacy design decisions, that would no longer be taken by modern C++ class designers. The behavior presented is part of what "frozen" strstreams provide, namely relying on a pre-allocated buffer, without the idiosynchracy of (o)strstream that automatically (re-)allocates a new buffer on the C-heap, when the original buffer is insufficient for the output, which happens when such a buffer is not explicitly marked as "frozen". This broken design is the reason it has long been deprecated, but its use with pre-allocated buffers is one of the reasons it has not been banned completely, yet. Together with p0407 this paper gets rid of it.
+
+As with all existing stream classes, using a stream object or a streambuf object from multiple threads can result in a data race. Only the pre-defined global stream objects cin/cout/cerr are exempt from this.
+
+\section{Open Issues (to be) Discussed by LEWG / LWG}
 \begin{itemize}
-\item Should arbitrary types as template arguments to \tcode{span} be allowed to provide the underlying buffer by using the \tcode{byte} sequence representation \tcode{span} provides. (I do not think so, but someone might have a usecase.)
-\item Should the \tcode{basic_spanbuf} be copy-able? It doesn't own any resources, so copying like with handles or \tcode{span} might be fine.
+\item Should arbitrary types as template arguments to \tcode{span} be allowed to provide the underlying buffer by using the \tcode{byte} sequence representation \tcode{span} provides. (I do not think so and some people in LEWG inofficially agree with it). You can always get a span of characters from the underlying byte sequence, so there is no need to put that functionality into spanbuf, it would break orthogonality and could lead to undefined behavior, because the streambuf would be aliasing with an arbitrary object.
+\item Should the \tcode{basic_spanbuf} be copy-able? It doesn't own any resources, so copying like with handles or \tcode{span} might be fine. Other concrete streambuf classes in the standard that own their buffer (\tcode{basic_stringbuf}, \tcode{basic_filebuf}) naturally prohibit copying, where the base class \tcode{basic_streambuf} provides a protected copy-ctor. I considered providing copyability for \tcode{basic_spanbuf}, because the implementation is \tcode{=default}. Note, none of the stream classes in the standard is copyable as are the stream classes provided here. Other streambuf subclasses are not copyable, mainly because they either represent an external resource (fstreambuf), or because one usually would not access it via its concrete type and only through its \tcode{basic_streambuf} abstraction, i.e., by using an associated stream's \tcode{rdbuf()} member function. I speculate that another reason, why basic_stringbuf is not copyable, is that copying its underlying string and re-establishing a new stream with it is possible and copying a streambuf felt not natural. Therefore, I stick with my decision to prohibit copying \tcode{basic_spanbuf}.
 \end{itemize}
 
 \chapter{Technical Specifications}
-Insert a new section 27.x in chapter 27 after section 27.8 [string.streams]
 
-\section{27.x Span-based Streams [span.streams]}
+\textbf{Remove section [depr.str.strstreams] from appendix D.
+}
+
+Insert a new section 30.x in chapter 30 [input.output] after section 30.8 [string.streams]
+
+\section{30.x Span-based Streams [span.streams]}
 This section introduces a stream interface for user-provided fixed-size buffers. 
-\subsection{27.x.1 Overview [span.streams.overview]}
-The header \tcode{<spanstream>} defines four class templates and eight types that associate stream buffers with objects of class \tcode{span} as described in [span].
+\subsection{30.x.1 Overview [span.streams.overview]}
+The header \tcode{<spanstream>} defines four class templates and eight types that associate stream buffers with objects of class \tcode{span} as described in [span]. 
+\begin{note}
+A user of theses classes is responsible that the character sequence represented by the given span outlives the use of the sequence by objects of the classes in this chapter. Using multiple basic_spanbuf objects referring to overlapping underlying sequences from different threads, where at least one spanbuf is used for writing to the sequence results in a data race.
+\end{note}
 
-\paragraph{Header \tcode{<spanstream>} synobsis}
+\paragraph{Header \tcode{<spanstream>} synopsis}
 
 \begin{codeblock}
 namespace std {
 namespace experimental {
   template <class charT, class traits = char_traits<charT> >
     class basic_spanbuf;
-  typedef basic_spanbuf<char>     spanbuf;
-  typedef basic_spanbuf<wchar_t> wspanbuf;
+  using spanbuf = basic_spanbuf<char>;
+  using wspanbuf = basic_spanbuf<wchar_t>;
   template <class charT, class traits = char_traits<charT> >
     class basic_ispanstream;
-  typedef basic_ispanstream<char>     ispanstream;
-  typedef basic_ispanstream<wchar_t> wispanstream;
+  using ispanstream = basic_ispanstream<char>;
+  using wispanstream = basic_ispanstream<wchar_t>;
   template <class charT, class traits = char_traits<charT> >
     class basic_ospanstream;
-  typedef basic_ospanstream<char>     ospanstream;
-  typedef basic_ospanstream<wchar_t> wospanstream;
+  using ospanstream = basic_ospanstream<char>;
+  using wospanstream = basic_ospanstream<wchar_t>;
   template <class charT, class traits = char_traits<charT> >
     class basic_spanstream;
-  typedef basic_spanstream<char>     spanstream;
-  typedef basic_spanstream<wchar_t> wspanstream;
+  using spanstream = basic_spanstream<char>;
+  using wspanstream = basic_spanstream<wchar_t>;
 }}
 \end{codeblock}
-\section{27.x.2 Class template \tcode{basic_spanbuf} [spanbuf]}
+\section{30.x.2 Class template \tcode{basic_spanbuf} [spanbuf]}
 %\rSec2[spanbuf]{Class template \tcode{basic_spanbuf}}
 %\indexlibrary{\idxcode{basic_spanbuf}}%
 \begin{codeblock}
@@ -244,7 +267,7 @@ set if the output sequence can be written.
 \end{itemize}
 %%%
 
-\section{27.x.2.1 \tcode{basic_spanbuf} constructors [spanbuf.cons]}
+\section{30.x.2.1 \tcode{basic_spanbuf} constructors [spanbuf.cons]}
 %\rSec3[spanbuf.cons]{\tcode{basic_spanbuf}  constructors}
 
 \indexlibrary{\idxcode{basic_spanbuf}!constructor}%
@@ -268,13 +291,16 @@ Initializes the internal pointers as if calling \tcode{span(s)}.
 \end{itemdescr}
 
 \indexlibrary{\idxcode{basic_spanbuf}!constructor}%
+%basic_spanbuf(basic_spanbuf const & rhs) noexcept;
 \begin{itemdecl}
 basic_spanbuf(basic_spanbuf&& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
-\effects Move constructs from the rvalue \tcode{rhs}. 
+\effects 
+%Copy/
+Move constructs from the rvalue \tcode{rhs}. 
 Both \tcode{basic_spanbuf} objects share the same underlying \tcode{span}.
 The sequence pointers in 
 \tcode{*this}
@@ -309,18 +335,23 @@ also copied.
 \end{itemdescr}
 
 
-\subsection{27.x.2.2 Assign and swap [spanbuf.assign]}
+\subsection{30.x.2.2 Assign and swap [spanbuf.assign]}
 
 %\rSec3[spanbuf.assign]{Assign and swap}
 %\indexlibrarymember{operator=}{basic_spanbuf}%
+%basic_spanbuf& operator=(basic_spanbuf const & rhs) noexcept;
 \begin{itemdecl}
 basic_spanbuf& operator=(basic_spanbuf&& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
-\effects After the move assignment \tcode{*this} has the observable state it would
-have had if it had been move constructed from \tcode{rhs} (see~\ref{spanbuf.cons}).
+\effects After the 
+%copy/
+move assignment \tcode{*this} has the observable state it would
+have had if it had been 
+%copy/
+move constructed from \tcode{rhs} (see~\ref{spanbuf.cons}).
 
 \pnum
 \returns \tcode{*this}.
@@ -339,7 +370,7 @@ and \tcode{rhs}.
 
 %\indexlibrarymember{swap}{basic_spanbuf}%
 \begin{itemdecl}
-template <class charT, class traits, class Allocator>
+template <class charT, class traits>
   void swap(basic_spanbuf<charT, traits>& x,
             basic_spanbuf<charT, traits>& y) noexcept;
 \end{itemdecl}
@@ -350,7 +381,7 @@ template <class charT, class traits, class Allocator>
 \end{itemdescr}
 
 
-\subsection{27.x.2.3 Member functions [spanbuf.members]}
+\subsection{30.x.2.3 Member functions [spanbuf.members]}
 %\rSec3[spanbuf.members]{Member functions}
 
 %\indexlibrarymember{span}{basic_spanbuf}%
@@ -391,7 +422,7 @@ sequence with \tcode{s} and initializes the input and output sequences according
 
 \pnum
 \postconditions If \tcode{mode \& ios_base::out} is true, \tcode{pbase()} points to the
-first underlying character and \tcode{epptr()} \tcode{>= pbase() + s.size()} holds; in
+first underlying character and \tcode{epptr() == pbase() + s.size()} holds; in
 addition, if \tcode{mode \& ios_base::ate} is true,
 \tcode{pptr() == pbase() + s.size()}
 holds, otherwise \tcode{pptr() == pbase()} is true. If \tcode{mode \& ios_base::in} is
@@ -404,7 +435,7 @@ Using append mode does not make sense for \tcode{span}-based streams.
 
 \end{itemdescr}
 
-\subsection{27.x.2.4 Overridden virtual functions [spanbuf.virtuals]}
+\subsection{30.x.2.4 Overridden virtual functions [spanbuf.virtuals]}
 %\rSec3[spanbuf.virtuals]{Overridden virtual functions}
 \pnum
 \begin{note}
@@ -562,7 +593,7 @@ If \tcode{s} and \tcode{n} denote a non-empty span
 \end{itemdescr}
 
 %\rSec2[ispanstream]{Class template \tcode{basic_ispanstream}}
-\section{27.x.3 Class template \tcode{basic_ispanstream} [ispanstream] }
+\section{30.x.3 Class template \tcode{basic_ispanstream} [ispanstream] }
 
 %\indexlibrary{\idxcode{basic_ispanstream}}%
 \begin{codeblock}
@@ -621,7 +652,7 @@ For the sake of exposition, the maintained data is presented here as:
 \end{itemize}
 
 %\rSec3[ispanstream.cons]{\tcode{basic_ispanstream} constructors}
-\subsection{27.x.3.1 \tcode{basic_ispanstream} constructors [ispanstream.cons]}
+\subsection{30.x.3.1 \tcode{basic_ispanstream} constructors [ispanstream.cons]}
 \label{ispanstream.cons}
 
 %\indexlibrary{\idxcode{basic_ispanstream}!constructor}%
@@ -658,7 +689,7 @@ install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
 %\rSec3[ispanstream.assign]{Assign and swap}
-\subsection{27.x.3.2 Assign and swap [ispanstream.assign]}
+\subsection{30.x.3.2 Assign and swap [ispanstream.assign]}
 \label{ispanstream.assign}
 
 %\indexlibrarymember{operator=}{basic_ispanstream}%
@@ -691,9 +722,9 @@ void swap(basic_ispanstream& rhs);
 
 %\indexlibrarymember{swap}{basic_ispanstream}%
 \begin{itemdecl}
-template <class charT, class traits, class Allocator>
-  void swap(basic_ispanstream<charT, traits, Allocator>& x,
-            basic_ispanstream<charT, traits, Allocator>& y);
+template <class charT, class traits>
+  void swap(basic_ispanstream<charT, traits>& x,
+            basic_ispanstream<charT, traits>& y);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -702,7 +733,7 @@ template <class charT, class traits, class Allocator>
 \end{itemdescr}
 
 %\rSec3[ispanstream.members]{Member functions}
-\subsection{27.x.3.3 Member functions [ispanstream.members]}
+\subsection{30.x.3.3 Member functions [ispanstream.members]}
 \label{ispanstream.members}
 
 %\indexlibrarymember{rdbuf}{basic_ispanstream}%
@@ -741,7 +772,7 @@ Calls
 \end{itemdescr}
 
 %\rSec2[ospanstream]{Class template \tcode{basic_ospanstream}}
-\section{27.x.4 Class template \tcode{basic_ospanstream} [ospanstream] }
+\section{30.x.4 Class template \tcode{basic_ospanstream} [ospanstream] }
 
 %\indexlibrary{\idxcode{basic_ospanstream}}%
 \begin{codeblock}
@@ -800,7 +831,7 @@ For the sake of exposition, the maintained data is presented here as:
 \end{itemize}
 
 %\rSec3[ospanstream.cons]{\tcode{basic_ospanstream} constructors}
-\subsection{27.x.4.1 \tcode{basic_ospanstream} constructors [ospanstream.cons]}
+\subsection{30.x.4.1 \tcode{basic_ospanstream} constructors [ospanstream.cons]}
 \label{ospanstream.cons}
 
 %\indexlibrary{\idxcode{basic_ospanstream}!constructor}%
@@ -837,7 +868,7 @@ install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
 %\rSec3[ospanstream.assign]{Assign and swap}
-\subsection{27.x.4.2 Assign and swap [ospanstream.assign]}
+\subsection{30.x.4.2 Assign and swap [ospanstream.assign]}
 \label{ospanstream.assign}
 
 %\indexlibrarymember{operator=}{basic_ospanstream}%
@@ -870,9 +901,9 @@ void swap(basic_ospanstream& rhs) noexcept;
 
 %\indexlibrarymember{swap}{basic_ospanstream}%
 \begin{itemdecl}
-template <class charT, class traits, class Allocator>
-  void swap(basic_ospanstream<charT, traits, Allocator>& x,
-            basic_ospanstream<charT, traits, Allocator>& y) noexcept;
+template <class charT, class traits>
+  void swap(basic_ospanstream<charT, traits>& x,
+            basic_ospanstream<charT, traits>& y) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -881,7 +912,7 @@ template <class charT, class traits, class Allocator>
 \end{itemdescr}
 
 %\rSec3[ospanstream.members]{Member functions}
-\subsection{27.x.4.3 Member functions [ospanstream.members]}
+\subsection{30.x.4.3 Member functions [ospanstream.members]}
 \label{ospanstream.members}
 
 %\indexlibrarymember{rdbuf}{basic_ospanstream}%
@@ -920,7 +951,7 @@ Calls
 \end{itemdescr}
 
 %\rSec2[spanstream]{Class template \tcode{basic_spanstream}}
-\section{27.x.5 Class template \tcode{basic_spanstream} [spanstream] }
+\section{30.x.5 Class template \tcode{basic_spanstream} [spanstream] }
 
 %\indexlibrary{\idxcode{basic_spanstream}}%
 \begin{codeblock}
@@ -979,7 +1010,7 @@ For the sake of exposition, the maintained data is presented here as:
 \end{itemize}
 
 %\rSec3[spanstream.cons]{\tcode{basic_spanstream} constructors}
-\subsection{27.x.5.1 \tcode{basic_spanstream} constructors [spanstream.cons]}
+\subsection{30.x.5.1 \tcode{basic_spanstream} constructors [spanstream.cons]}
 \label{spanstream.cons}
 
 %\indexlibrary{\idxcode{basic_spanstream}!constructor}%
@@ -1016,7 +1047,7 @@ install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
 %\rSec3[spanstream.assign]{Assign and swap}
-\subsection{27.x.5.2 Assign and swap [spanstream.assign]}
+\subsection{30.x.5.2 Assign and swap [spanstream.assign]}
 \label{spanstream.assign}
 
 %\indexlibrarymember{operator=}{basic_spanstream}%
@@ -1049,9 +1080,9 @@ void swap(basic_spanstream& rhs) noexcept;
 
 %\indexlibrarymember{swap}{basic_spanstream}%
 \begin{itemdecl}
-template <class charT, class traits, class Allocator>
-  void swap(basic_spanstream<charT, traits, Allocator>& x,
-            basic_spanstream<charT, traits, Allocator>& y) noexcept;
+template <class charT, class traits>
+  void swap(basic_spanstream<charT, traits>& x,
+            basic_spanstream<charT, traits>& y) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1060,7 +1091,7 @@ template <class charT, class traits, class Allocator>
 \end{itemdescr}
 
 %\rSec3[spanstream.members]{Member functions}
-\subsection{27.x.5.3 Member functions [spanstream.members]}
+\subsection{30.x.5.3 Member functions [spanstream.members]}
 \label{spanstream.members}
 
 %\indexlibrarymember{rdbuf}{basic_spanstream}%
@@ -1101,7 +1132,7 @@ Calls
 
 
 \chapter{Appendix: Example Implementations}
-An example implementation will become available under the author's github account at:
-\url{https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/Test_basic_spanbuf}
+An example implementation is available under the author's github account at:
+\url{https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/p0448}
 \end{document}
 

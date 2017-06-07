@@ -45,17 +45,17 @@ ASSERT_EQUAL(static_cast<void*>(output),sp.data()); // no copying of underlying 
 ASSERT_EQUAL("102030",output); // initialization guarantees NUL termination
 }
 
-void testSpanstreambufCopy(){
-	char  output[30]{};
-	span<char > theSpan{output};
-	ospanstream os{theSpan};
-	spanbuf buf2=*os.rdbuf();
-	std::ostream os2{&buf2};
-	os << "bla" << std::flush;
-	os2 << 10 << 20 << 30 << std::flush;
-	std::string s{theSpan.data()};
-	ASSERT_EQUAL("102030",s);
-}
+//void testSpanstreambufCopy(){
+//	char  output[30]{};
+//	span<char > theSpan{output};
+//	ospanstream os{theSpan};
+//	spanbuf buf2=*os.rdbuf();
+//	std::ostream os2{&buf2};
+//	os << "bla" << std::flush;
+//	os2 << 10 << 20 << 30 << std::flush;
+//	std::string s{theSpan.data()};
+//	ASSERT_EQUAL("102030",s);
+//}
 
 
 
@@ -66,7 +66,7 @@ bool runAllTests(int argc, char const *argv[]) {
 	s.push_back(CUTE(thisIsATest));
 	s.push_back(CUTE(testOspanstreamOutputToCharArray));
 	s.push_back(CUTE(testOspanstreamWithShortOutput));
-	s.push_back(CUTE(testSpanstreambufCopy));
+	//s.push_back(CUTE(testSpanstreambufCopy));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<>> lis(xmlfile.out);
 	auto runner { cute::makeRunner(lis, argc, argv) };
