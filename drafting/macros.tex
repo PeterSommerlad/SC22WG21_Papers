@@ -48,13 +48,21 @@
 \makeatother
 
 %%--------------------------------------------------
-%% Cross references.
-\newcommand{\addxref}[1]{\glossary[xrefindex]{#1}{(\ref{#1})}}
+% Escaping for index entries. Replaces ! with "! throughout its argument.
+\def\indexescape#1{\doindexescape#1\stopindexescape!\doneindexescape}
+\def\doindexescape#1!{#1"!\doindexescape}
+\def\stopindexescape#1\doneindexescape{}
 
 %%--------------------------------------------------
-%% Sectioning macros.  
-% Each section has a depth, an automatically generated section 
-% number, a name, and a short tag.  The depth is an integer in 
+%% Cross references.
+\newcommand{\addxref}[1]{%
+ \glossary[xrefindex]{\indexescape{#1}}{(\ref{\indexescape{#1}})}%
+}
+
+%%--------------------------------------------------
+%% Sectioning macros.
+% Each section has a depth, an automatically generated section
+% number, a name, and a short tag.  The depth is an integer in
 % the range [0,5].  (If it proves necessary, it wouldn't take much
 % programming to raise the limit from 5 to something larger.)
 
@@ -75,7 +83,7 @@
 
 % A convenience feature (mostly for the convenience of the Project
 % Editor, to make it easy to move around large blocks of text):
-% the \rSec macro is just like the \Sec macro, except that depths 
+% the \rSec macro is just like the \Sec macro, except that depths
 % relative to a global variable, SectionDepthBase.  So, for example,
 % if SectionDepthBase is 1,
 %   \rSec1[temp.arg.type]{Template type arguments}
@@ -98,7 +106,7 @@
 \newcommand{\indexgram}[1]{\index[grammarindex]{#1}}
 
 % Collation helper: When building an index key, replace all macro definitions
-% in the key argument with a no-op for purposes of collation. 
+% in the key argument with a no-op for purposes of collation.
 \newcommand{\nocode}[1]{#1}
 \newcommand{\idxmname}[1]{\_\_#1\_\_}
 \newcommand{\idxCpp}{C++}
@@ -160,14 +168,13 @@
 \newcommand{\defn}[1]{\defnx{#1}{#1}}
 \newcommand{\term}[1]{\textit{#1}\xspace}
 \newcommand{\grammarterm}[1]{\textit{#1}\xspace}
+\newcommand{\grammartermnc}[1]{\textit{#1}\nocorr}
 \newcommand{\placeholder}[1]{\textit{#1}}
 \newcommand{\placeholdernc}[1]{\textit{#1\nocorr}}
 
 %%--------------------------------------------------
 %% allow line break if needed for justification
 \newcommand{\brk}{\discretionary{}{}{}}
-%  especially for scope qualifier
-\newcommand{\colcol}{\brk::\brk}
 
 %%--------------------------------------------------
 %% Macros for funky text
@@ -214,8 +221,6 @@
 \newcommand{\default}{\Fundesc{Default behavior}}
 \newcommand{\complexity}{\Fundesc{Complexity}}
 \newcommand{\remarks}{\Fundesc{Remarks}}
-\newcommand{\realnote}{\Fundesc{Note}}
-\newcommand{\realnotes}{\Fundesc{Notes}}
 \newcommand{\errors}{\Fundesc{Error conditions}}
 \newcommand{\sync}{\Fundesc{Synchronization}}
 \newcommand{\implimits}{\Fundesc{Implementation limits}}
@@ -321,12 +326,12 @@
         xleftmargin=1em,
         showstringspaces=false,
         commentstyle=\itshape\rmfamily,
-        columns=flexible,
+        columns=fullflexible,
         keepspaces=true,
         texcl=true}
 
-% Our usual abbreviation for 'listings'.  Comments are in 
-% italics.  Arbitrary TeX commands can be used if they're 
+% Our usual abbreviation for 'listings'.  Comments are in
+% italics.  Arbitrary TeX commands can be used if they're
 % surrounded by @ signs.
 \newcommand{\CodeBlockSetup}{
  \lstset{escapechar=@, aboveskip=\parskip, belowskip=0pt}
@@ -388,23 +393,21 @@
 \setlength{\BnfRest}{2\BnfIndent}
 \newcommand{\BnfNontermshape}{\small\rmfamily\itshape}
 \newcommand{\BnfTermshape}{\small\ttfamily\upshape}
-\newcommand{\nonterminal}[1]{{\BnfNontermshape #1}}
 
 \newenvironment{bnfbase}
  {
- \newcommand{\nontermdef}[1]{\nonterminal{##1\itcorr}\indexgrammar{\idxgram{##1}}\textnormal{:}}
+ \newcommand{\nontermdef}[1]{{\BnfNontermshape##1\itcorr}\indexgrammar{\idxgram{##1}}\textnormal{:}}
  \newcommand{\terminal}[1]{{\BnfTermshape ##1}\xspace}
  \newcommand{\descr}[1]{\textnormal{##1}}
  \newcommand{\bnfindentfirst}{\BnfIndent}
  \newcommand{\bnfindentinc}{\BnfInc}
  \newcommand{\bnfindentrest}{\BnfRest}
- \begin{minipage}{.9\hsize}
- \newcommand{\br}{\hfill\\}
+ \newcommand{\br}{\hfill\\*}
+ \widowpenalties 1 10000
  \frenchspacing
  }
  {
  \nonfrenchspacing
- \end{minipage}
  }
 
 \newenvironment{BnfTabBase}[1]
@@ -450,17 +453,12 @@
 \newenvironment{bnf}
 {
  \begin{bnfbase}
- \list{}
-	{
-	\setlength{\leftmargin}{\bnfindentrest}
-	\setlength{\listparindent}{-\bnfindentinc}
-	\setlength{\itemindent}{\listparindent}
-	}
+ \begin{bnflist}
  \BnfNontermshape
  \item\relax
 }
 {
- \endlist
+ \end{bnflist}
  \end{bnfbase}
 }
 
@@ -518,17 +516,14 @@
 }
 
 %%--------------------------------------------------
-%% Definitions section
-% usage: \definition{name}{xref}
-%\newcommand{\definition}[2]{\rSec2[#2]{#1}}
-% for ISO format, use:
-\newcommand{\definition}[2]{%
-\addxref{#2}%
-\subsection[#1]{\hfill[#2]}\vspace{-.3\onelineskip}\label{#2}\textbf{#1}\\%
-}
-\newcommand{\definitionx}[2]{%
-\addxref{#2}%
-\subsubsection[#1]{\hfill[#2]}\vspace{-.3\onelineskip}\label{#2}\textbf{#1}\\%
+%% Definitions section for "Terms and definitions"
+\newcommand{\nocontentsline}[3]{}
+\newcommand{\definitionx}[3]{%
+\addxref{#3}%
+\let\oldcontentsline\addcontentsline%
+\let\addcontentsline\nocontentsline%
+#1[#2]{\hfill[#3]}\vspace{-.3\onelineskip}\label{#3} \textbf{#2}\\*%
+\let\addcontentsline\oldcontentsline%
 }
 \newcommand{\defncontext}[1]{\textlangle#1\textrangle}
  
@@ -553,3 +548,6 @@
 
 \newenvironment{insrt}{\begin{addedblock}}{\end{addedblock}}
 
+% from std.tex
+%% turn off all ligatures inside \texttt
+\DisableLigatures{encoding = T1, family = tt*}
