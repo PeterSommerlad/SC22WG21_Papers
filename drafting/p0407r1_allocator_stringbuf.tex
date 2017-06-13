@@ -2,7 +2,6 @@
 \usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
 \geometry{a4paper}  % ... or a4paper or a5paper or ... 
 %\geometry{landscape}  % Activate for for rotated page geometry
-\pagestyle{myheadings}
 %%% from std.tex
 %\usepackage[american]
 %           {babel}        % needed for iso dates
@@ -22,7 +21,7 @@
 \usepackage{color}        % define colors for strikeouts and underlines
 %\usepackage{amsmath}      % additional math symbols
 %\usepackage{mathrsfs}     % mathscr font
-%\usepackage{microtype}
+\usepackage[final]{microtype}
 %\usepackage{multicol}
 \usepackage{xspace}
 %\usepackage{lmodern}
@@ -55,8 +54,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0407r0}
-\newcommand{\paperdate}{2016-07-05}
+\newcommand{\papernumber}{p0407r1}
+\newcommand{\paperdate}{2017-06-15}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -75,10 +74,11 @@ Audience: & LWG/LEWG\\\hline
 \end{tabular}
 
 \chapter{History}
-Streams have been the oldest part of the C++ standard library and their specification doesn't take into account many things introduced since C++11. One of  the oversights is that allocator support is only available through a template parameter but not really encouraged or allowed on a per-object basis. The second issue that there is no non-copying access to the internal buffer of a basic_stringbuf which makes at least the obtaining of the output results from an ostringstream inefficient, because a copy is always made. There will be a second paper on the efficient internal buffer access.
+Streams have been the oldest part of the C++ standard library and their specification doesn't take into account many things introduced since C++11. One of  the oversights is that allocator support is only available through a template parameter but not really encouraged or allowed on a per-object basis. The second issue that there is no non-copying access to the internal buffer of a \tcode{basic_stringbuf} which makes at least the obtaining of the output results from an \tcode{ostringstream} inefficient, because a copy is always made. There is a second paper p0408 on the efficient internal buffer access that sidesteps the extra copy.
 \section{n3172}
 In Batavia 2010 n3172 was discussed and the issue LWG 2429 was closed with NAD but including an encouraging note that n3172 was just not enough (retrospectively this was due to the rush to get C++11 done). And there was not yet the allocator infrastructure in place that we aim for with C++17.
-
+\section{p0407r0}
+Since this paper has not yet really been discussed by LEWG or LWG this update mainly reflects the re-ordering of the standard's section numbers. It also adds access to the set allocator of \tcode{basic_stringbuf}.
 
 \chapter{Introduction}
 This paper proposes one adjustment to \tcode{basic_stringbuf} and the corresponding stream class templates to enable the actual use of allocators. It follows the direction of what \tcode{basic_string} provides and thus allows implementations who actually use \tcode{basic_string} as the internal buffer for \tcode{basic_stringbuf} to directly map the allocator to the underlying \tcode{basic_string}.
@@ -96,6 +96,8 @@ With the introduction of more useful allocator API in the recent editions of the
 \chapter{Impact on the Standard}
 This is an extension to the constructor API of \tcode{basic_stringbuf}, \tcode{basic_stringstream}, \tcode{basic_istringstream}, and \tcode{basic_ostringstream} class templates to follow the constructors taking allocators from \tcode{basic_string}. Because each constructor is extended with a parameter as the last one and this parameter is provided with a default argument there should be minimal impact on existing client code. Regular usage should be completely unaffected. 
 
+The class \tcode{basic_stringbuf} gets an additional member function to obtain a copy of the underlying allocator object, like \tcode{basic_string} provides.
+
 \chapter{Design Decisions}
 \section{General Principles}
 Allocator support in the standard library is lacking for string-based streams and seems to be addable in a straightforward way, because all class templates already take it as template parameter.
@@ -107,7 +109,7 @@ Allocator support in the standard library is lacking for string-based streams an
 
 \chapter{Technical Specifications}
 
-\section{27.8.2 Adjust synopsis of \tcode{basic_stringbuf} [stringbuf]}
+\section{30.8.2 Adjust synopsis of \tcode{basic_stringbuf} [stringbuf]}
 Change each of the non-moving, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
 explicit basic_stringbuf(
@@ -120,6 +122,13 @@ explicit basic_stringbuf(
         @\added{const Allocator \&a=Allocator()}@);
 \end{codeblock}
 
+\textit{Add the following declaration to the public section of synopsis of the class template \tcode{basic_stringbuf}:}
+\begin{addedblock}
+\begin{codeblock}
+    allocator_type get_allocator() const noexcept;
+\end{codeblock}
+\end{addedblock}
+
 \textit{Append a paragraph p3 to the text following the synopsis:}
 
 \begin{insrt}
@@ -130,7 +139,7 @@ Implementations using \tcode{basic_string} internally, will simply pass the allo
 \end{note}
 \end{insrt}
 
-\subsection{27.8.2.1 \tcode{basic_stringbuf} constructors [stringbuf.cons]}
+\subsection{30.8.2.1 \tcode{basic_stringbuf} constructors [stringbuf.cons]}
 Adjust the constructor specifications taking the additional Allocator parameter, no further explanation required:
 
 \begin{itemdecl}
@@ -148,8 +157,30 @@ explicit basic_stringbuf(
   @\added{const Allocator \&a=Allocator()}@);
 \end{itemdecl}
 
+\section{30.8.2.3 Member functions [stringbuf.members]}
+Add the definition of the \tcode{get_allocator} function:
+\begin{addedblock}
+%\indexlibrarymember{get_allocator}{basic_stringbuf}%
+\begin{itemdecl}
+allocator_type get_allocator() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns
+A copy of the
+\tcode{Allocator}
+object used to construct the underlying character sequence or, if that allocator has been replaced, a
+copy of the most recent replacement.
+\begin{note}
+Implementations using \tcode{basic_string} internally, will simply call its \tcode{get_allocator()} member function.
+\end{note}
+
+\end{itemdescr}
+\end{addedblock}
+
 %% basic_istringstream
-\section{27.8.3 Adjust synopsis of basic\_istringstream [istringstream]}
+\section{30.8.3 Adjust synopsis of basic\_istringstream [istringstream]}
 Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
 explicit basic_istringstream(
@@ -161,6 +192,7 @@ explicit basic_istringstream(
              @\added{const Allocator \&a=Allocator()}@);
 \end{codeblock}
 
+
 \textit{Append a paragraph p2 to the text following the synopsis:}
 
 \begin{insrt}
@@ -169,9 +201,13 @@ In every specialization \tcode{basic_istringstream<charT, traits, Allocator>}, t
 \begin{note}
 Implementations using \tcode{basic_string} internally, will simply pass the allocator parameter to the corresponding \tcode{basic_string} constructors.
 \end{note}
+\begin{note}
+Access to the current allocator can be obtained via \tcode{rdbuf()->get_allocator()}.
+\end{note}
 \end{insrt}
 
-\subsection{27.8.3.1 \tcode{basic_istringstream} constructors [istringstream.cons]}
+
+\subsection{30.8.3.1 \tcode{basic_istringstream} constructors [istringstream.cons]}
 Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_stringbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
 
 \begin{itemdecl}
@@ -186,7 +222,7 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_istream(\&sb)}
 and initializing \tcode{sb} with
-\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(which | ios_base::in\added{, a}))}~({27.8.2.1}).
+\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(which | ios_base::in\added{, a}))}~({30.8.2.1}).
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -204,13 +240,13 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_istream(\&sb)}
 and initializing \tcode{sb} with
-\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(str, which | ios_base::in\added{, a)})}~({27.8.2.1}).
+\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(str, which | ios_base::in\added{, a)})}~({30.8.2.1}).
 \end{itemdescr}
 
 
 
 %% basic_ostringstream
-\section{27.8.4 Adjust synopsis of \tcode{basic_ostringstream} [ostringstream]}
+\section{30.8.4 Adjust synopsis of \tcode{basic_ostringstream} [ostringstream]}
 Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
 explicit basic_ostringstream(
@@ -230,10 +266,13 @@ In every specialization \tcode{basic_ostringstream<charT, traits, Allocator>}, t
 \begin{note}
 Implementations using \tcode{basic_string} internally, will simply pass the allocator parameter to the corresponding \tcode{basic_string} constructors.
 \end{note}
+\begin{note}
+Access to the current allocator can be obtained via \tcode{rdbuf()->get_allocator()}.
+\end{note}
 \end{insrt}
 
 
-\subsection{27.8.4.1 \tcode{basic_ostringstream} constructors [ostringstream.cons]}
+\subsection{30.8.4.1 \tcode{basic_ostringstream} constructors [ostringstream.cons]}
 Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_stringbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
 
 \begin{itemdecl}
@@ -250,7 +289,7 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_ostream(\brk{}\&sb)}
 and initializing \tcode{sb} with
-\tcode{basic_stringbuf<charT, traits, Allocator>(which | \brk{}ios_base::out\added{, a}))}~({27.8.2.1}).
+\tcode{basic_stringbuf<charT, traits, Allocator>(which | \brk{}ios_base::out\added{, a}))}~({30.8.2.1}).
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -268,12 +307,12 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_ostream(\&sb)}
 and initializing \tcode{sb} with
-\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(str, which | ios_base::out\added{, a}))}~({27.8.2.1}).
+\tcode{basic_stringbuf<charT, traits, Alloca\-tor>(str, which | ios_base::out\added{, a}))}~({30.8.2.1}).
 \end{itemdescr}
 
 
 %% basic_stringstream
-\section{27.8.5 Adjust synopsis of \tcode{basic_stringstream} [stringstream]}
+\section{30.8.5 Adjust synopsis of \tcode{basic_stringstream} [stringstream]}
 Change each of the non-move, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. 
 \begin{codeblock}
 explicit basic_stringstream(
@@ -293,9 +332,12 @@ In every specialization \tcode{basic_stringstream<charT, traits, Allocator>}, th
 \begin{note}
 Implementations using \tcode{basic_string} internally, will simply pass the allocator parameter to the corresponding \tcode{basic_string} constructors.
 \end{note}
+\begin{note}
+Access to the current allocator can be obtained via \tcode{rdbuf()->get_allocator()}.
+\end{note}
 \end{insrt}
 
-\subsection{27.8.5.1 \tcode{basic_stringstream} constructors [stringstream.cons]}
+\subsection{30.8.5.1 \tcode{basic_stringstream} constructors [stringstream.cons]}
 Adjust the constructor specifications taking the additional Allocator parameter and adjust the delegation to basic_stringbuf constructors in the Effects clauses in p1 and p2 to pass on the given allocator object.
 \begin{itemdecl}
 explicit basic_stringstream(
