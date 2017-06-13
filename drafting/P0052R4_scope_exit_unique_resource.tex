@@ -23,7 +23,7 @@
 \usepackage{color}        % define colors for strikeouts and underlines
 %\usepackage{amsmath}      % additional math symbols
 %\usepackage{mathrsfs}     % mathscr font
-%\usepackage{microtype}
+\usepackage[final]{microtype}
 %\usepackage{multicol}
 \usepackage{xspace}
 %\usepackage{lmodern}
@@ -56,8 +56,8 @@
 
 %%%%
 
-\newcommand{\papernumber}{P0052R3}
-\newcommand{\paperdate}{2017-02-06}
+\newcommand{\papernumber}{P0052R4}
+\newcommand{\paperdate}{2017-06-15}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -76,6 +76,14 @@ Audience: & LWG/LEWG\\\hline
 \end{tabular}
 
 \chapter{History}
+\section{Changes from P0052R3}
+\begin{itemize}
+\item Take new section numbering of the standard working paper into account.
+\item require noexcept of \tcode{f()} for \tcode{scope_exit} and \tcode{scope_fail} explicitly
+\item implementation could be tested with C++17 compiler and class template constructor argument deduction thus the paper no longer claims help or not being sure.
+\end{itemize}
+
+
 \section{Changes from P0052R2}
 \begin{itemize}
 \item Take into account class template ctor argument deduction. However, I recommend keeping the factories for LFTS 3 to allow for C++14 implementations. At the time of this writing, I do not have a working C++17 compliant compiler handy to run corresponding test cases without the factories. However, there is one factory function make_unique_checked that needs to stay, because it addresses a specific but seemingly common use-case.
@@ -236,7 +244,7 @@ void demo_scope_exit_fail_success(){
 
 
 \chapter{Impact on the Standard}
-This proposal is a pure library extension. A new header, \tcode{<scope>} is proposed, but it does not require changes to any standard classes or functions. Since it proposes a new header, no feature test macro seems required. It does not require any changes in the core language, and it has been implemented in standard C++ conforming to C++14, resp. draft C++17. Depending on the timing of the acceptance of this proposal, it might go into a library fundamentals TS under the namespace std::experimental or directly in the working paper of the standard.
+This proposal is a pure library extension. A new header, \tcode{<scope>} is proposed, but it does not require changes to any standard classes or functions. Since it proposes a new header, no feature test macro seems required. It does not require any changes in the core language, and it has been implemented in standard C++ conforming to \removed{C++14, resp. draft} C++17. Depending on the timing of the acceptance of this proposal, it might go into a library fundamentals TS under the namespace std::experimental or directly in the working paper of the standard.
 
 \chapter{Design Decisions}
 \section{General Principles}
@@ -277,8 +285,6 @@ The following issues have been recommended by LWG already:
 \section{Open Issues (to be) Discussed by LEWG / LWG}
 Since a lot of the design changed due to Eric Niebler's implementation taking great effort to provide strong exception guarantee, another round through LEWG and LWG seems to be required.
 \begin{itemize}
-\item I need help to specify the potentially required constructur template argument deduction guides, but due to a lack of compatible compiler on my machine and lack of time, I am unable to provide that.
-I hope someone at Kona can help me get this in an acceptable shape for LFTS3.
 \item which "callable" definition in the standard should be applied (call expression (as it is now) or via INVOKE (\tcode{is_callable_v<EF\&>}). 
 \emph{IMHO call expression is fine, since everything is about side-effects and we never return a useful value from any of the function objects.}
 \item Should we provide a non-explicit conversion operator to \tcode{R} in \tcode{unique_resource<R,D>} ? Last time people seem to have been strongly against, however, it would make the use of unique_resource much easier in contexts envisioned by author Andrew Sandoval. Please re-visit, since it is omitted here.
@@ -290,23 +296,23 @@ The following formulation is based on inclusion to the draft of the C++ standard
 
 A very recent draft of the standard already has the requested change below that was suggested by Daniel Kr\"ugler:
 
-\section{Adjust 17.5.4.8 Other functions [res.on.functions]}
+\section{Adjust 20.5.4.8 Other functions [res.on.functions]}
 Since \tcode{~scope_success()} might throw an exception and we can not specify that in a required behavior clause, we need to allow doing so for the standard library's normative remarks section as well.
 
-In section 17.5.4.8 Other functions [res.on.functions] modify p2 item (2.4) as follows by adding "or \remarks"
+In section 20.5.4.8 Other functions [res.on.functions] modify p2 item (2.4) as follows by adding "or \remarks"
 
 \begin{description}
 \item[\textit{(2.4)} ---]
 if any replacement function or handler function or destructor operation exits via an exception,
 unless specifically allowed
 in the applicable
-\required \textbf{or \remarks}
+\required \added{or \remarks}
 paragraph.
 \end{description}
 
 However the following adjustment is missing, since the standard library promises that all library classes won't throw on destruction:
 
-\section{Adjust 17.5.5.12 Restrictions on exception handling [res.on.exception.handling]}
+\section{Adjust 20.5.5.12 Restrictions on exception handling [res.on.exception.handling]}
 
 Change paragraph 3 as follows:
 
@@ -320,19 +326,19 @@ non-throwing exception specification.
 
 
 \section{Header}
-In section 17.5.1.1 Library contents [contents] add an entry to table 14 for the new header \tcode{<scope>}. Because of the new header, there is no need for a feature test macro.
+In section 20.5.1.1 Library contents [contents] add an entry to table 16 (cpp.library.headers) for the new header \tcode{<scope>}. Because of the new header, there is no need for a feature test macro.
 
-In section 17.5.1.3 Freestanding implementations [compliance] add an extra row to table 16 (cpp.library.headers) and 
-in section [utilities.general] add the same extra row to table 44 (util.lib.summary)
+In section 20.5.1.3 Freestanding implementations [compliance] add an extra row to table 19 (cpp.headers.freestanding) and 
+in section [utilities.general] add the same extra row to table 34 (util.lib.summary)
 %%TODO clearer specification 
 \begin{table}[htb]
-\caption{table 16 and table 44}
+\caption{table 19 and table 34}
 \begin{center}
 \begin{tabular}{|lcl|}
 \hline
 &Subclause & Header\\
 \hline
-20.nn &Scope Guard Support & \tcode{<scope>}\\
+23.nn &Scope Guard Support & \tcode{<scope>}\\
 \hline
 \end{tabular}
 \end{center}
@@ -340,7 +346,7 @@ in section [utilities.general] add the same extra row to table 44 (util.lib.summ
 \end{table}%
 
 \section{Additional sections}
-Add a a new section to chapter 20 introducing the contents of the header \tcode{<scope>}.
+Add a a new section to chapter 23 introducing the contents of the header \tcode{<scope>}.
 
 %\rSec1[utilities.scope]{Scope Guard}
 \section{Scope guard support [scope]}
@@ -370,7 +376,7 @@ make_unique_resource_checked(R&& r, S const& invalid, D&& d)
 noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
          is_nothrow_constructible_v<decay_t<D>, D>);
 
-// optional factory functions (should at least be present for LFTS3)
+// optional factory functions (obsoleted by C++17 class template ctor argument deduction)
 template <class EF>
 scope_exit<decay_t<EF>> make_scope_exit(EF&& exit_function) ;
 template <class EF>
@@ -451,12 +457,12 @@ Template argument \tcode{EF} shall be a function object type ([function.objects]
 lvalue reference to function, or 
 lvalue reference to function object type.
 If EF is an object type, it  shall satisfy
-the requirements of \tcode{Destructible} (Table~24
+the requirements of \tcode{Destructible} (Table~27
 %\ref{destructible}
 ). 
 %\tcode{is_callable<EF\&>::value} is \tcode{true}.
 Given an lvalue \tcode{f} of type \tcode{EF}, the expression \tcode{f()} shall be well formed and shall have well-defined behavior.
-The constructor arguments \tcode{f} in the following constructors shall be a function object (20.9)[function.objects], 
+The constructor arguments \tcode{f} in the following constructors shall be a function object (23.14)[function.objects], 
 lvalue reference to function, or 
 lvalue reference to function object.
 
@@ -472,7 +478,7 @@ scope_exit(EFP&& f) ;
 \remarks This constructor shall not participate in overload resolution unless \tcode{is_constructible_v<EF,EFP>} is \tcode{true}.
 
 \pnum
-\requires Given an lvalue \tcode{f} of type \tcode{EFP}, the expression \tcode{f()} shall be well formed and shall have well-defined behavior.
+\requires Given an lvalue \tcode{f} of type \tcode{EFP}, the expression \tcode{f()} shall be well formed and shall have well-defined behavior and not throw an exception.
 
 
 \pnum
@@ -495,7 +501,7 @@ scope_fail(EFP&& f) ;
 \remarks This constructor shall not participate in overload resolution unless \tcode{is_constructible_v<EF,EFP>} is \tcode{true}.
 
 \pnum
-\requires Given an lvalue \tcode{f} of type \tcode{EFP}, the expression \tcode{f()} shall be well formed and shall have well-defined behavior.
+\requires Given an lvalue \tcode{f} of type \tcode{EFP}, the expression \tcode{f()} shall be well formed and shall have well-defined behavior and not throw an exception.
 
 \pnum
 \effects If \tcode{EFP} is not a lvalue-reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, initialize  \tcode{exit_function} with \tcode{move(f)} otherwise initialize \tcode{exit_function} with \tcode{f}. If the copying throws an exception, calls \tcode{f()}.
@@ -514,6 +520,9 @@ scope_success(EFP&& f) ;
 \begin{itemdescr}
 \pnum
 \remarks This constructor shall not participate in overload resolution unless \tcode{is_constructible_v<EF,EFP>} is \tcode{true}.
+
+\pnum
+\requires Given an lvalue \tcode{f} of type \tcode{EFP}, the expression \tcode{f()} shall be well formed and shall have well-defined behavior.
 
 \pnum
 \effects If \tcode{EFP} is not a lvalue-reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, initialize  \tcode{exit_function} with \tcode{move(f)} otherwise initialize \tcode{exit_function} with \tcode{f}. \\
@@ -609,7 +618,6 @@ void release() noexcept;
 \subsection {Scope guard factory functions [scope.make_scope_exit]}
 \begin{note}
 These factory functions are meant for C++14 backward compatibility of this feature. 
-However, the ctor specifications of the classes might need some adjustment to make template argument deduction work correctly.
 \end{note}
 
 \pnum
@@ -704,9 +712,9 @@ The template argument
 %\ref{copyconstructible}
 %) and 
 Destructible 
-(Table~24
+(Table~27
 %\ref{destructible}
-) function object type~(20.9
+) function object type~(23.14
 %\ref{function.objects}
 ), 
 for which, given
@@ -722,7 +730,7 @@ a value \tcode{d} of type \tcode{D} and a value
 %\ref{copyassignable}
 %), and  
 Destructible 
-(Table~24
+(Table~27
 %\ref{destructible}
 ) object type 
 or a lvalue reference type.
@@ -944,7 +952,6 @@ const D & get_deleter() const noexcept;
 
 \begin{note}
 The make_unique_resource factory functions can be omitted for putting it into the standard. However, they could be useful for the LFTS3 to allow backporting to C++14.
-However, omitting these factories might require adaptation of the constructors to get template argument deduction correct.
 \end{note}
 
 
