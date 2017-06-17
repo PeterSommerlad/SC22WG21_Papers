@@ -1,0 +1,849 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
+\usepackage[final]
+           {listings}     % code listings
+%\usepackage{longtable}    % auto-breaking tables
+%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+%\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+\usepackage[final]{microtype}
+%\usepackage{multicol}
+\usepackage{xspace}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+
+%%%% reuse all three from std.tex:
+\input{macros}
+\input{layout}
+\input{styles}
+
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{p0052r5}
+\newcommand{\paperdate}{2017-06-18}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - C++ Synchronized Buffered Ostream}
+\author{Lawrence Crowl, Peter Sommerlad, Nicolai Josuttis, Pablo Halpern}
+\date{\paperdate}                % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{center}
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number:&  \papernumber \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++\\\hline 
+Audience: & LWG/LEWG\\\hline
+\end{tabular}
+\end{center}
+\chapter{Introduction}
+At present, some stream output operations guarantee that they will not produce race conditions, but do not guarantee that the effect will be sensible. Some form of external synchronization is required. Unfortunately, without a standard mechanism for synchronizing, independently developed software will be unable to synchronize.
+
+\href{https://wg21.link/n3535}{N3535 C++ Stream Mutexes} proposed a standard mechanism for finding and sharing a mutex on streams. At the Spring 2013 standards meeting, the Concurrency Study Group requested a change away from a full mutex definition to a definition that also enabled buffering.
+
+\href{https://wg21.link/N3678}{N3678 C++ Stream Guards} proposed a standard mechanism for batching operations on a stream. That batching may be implemented as mutexes, as buffering, or some combination of both. It was the response to the Concurrency Study Group. A draft of that paper was reviewed in the Library Working Group, who found too many open issues on what was reasonably exposed to the 'buffering' part.
+
+\href{https://wg21.link/N3665}{N3665 Uninterleaved Sring Output Streaming} proposed making streaming of strings of length less than BUFSIZ appear uninterleaved in the output. It was a "minimal" functionality change to the existing standard to address the problem. The full Committee chose not to adopt that minimal solution.
+
+\href{https://wg21.link/N3750}{N3750 C++ Ostream Buffers} proposed an explicit buffering, at the direction of the general consensus in the July 2013 meeting of the Concurrency Study Group. In November 2014 a further updated version \href{https://wg21.link/N4187}{N4187} was discussed in Library Evolution in Urbana and it was consensus to work with a library expert to get the naming and wording better suited to LWG expectations. Nico Josuttis volunteered to help the original authors. More information on the discussion is available at \href{http://wiki.edg.com/twiki/bin/view/Wg21urbana-champaign/N4187}{LEWG wiki} and the corresponding \href{https://issues.isocpp.org/show_bug.cgi?id=20}{LEWG bug tracker entry (20)}. This paper address issues raised with \href{https://wg21.link/N4187}{N4187}. This paper has a change of title to reflect a change in class name, but contains the same fundamental approach.
+
+\section{Solution}
+We propose a \tcode{basic_osyncstream}, that buffers output operations for a wrapped stream. The \tcode{basic_osyncstream} will atomically transfer the contents of an internal stream buffer to a \tcode{basic_ostream}'s stream buffer on destruction of the \tcode{basic_osyncstream}.
+
+The transfer on destruction simplifies the code and ensures at least some output in the presence of an exception.
+
+The intent is that the \tcode{basic_osyncstream} is an automatic-duration variable with a relatively small scope which constructs the text to appear uninterleaved. For example,
+
+\begin{codeblock}
+{
+  osyncstream bout(cout);
+  bout << "Hello, " << "World!" << '\n';
+}
+\end{codeblock}
+
+
+\chapter{Design}
+Here we list a set of previous objections to our proposal in the form of questions. We then give our reasons why other potential solutions do not work as well as our proposed solution.
+\begin{description}[style=nextline]
+\item[Why can I not just use cout? It should be thread-safe.] 
+You will not get data races for cout, but that is not true for most other streams. In addition there is no guarantee that output from different threads appears in any sensible order. Coherent output order is the main reason for this proposal.
+\item[Why must osyncstream be an ostream? Could a simple proxy wrapper work?] 
+To support all existing and user-defined output operators, osyncstream must be an ostream subclass.
+\item[Can you make a flush of the osyncstream mean transfer the characters and flush the underlying stream?
+] 
+No, because the point of the osyncstream is to collect text into an atomic unit. Flushes are often emitted in calls where the body is not visible, and hence unintentionally break up the text. Furthermore, there may be more than one flush within the lifetime of an osyncstream, which would impose a performance loss when an atomic unit of text needs only one flush. The design decision is only to flush the underlying stream, if the osyncstream was flushed, and only once per atomic transfer of the character sequence.
+\added{ p0052r5 introduced manipulators to allow both ways, but the default remains not to flush immediately.}
+
+\item[Can you flush just transfer the characters and not flush the underlying stream?] 
+The flush intends an effect on visible to the user. So, we should preserve at least one flush. The flush may not be visible to the code around the osyncstream, and so its programmer cannot do a manual flush, because attempting to flush the underlying stream that is shared among threads will introduce a data race.
+
+\item[Why do you specify \tcode{basic_syncbuf}? LWG and LEWG thought you wouldn't need it.] 
+Users use the streambuf interface. Without access to the \tcode{basic_syncbuf} they would not be able call \tcode{emit()} on the underlying streambuf responsible the synchronization. Ask Pablo Halpern if you need more to be convinced.
+\item[Where will the required lock/mutex be put? Will it be in every streambuf object changing the ABI?] 
+That is one of the reasons, why this must be put into the standard library. It is possible to implement with a global map from streambuf* to mutexes as the example code does, however, existing standard library implementations might have already a space for the mutexes (not breaking their ABI), because \tcode{cout}/\tcode{cerr} seem to require one and those might be the most important ones to wrap.
+\end{description}
+
+The design follows from the principles of the iostream library. If discussed a person knowledgable about iostream's implementation is favorable, because of its many legacy design decisions, that would no longer be taken by modern C++ class designers. 
+ 
+As with all existing stream classes, using a stream object or a streambuf object from multiple threads can result in a data race, this is also true for \tcode{osyncstream}. Its use enables sharing the wrapped streambuf object/output stream across several threads, if all concurrently using threads apply a local osyncstream around it.
+
+We follow typical stream conventions of \tcode{basic_} prefixes and typedefs.
+
+The constructor for \tcode{osyncstream} takes a non-const reference to a \tcode{basic_ostream} obtaining its stream buffer or a \tcode{basic_streambuf} or can be put around such a stream buffer directly. This stream buffer indicates that the destruction of the \tcode{osyncstream} or calling its \tcode{emit()} member function may write to the stream buffer obtained with the constructor argument.
+
+The wording below permits implementation of \tcode{basic_osyncstream} with either a stream_mutex from \href{https://wg21.link/n3535}{N3535} or with implementations suitable for \href{https://wg21.link/N3665}{N3665}, e.g. with Posix file locks \href{http://pubs.opengroup.org/onlinepubs/009695399/functions/flockfile.html}{[PSL]}
+
+\section{Items to be discussed by LEWG/LWG}
+\begin{itemize}
+\item Naming of the manipulators
+\item Should the manipulators be in header \tcode{<osyncstream>} instead of globally available?
+\item Should the manipulator-hook member function of \tcode{basic_syncbuf} be public, or should the manipulators be made friends instead. However, without the accessor users can not directly force the stream buffer to pass through every sync.
+\item re-check wording.
+\end{itemize}
+
+
+\chapter{Wording}
+
+This wording is relative to the current C++ working draft. It could be integrated into a Concurrency TS  accordingly.
+
+Changes will happen in section 30 mainly.
+
+In section 20.5.1.1 Library contents [contents] add an entry to table 16 (cpp.library.headers) for the new header \tcode{<syncstream>}. Because of the new header, there is no need for a feature test macro.
+
+\section{30.1 General [input.output.general]}
+Insert a new entry in table 106 Input/output library summary (tab:iostreams.lib.summary) 
+
+\begin{center} 
+\begin{tabular}{|lll|}
+%\ref{syncstream}             
+\textbf{30.x }& Synchronized output stream                & \tcode{<syncstream>} \\ 
+\end{tabular}
+\end{center}
+
+\section{30.3.1 Header <iosfwd> synopsis [iosfwd.syn]}
+
+Insert the following declarations to the synopsis of \tcode{<iosfwd>} in the namespace std.
+
+\begin{addedblock}
+\begin{codeblock}
+template <class charT,
+          class traits = char_traits<charT>,
+          class Allocator = allocator<charT>>
+  class basic_syncbuf;
+using syncbuf  = basic_syncbuf<char>;
+using wsyncbuf = basic_syncbuf<wchar_t>;
+
+template <class charT,
+          class traits = char_traits<charT>,
+          class Allocator = allocator<charT> >
+  class basic_osyncstream;
+typedef basic_osyncstream<char> osyncstream;
+typedef basic_osyncstream<wchar_t> wosyncstream; 
+\end{codeblock}
+\end{addedblock}
+
+\section{30.7.5.4 Standard \tcode{basic_ostream} manipulators [ostream.manip]}
+Add the following two manipulators.
+\begin{addedblock}
+\begin{itemdecl}
+template <class charT, class traits>
+  basic_ostream<charT, traits>& immediateflush(basic_ostream<charT, traits>& os);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+If \tcode{os} is a \tcode{basic_osyncstream<charT, traits, Allocator>} reference, calls \tcode{dynamic_cast<basic_osyncbuf<charT, traits, Allocator>*>(os.rdbuf())->set_emit_on_sync(true)}. Otherwise this manipulator has no effect. 
+\begin{note}
+To work around the issue that the \tcode{Allocator} template argument can not be deduced, implementations can introduce an intermediate base class to \tcode{basic_osyncbuf} that takes care its \tcode{emit_on_sync} flag.
+\end{note}
+
+\pnum
+\returns
+\tcode{os}.
+\end{itemdescr}
+
+\begin{itemdecl}
+template <class charT, class traits>
+  basic_ostream<charT, traits>& noimmediateflush(basic_ostream<charT, traits>& os);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+If \tcode{os} is a \tcode{basic_osyncstream<charT, traits, Allocator>} reference, calls \tcode{dynamic_cast<basic_osyncbuf<charT, traits, Allocator>*>(os.rdbuf())->set_emit_on_sync(false)}. Otherwise this manipulator has no effect. 
+
+\pnum
+\returns
+\tcode{os}.
+\end{itemdescr}
+\end{addedblock}
+
+\section{30.x Synchronized output stream [syncstream]}
+\emph{Insert this new section 30.x in chapter 30 [input.output] }
+\subsection{30.x.1 Header <synstream> synopsis [syncstream.syn]}
+\begin{addedblock}
+\begin{codeblock}
+namespace std {
+template <class charT,
+          class traits = char_traits<charT>,
+          class Allocator = allocator<charT>>
+  class basic_syncbuf;
+using syncbuf  = basic_syncbuf<char>;
+using wsyncbuf = basic_syncbuf<wchar_t>;
+
+template <class charT,
+          class traits,
+          class Allocator>
+  class basic_osyncstream;
+typedef basic_osyncstream<char> osyncstream;
+typedef basic_osyncstream<wchar_t> wosyncstream; 
+}
+\end{codeblock}
+\end{addedblock}
+
+\begin{addedblock}
+The header \tcode{<syncstream>} provides a mechanism to synchronize execution agents writing to the same stream. 
+It defines a class template \tcode{basic_osyncstream} to buffer output and transfer the buffered content into an object of type \tcode{basic_streambuf<charT,traits>} atomically with respect to such transfers by other \tcode{basic_osyncstream<charT,traits,Allocator>} objects referring to the same \tcode{basic_streambuf<charT,traits>} object. The transfer occurs when \tcode{emit()} is called and when the \tcode{basic_osyncstream<chart,traits,Allocator>} object is destroyed.
+
+
+\end{addedblock}
+\subsection{30.x.2 Class template basic_syncbuf [syncstream.syncbuf]}
+\begin{addedblock}
+\begin{codeblock}
+template <class charT,
+          class traits = char_traits<charT>,
+          class Allocator = allocator<charT>>
+class basic_syncbuf
+  : public std::basic_streambuf<charT, traits> {
+
+public:
+  using char_type      = charT;
+  using int_type       = typename traits::int_type;
+  using pos_type       = typename traits::pos_type;
+  using off_type       = typename traits::off_type;
+  using traits_type    = traits;
+  using allocator_type = Allocator;
+
+  using streambuf_type = basic_streambuf<charT,traits>;
+
+  explicit
+  basic_syncbuf(streambuf_type* obuf = nullptr)
+  : basic_syncbuf(obuf,Allocator{});
+  basic_syncbuf(streambuf_type* obuf,
+                Allocator const &allocator);
+  basic_syncbuf(basic_syncbuf&& other);
+  ~basic_syncbuf();
+
+  basic_syncbuf& operator=(basic_syncbuf&& rhs);
+  void swap(basic_syncbuf &other);
+
+  bool emit();
+  streambuf_type* get_wrapped()   const noexcept;
+  allocator_type  get_allocator() const noexcept;
+  void            set_emit_on_sync(bool b) noexcept;
+
+protected:
+  int sync() override;
+
+private:
+  streambuf_type *wrapped;       // exposition only
+  bool            emit_on_sync{} // exposition only
+};
+
+template <class charT, class traits, class Allocator>
+inline void swap(basic_syncbuf<charT,traits,Allocator>& a,
+                 basic_syncbuf<charT,traits,Allocator>& b);
+
+\end{codeblock}
+\end{addedblock}
+
+\section{30.x.2.1 \tcode{basic_syncbuf} constructors [syncstream.syncbuf.cons]}
+%\rSec3[syncbuf.cons]{\tcode{basic_syncbuf}  constructors}
+
+\indexlibrary{\idxcode{basic_syncbuf}!constructor}%
+\begin{addedblock}
+\begin{itemdecl}
+explicit basic_syncbuf(
+  streambuf_type* obuf = nullptr,
+  Allocator const &allocator = Allocator());
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs the \tcode{basic_syncbuf} object and sets \tcode{wrapped} to \tcode{obuf} which will be the final destination of characters inserted into the stream.
+
+\remarks
+If \tcode{obuf == nullptr}, output operations on \tcode{*this} will fail. A copy of \tcode{allocator} is used to allocate memory for internal buffers.
+
+\pnum
+\throws
+Nothing unless constructing a mutex or allocating memory throws.
+
+\pnum
+\begin{note}
+Subsequent calls to \tcode{emit()} might result in member functions being called on the user-provided stream buffer while a lock is held. 
+\end{note}
+
+\pnum
+\postconditions
+\tcode{get_wrapped() == obuf \&\& get_allocator() == allocator}.
+
+\end{itemdescr}
+
+
+\begin{itemdecl}
+basic_syncbuf(basic_syncbuf&& other);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+If \tcode{other.get_wrapped() == nullptr}, equivalent to \tcode{basic_syncbuf(nullptr, other.get_allocator())} otherwise the state necessary to perform \tcode{other.emit()} is moved to \tcode{*this}.
+
+\pnum
+\postconditions
+The value returned by \tcode{this->get_wrapped()} is the value returned by \tcode{other.get_wrapped()} prior to calling this constructor. Output stored in \tcode{other} prior to calling this constructor will be stored in \tcode{*this} afterwards. \tcode{other.rdbuf()->pbase() == other.rdbuf()->pptr()} and \tcode{other.get_wrapped() == nullptr}.
+
+
+\pnum
+\begin{note}
+This constructor disassociates \tcode{other} from its wrapped stream buffer ensuring destruction of other produces no output. 
+\end{note}
+\end{itemdescr}
+
+\end{addedblock}
+
+\section{30.x.2.2 \tcode{basic_syncbuf} destructor [syncstream.syncbuf.dtor]}
+%\rSec3[syncbuf.dtor]{\tcode{basic_syncbuf}  destructors}
+
+\indexlibrary{\idxcode{basic_syncbuf}!destructor}%
+\begin{addedblock}
+\begin{itemdecl}
+~basic_syncbuf();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Calls \tcode{this->emit()}.
+
+\pnum
+\throws
+Nothing. 
+If an exception is thrown while writing to the wrapped buffer, that exception is caught and ignored.
+
+\end{itemdescr}
+
+\end{addedblock}
+
+\subsection{30.x.2.3 \tcode{basic_syncbuf} assign and swap [syncstream.syncbuf.assign]}
+
+%\rSec3[syncstream.syncbuf.assign]{\tcode{basic_syncbuf} assign and swap }
+%\indexlibrarymember{operator=}{basic_syncbuf}%
+
+\begin{addedblock}
+\begin{itemdecl}
+basic_syncbuf& operator=(basic_syncbuf&& rhs) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects 
+Calls \tcode{this->emit()}. If \tcode{rhs.get_wrapped() != nullptr}, the state necessary to perform \tcode{rhs.emit()} is moved to \tcode{*this}.
+
+
+\pnum
+\returns \tcode{*this}.
+
+\pnum
+\postconditions
+\tcode{rhs.get_wrapped() == nullptr}. If \tcode{allocator_traits<Allocator>::propagate_on_container_move_assignment::value == true}, then \tcode{this->get_allocator() == rhs.get_allocator();} otherwise the allocator is unchanged.
+
+\pnum
+\begin{note}
+This assignment operator disassociates \tcode{rhs} from its wrapped stream buffer ensuring destruction of other produces no output. 
+\end{note}
+\end{itemdescr}
+
+\begin{itemdecl}
+void swap(basic_syncbuf& other) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\requires
+\tcode{this->get_allocator() == other.get_allocator()}.
+
+\pnum
+\effects
+Exchanges the state of \tcode{*this} and \tcode{other}.
+\end{itemdescr}
+
+\begin{itemdecl}
+template <class charT, class traits, class Allocator>
+void swap(basic_syncbuf<charT,traits,Allocator>& a, 
+          basic_syncbuf<charT,traits,Allocator>& b) noexcept;
+\end{itemdecl}
+\begin{itemdescr}
+
+\pnum
+\effects
+As if by \tcode{a.swap(b)}.
+\end{itemdescr}
+
+\end{addedblock}
+
+\subsection{30.x.2.4 \tcode{basic_syncbuf} member functions [syncstream.syncbuf.mfun]}
+
+%\rSec3[syncstream.syncbuf.mfun]{\tcode{basic_syncbuf} member functions }
+
+\begin{addedblock}
+\begin{itemdecl}
+bool emit();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects 
+Atomically transfers the contents of the internal buffer to the stream buffer \tcode{*wrapped}, so that they appear in the output stream as a contiguous sequence of characters. If and only if a call was made to \tcode{this->sync()},  \tcode{wrapped->pubsync()} is called.
+
+\pnum
+\returns \tcode{true} if \tcode{wrapped != nullptr}, all of the buffered characters were successfully transferred, and the call to \tcode{wrapped->pubsync()} (if any) succeeded; otherwise \tcode{false}.
+
+
+\pnum
+{\Fundesc{Synchronization}}
+All \tcode{emit()} calls transferring characters to the same stream buffer object appear to execute in a total order consistent with \emph{happens-before} where each \tcode{emit()} call \emph{synchronizes-with} subsequent \tcode{emit()} calls in that total order.
+
+
+\pnum
+\remarks
+May call member functions of \tcode{wrapped} while holding a lock uniquely associated with \tcode{wrapped}.
+\end{itemdescr}
+
+\begin{itemdecl}
+streambuf_type* get_wrapped() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns 
+\tcode{wrapped}.
+\end{itemdescr}
+
+\begin{itemdecl}
+allocator_type get_allocator() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns 
+A copy of the allocator set in the constructor or from assignment.
+\end{itemdescr}
+
+\begin{itemdecl}
+void set_emit_on_sync(bool b) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects 
+\tcode{emit_on_sync=b}.
+\end{itemdescr}
+
+\end{addedblock}
+
+\subsection{30.x.2.5 \tcode{basic_syncbuf} overridden virtual member functions [syncstream.syncbuf.virtuals]}
+
+%\rSec3[syncstream.syncbuf.virtuals]{\tcode{basic_syncbuf} overridden virtual member functions }
+
+\begin{addedblock}
+\begin{itemdecl}
+int sync() override;
+\end{itemdecl}
+\begin{itemdescr}
+\pnum
+\effects 
+Record the fact that user desires that the wrapped buffer be flushed. 
+If \tcode{emit_on_sync == true}, calls \tcode{emit()}, otherwise
+the actual flush is delayed until a call to \tcode{emit()}.
+
+\pnum
+\returns
+if \tcode{emit()} was called and returned \tcode{false}, returns \tcode{-1} otherwise \tcode{0}.
+\end{itemdescr}
+
+\end{addedblock}
+
+%\rSec2[syncstream.osyncstream]{Class template \tcode{basic_osyncstream}}
+\section{30.x.3 Class template \tcode{basic_osyncstream} [syncstream.osyncstream] }
+
+%\indexlibrary{\idxcode{basic_osyncstream}}%
+
+\begin{addedblock}
+ 
+\begin{codeblock}
+template <class charT,
+          class traits,
+          class Allocator>
+class basic_osyncstream
+  : public basic_ostream<charT,traits>
+{
+public:
+  using char_type      = charT;
+  using int_type       = typename traits::int_type;
+  using pos_type       = typename traits::pos_type;
+  using off_type       = typename traits::off_type;
+  using traits_type    = traits;
+  using allocator_type = Allocator;
+  using streambuf_type = basic_streambuf<charT,traits>;
+  using syncbuf_type   = basic_syncbuf<charT,traits, Allocator>;
+
+  basic_osyncstream(streambuf_type *obuf, Allocator const &allocator);
+  explicit basic_osyncstream(streambuf_type *obuf)
+  :basic_osyncstream{obuf, Allocator{}}{}
+  basic_osyncstream(basic_ostream<charT,traits> &os, Allocator const &allocator)
+  :basic_osyncstream{os.rdbuf(),allocator}{}
+  explicit basic_osyncstream(basic_ostream<charT,traits> &os)
+  :basic_osyncstream{os,Allocator{}}{}
+  basic_osyncstream(basic_osyncstream&&) noexcept;
+  ~basic_osyncstream();
+  basic_osyncstream& operator=(basic_osyncstream&&) noexcept;
+  void emit();
+  streambuf_type* get_wrapped() const noexcept;
+  syncbuf_type*   rdbuf() const noexcept override { return &sb ; }
+private:
+  syncbuf_type sb; // exposition only
+};
+\end{codeblock}
+
+\pnum
+\tcode{Allocator} shall meet the allocator requirements [allocator.requirements].
+
+\pnum
+\begin{example}
+Use a named variable within a block statement for streaming.
+\begin{codeblock}
+{
+  osyncstream bout(cout);
+  bout << "Hello, ";
+  bout << "World!";
+  bout << endl; // flush is noted
+  bout << "and more!\n";
+} // characters are transferred and cout is flushed
+\end{codeblock}
+\end{example}
+
+\pnum
+\begin{example}
+Use a temporary object for streaming within a single statement. \tcode{cout} is not flushed.
+\begin{codeblock}
+osyncstream(cout) << "Hello, " << "World!" << '\n';
+\end{codeblock}
+\end{example}
+% basic_ostream& operator<<(basic_ostream&&, T const &) exists, so this is fine!
+\end{addedblock}
+
+
+%\rSec3[osyncstream.cons]{\tcode{basic_osynctream} constructors}
+\subsection{30.x.3.1 \tcode{basic_osyncstream} constructors [syncstream.osyncstream.cons]}
+
+\begin{addedblock}
+
+\begin{itemdecl}
+basic_osyncstream(
+  streambuf_type  *buf, 
+  Allocator const &allocator);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Initializes \tcode{sb} from \tcode{buf} and 
+\tcode{allocator} and initializes the base class with \tcode{basic_ostream(\&sb)}.
+
+\pnum
+\begin{note}
+If wrapped stream buffer pointer refers to a user provided stream buffer then its implementation must be aware that its member functions might be called from \tcode{emit()} while a lock is held. 
+\end{note}
+
+\pnum
+\postconditions
+\tcode{get_wrapped() == buf}.
+\end{itemdescr}
+
+\begin{itemdecl}
+basic_osyncstream(basic_osyncstream&& other) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects 
+Move constructs from \tcode{other}. This is accomplished by move constructing the base class, and the contained \tcode{basic_syncbuf} \tcode{sb}. Next \tcode{basic_ostream<charT, traits>::set_rdbuf(\&sb)} is called to install the \tcode{basic_syncbuf} \tcode{sb}.
+
+\pnum
+\postconditions
+The value returned by \tcode{this->get_wrapped()} is the value returned by \tcode{os.get_wrapped()} prior to calling this constructor. \tcode{nullptr == os.get_wrapped()}.
+\end{itemdescr}
+
+\end{addedblock}
+
+%\rSec3[osyncstream.dtor]{\tcode{basic_osynctream} destructor}
+\subsection{30.x.3.2 \tcode{basic_osyncstream} destructor [syncstream.osyncstream.dtor]}
+
+\begin{addedblock}
+
+\begin{itemdecl}
+~basic_osyncstream();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects 
+Calls \tcode{emit()} and swallows any exceptions arising.
+\end{itemdescr}
+
+
+\end{addedblock}
+
+
+%\rSec3[osyncstream.assign]{Assignment}
+\subsection{30.x.3.3 Assignment [syncstream.osyncstream.assign]}
+\begin{addedblock}
+
+\begin{itemdecl}
+basic_osyncstream& operator=(basic_osyncstream&& other) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects 
+First, calls \tcode{this->emit()} and swallows any exceptions arising. Move assigns \tcode{sb} from \tcode{other.sb}.
+\begin{note}
+This disassociates \tcode{other} from its wrapped stream buffer ensuring destruction of other produces no output. 
+\end{note}
+
+\pnum
+\postconditions
+Primarily, \tcode{nullptr == other.get_wrapped()}. Also, \tcode{get_wrapped()} returns the value previously returned by \tcode{other.get_wrapped()}.
+\end{itemdescr}
+
+
+\end{addedblock}
+
+%\rSec3[osyncstream.members]{Member functions}
+\subsection{30.x.3.4 Member functions [syncstream.osyncstream.members]}
+\begin{addedblock}
+
+\begin{itemdecl}
+void emit();
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects 
+Calls \tcode{sb.emit()}. If this call returns \tcode{false}, calls \tcode{setstate(ios::badbit)}.
+
+\begin{example}
+A flush on a \tcode{basic_osyncstream} does not flush immediately:
+\begin{codeblock}
+{
+  osyncstream bout(cout);
+  bout << "Hello," << '\n'; // no flush
+  bout.emit(); // characters transferred; cout not flushed
+  bout << "World!" << endl; // flush noted; bout not flushed
+  bout.emit(); // characters transferred; cout flushed
+  bout << "Greetings." << '\n'; // no flush
+} // characters transferred; cout not flushed
+\end{codeblock}
+\end{example}
+
+\begin{example}
+The function emit() can be used to catch exceptions from operations on the underlying stream.
+\begin{codeblock}
+{
+  osyncstream bout(cout);
+  bout << "Hello, " << "World!" << '\n';
+  try {
+    bout.emit();
+  } catch ( ... ) {
+    // stuff
+  }
+}
+\end{codeblock}
+\end{example}
+\end{itemdescr}
+
+\begin{itemdecl}
+streambuf_type* get_wrapped() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\returns 
+\tcode{sb.get_wrapped()}.
+
+\begin{example}
+Obtaining the wrapped stream buffer with \tcode{get_wrapped()} allows wrapping it again with an \tcode{osyncstream}. For example,
+\begin{codeblock}
+{
+  osyncstream bout1(cout);
+  bout1 << "Hello, ";
+  {
+    osyncstream(bout1.get_wrapped()) << "Goodbye, " << "Planet!" << '\n';
+  }
+  bout1 << "World!" << '\n';
+}
+\end{codeblock}
+produces the \emph{uninterleaved} output
+\begin{codeblock}
+Goodbye, Planet!
+Hello, World!
+\end{codeblock}
+\end{example}
+
+\end{itemdescr}
+
+
+\end{addedblock}
+
+
+
+%%%%%%
+\section{Implementation}
+An example implementation is availabile on \url{https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/p0053_basic_osyncstreambuf}
+
+\chapter{Revisions}
+Each section lists the revisions in the following version from the version given in the heading.
+\section{\href{http://wiki.edg.com/pub/Wg21kona2017/LibraryEvolutionWorkingGroup/p0053r4.html}{D0053R4}}
+This version was only published on the Kona Wiki.
+\begin{itemize}
+\item Translate text to LaTeX
+\item Added manipulator support so that logging frameworks that get an osyncstream passed can rely on flushes happening.
+\item Make sure that temporary stream objects can be used safely (it is already in the standard, Pablo!)
+\item Ensured section/table numbers match current working draft (as of 06/2017 before the mailing)
+\end{itemize}
+
+\section{\href{https://wg21.link/P0053R3}{P0053R3}}
+\begin{itemize}
+\item Takes input from Pablo Halpern and re-instantiate the stream buffer that performs the synchronization.
+\item Split the constructors with a defaulted allocator parameter to one single-argument one being explicit and one non-explicit taking 2 arguments.
+\end{itemize}
+
+\section{\href{https://wg21.link/P0053R2}{P0053R2}}
+\begin{itemize}
+\item Remove the "may construct a mutex" notes.
+\item Remove "may destroy mutex" notes.
+\item Clarify \tcode{osyncstream} flush behavior in an example.
+\item Make minor editorial fixes.
+\end{itemize}
+
+\section{\href{https://wg21.link/P0053R1}{P0053R1}}
+\begin{itemize}
+\item Provide a \tcode{typedef} for the wrapped stream buffer and use it to shorten the specification as suggested by Daniel Kr\"ugler.
+\item Provide move construction and move assignment and specify the moved-from state to be detached from the wrapped stream buffer.
+\item Rename \tcode{get()} to \tcode{rdbuf_wrapped()} and provide \tcode{noexcept} specification.
+\item Changed to explicitly rely on wrapping a stream buffer, instead of an \tcode{ostream} object and adjust explanations accordingly.
+\end{itemize}
+
+\section{\href{https://wg21.link/P0053R0}{P0053R0}}
+\begin{itemize}
+\item Add remark to note that exchanging the stream buffer while the stream is wrapped causes undefined behavior and added a note to warn stream buffer implementers about the lock being held in \tcode{emit()}. Call \tcode{setstate(badbit)} if IO errors occur in \tcode{emit()}.
+\item Replace code references to \tcode{basic_streambuf} by the term stream buffer introduced in [stream.buffers].
+\item Provide an example implementation.
+\item The lock is to be associate to the underlying \tcode{basic_streambuf} instead of the \tcode{basic_stream}.
+\item Added an \tcode{Allocator} constructor parameter.
+\item Moves destructor example to \tcode{emit()}.
+\item Clarifies wording about synchronization and flushing (several times).
+\item List the new header in corresponding table.
+\item Provide type aliases in \tcode{<iosfwd>}.
+\item Removed copy constructor in favor of providing \tcode{get()}.
+\item Notify that move construction and assignment is deleted.
+\item Moved class \tcode{noteflush_streambuf} into an implementation note.
+\item Add a design subsection that states that a header test is a sufficient feature test.
+\end{itemize}
+
+\section{\href{https://wg21.link/N4187}{N4187}}
+\begin{itemize}
+\item Updated introduction with recent history.
+\item Rename ostream_buffer to \tcode{osyncstream} to reflect its appearance is more like a stream than like a buffer.
+\item Add an example of using \tcode{osyncstream} as a temporary object.
+\item Add an example of a \tcode{osyncstream} constructed with another \tcode{osyncstream}.
+\item Clarify the behavior of nested \tcode{osyncstream} executions.
+\item Clarify the behavior of exceptions occuring with the \tcode{osyncstream} destructor.
+\item Clarify the deferral of flush from the \tcode{osyncstream}'s streambuf to the final \tcode{basic_ostream}.
+\item Limit the number of references to \tcode{noteflush_stringbuf} in anticipation of the committee removing it from the specification.
+\item Rename \tcode{noteflush_stringbuf} to \tcode{noteflush_streambuf} to hide possible implementation details.
+\item Change the base class of \tcode{noteflush_streambuf} from \tcode{basic_stringbuf} to \tcode{basic_streambuf}.
+\end{itemize}
+\section{\href{https://wg21.link/N4069}{N4069}}
+\begin{itemize}
+\item Added note to sync as suggested by BSI via email.
+\end{itemize}
+
+\section{\href{https://wg21.link/N3978}{N3978}}
+\begin{itemize}
+\item Added a Design section.
+\item Clarify the reference capturing behavior of the \tcode{ostream_buffer} constructors.
+\item Added \tcode{noexcept} and \tcode{const} as appropriate to members.
+\item Added note on throwing wrapped streams.
+\item Change the \tcode{noteflush_stringbuf} public member variable \tcode{needsflush} to a public member query function \tcode{flushed}.
+\item Removed the public member function \tcode{noteflush_stringbuf::clear}.
+\item Minor synopsis formatting changes.
+\item Incorporated feedback from SG1 and Dietmar K\"uhl in specific in Rapperswil.
+\end{itemize}
+\section{\href{https://wg21.link/N3892}{N3892}}
+\begin{itemize}
+\item Flush the \tcode{ostream} if and only if the \tcode{ostream_buffer} was flushed.
+\item Add the \tcode{clear_for_reuse} function.
+\item Change the design from inheriting from \tcode{basic_ostream} to using a \tcode{noteflush_stringbuf}, which is a slightly modified \tcode{basic_stringbuf}. The modification is to note the flush rather than act upon it.
+\end{itemize}
+\section{\href{https://wg21.link/N3750}{N3750}}
+\begin{itemize}
+\item Change name to basic_ostream_buffer and add the usual typedefs.
+\item Change interface to inherit from basic_ostringstream rather than provide access to a member of that type.
+\item Add a Revisions section.
+\end{itemize}
+
+
+\end{document}
+
