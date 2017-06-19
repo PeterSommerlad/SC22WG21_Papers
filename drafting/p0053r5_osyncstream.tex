@@ -55,7 +55,7 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{p0052r5}
-\newcommand{\paperdate}{2017-06-18}
+\newcommand{\paperdate}{2017-06-19}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -81,7 +81,7 @@ At present, some stream output operations guarantee that they will not produce r
 
 \href{https://wg21.link/N3678}{N3678 C++ Stream Guards} proposed a standard mechanism for batching operations on a stream. That batching may be implemented as mutexes, as buffering, or some combination of both. It was the response to the Concurrency Study Group. A draft of that paper was reviewed in the Library Working Group, who found too many open issues on what was reasonably exposed to the 'buffering' part.
 
-\href{https://wg21.link/N3665}{N3665 Uninterleaved Sring Output Streaming} proposed making streaming of strings of length less than BUFSIZ appear uninterleaved in the output. It was a "minimal" functionality change to the existing standard to address the problem. The full Committee chose not to adopt that minimal solution.
+\href{https://wg21.link/N3665}{N3665 Uninterleaved String Output Streaming} proposed making streaming of strings of length less than BUFSIZ appear uninterleaved in the output. It was a "minimal" functionality change to the existing standard to address the problem. The full Committee chose not to adopt that minimal solution.
 
 \href{https://wg21.link/N3750}{N3750 C++ Ostream Buffers} proposed an explicit buffering, at the direction of the general consensus in the July 2013 meeting of the Concurrency Study Group. In November 2014 a further updated version \href{https://wg21.link/N4187}{N4187} was discussed in Library Evolution in Urbana and it was consensus to work with a library expert to get the naming and wording better suited to LWG expectations. Nico Josuttis volunteered to help the original authors. More information on the discussion is available at \href{http://wiki.edg.com/twiki/bin/view/Wg21urbana-champaign/N4187}{LEWG wiki} and the corresponding \href{https://issues.isocpp.org/show_bug.cgi?id=20}{LEWG bug tracker entry (20)}. This paper address issues raised with \href{https://wg21.link/N4187}{N4187}. This paper has a change of title to reflect a change in class name, but contains the same fundamental approach.
 
@@ -98,6 +98,10 @@ The intent is that the \tcode{basic_osyncstream} is an automatic-duration variab
   bout << "Hello, " << "World!" << '\n';
 }
 \end{codeblock}
+or with a single output statement:
+\begin{codeblock}
+  osyncstream{cout} << "The answer is " << 6*7 << endl;
+\end{codeblock}
 
 
 \chapter{Design}
@@ -109,16 +113,16 @@ You will not get data races for cout, but that is not true for most other stream
 To support all existing and user-defined output operators, osyncstream must be an ostream subclass.
 \item[Can you make a flush of the osyncstream mean transfer the characters and flush the underlying stream?
 ] 
-No, because the point of the osyncstream is to collect text into an atomic unit. Flushes are often emitted in calls where the body is not visible, and hence unintentionally break up the text. Furthermore, there may be more than one flush within the lifetime of an osyncstream, which would impose a performance loss when an atomic unit of text needs only one flush. The design decision is only to flush the underlying stream, if the osyncstream was flushed, and only once per atomic transfer of the character sequence.
+No, because the point of the osyncstream is to collect text into an atomic unit. Flushes are often emitted in calls where the body is not visible, and hence unintentionally break up the text. Furthermore, there may be more than one flush within the lifetime of an osyncstream, which would impose a performance loss when an atomic unit of text needs only one flush. The design decision is only to flush the underlying stream if the osyncstream was flushed, and only once per atomic transfer of the character sequence.
 \added{ p0052r5 introduced manipulators to allow both ways, but the default remains not to flush immediately.}
 
-\item[Can you flush just transfer the characters and not flush the underlying stream?] 
+\item[Can flush just transfer the characters and not flush the underlying stream?] 
 The flush intends an effect on visible to the user. So, we should preserve at least one flush. The flush may not be visible to the code around the osyncstream, and so its programmer cannot do a manual flush, because attempting to flush the underlying stream that is shared among threads will introduce a data race.
 
 \item[Why do you specify \tcode{basic_syncbuf}? LWG and LEWG thought you wouldn't need it.] 
-Users use the streambuf interface. Without access to the \tcode{basic_syncbuf} they would not be able call \tcode{emit()} on the underlying streambuf responsible the synchronization. Ask Pablo Halpern if you need more to be convinced.
-\item[Where will the required lock/mutex be put? Will it be in every streambuf object changing the ABI?] 
-That is one of the reasons, why this must be put into the standard library. It is possible to implement with a global map from streambuf* to mutexes as the example code does, however, existing standard library implementations might have already a space for the mutexes (not breaking their ABI), because \tcode{cout}/\tcode{cerr} seem to require one and those might be the most important ones to wrap.
+Users use the streambuf interface. Without access to the \tcode{basic_syncbuf} they would not be able call \tcode{emit()} on the underlying streambuf responsible the synchronization. Every stream in the standard is defined as a pair of streambuf/stream, for good reason. Ask Pablo Halpern if you need more to be convinced.
+\item[Where will the required lock/mutex be put? Will it be in every \tcode{streambuf} object changing the ABI?] 
+That is one of the reasons why this must be put into the standard library. It is possible to implement with a global map from \tcode{streambuf*} to mutexes as the example code does, however, existing standard library implementations might have already a space for the mutexes (not breaking their ABI), because \tcode{cout}/\tcode{cerr} seem to require one and those might be the most important ones to wrap.
 \end{description}
 
 The design follows from the principles of the iostream library. If discussed a person knowledgable about iostream's implementation is favorable, because of its many legacy design decisions, that would no longer be taken by modern C++ class designers. 
@@ -127,7 +131,8 @@ As with all existing stream classes, using a stream object or a streambuf object
 
 We follow typical stream conventions of \tcode{basic_} prefixes and typedefs.
 
-The constructor for \tcode{osyncstream} takes a non-const reference to a \tcode{basic_ostream} obtaining its stream buffer or a \tcode{basic_streambuf} or can be put around such a stream buffer directly. This stream buffer indicates that the destruction of the \tcode{osyncstream} or calling its \tcode{emit()} member function may write to the stream buffer obtained with the constructor argument.
+The constructor for \tcode{osyncstream} takes a non-const reference to a \tcode{basic_ostream} obtaining its stream buffer or a \tcode{basic_streambuf*} or can be put around such a stream buffer directly. Calling the \tcode{emit()} member function or destroying the \tcode{osyncstream} may write to the stream buffer obtained at construction.
+
 
 The wording below permits implementation of \tcode{basic_osyncstream} with either a stream_mutex from \href{https://wg21.link/n3535}{N3535} or with implementations suitable for \href{https://wg21.link/N3665}{N3665}, e.g. with Posix file locks \href{http://pubs.opengroup.org/onlinepubs/009695399/functions/flockfile.html}{[PSL]}
 
@@ -137,6 +142,8 @@ The wording below permits implementation of \tcode{basic_osyncstream} with eithe
 \item Should the manipulators be in header \tcode{<osyncstream>} instead of globally available?
 \item Should the manipulator-hook member function of \tcode{basic_syncbuf} be public, or should the manipulators be made friends instead. However, without the accessor users can not directly force the stream buffer to pass through every sync.
 \item re-check wording.
+\item Should the \tcode{Allocator} be part of the stream type, or should it simply use \tcode{polymorphic_allocator<CharT>}, consistent with P0339? Pablo thinks the latter would be easier to use.
+\item What should be the delivery vehicle for this feature: C++20 or the concurrency TS?
 \end{itemize}
 
 
@@ -185,7 +192,7 @@ Add the following two manipulators.
 \begin{addedblock}
 \begin{itemdecl}
 template <class charT, class traits>
-  basic_ostream<charT, traits>& immediateflush(basic_ostream<charT, traits>& os);
+  basic_ostream<charT, traits>& emit_on_flush(basic_ostream<charT, traits>& os);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -203,7 +210,7 @@ To work around the issue that the \tcode{Allocator} template argument can not be
 
 \begin{itemdecl}
 template <class charT, class traits>
-  basic_ostream<charT, traits>& noimmediateflush(basic_ostream<charT, traits>& os);
+  basic_ostream<charT, traits>& noemit_on_flush(basic_ostream<charT, traits>& os);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -211,6 +218,20 @@ template <class charT, class traits>
 \effects
 If \tcode{os} is a \tcode{basic_osyncstream<charT, traits, Allocator>} reference, calls \tcode{dynamic_cast<basic_osyncbuf<charT, traits, Allocator>*>(os.rdbuf())->set_emit_on_sync(false)}. Otherwise this manipulator has no effect. 
 
+\pnum
+\returns
+\tcode{os}.
+\end{itemdescr}
+
+\begin{itemdecl}
+template <class charT, class traits>
+  basic_ostream<charT, traits>& flush_emit(basic_ostream<charT, traits>& os);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+\tcode{flush(os)}, if \tcode{os} is a \tcode{basic_osyncstream<charT, traits, Allocator>} reference,  \tcode{dynamic_cast<basic_osyncbuf<charT, traits, Allocator>*>(os.rdbuf())->emit(),}. 
 \pnum
 \returns
 \tcode{os}.
@@ -346,9 +367,9 @@ The value returned by \tcode{this->get_wrapped()} is the value returned by \tcod
 
 
 \pnum
-\begin{note}
+\begin{remarks}
 This constructor disassociates \tcode{other} from its wrapped stream buffer ensuring destruction of other produces no output. 
-\end{note}
+\end{remarks}
 \end{itemdescr}
 
 \end{addedblock}
@@ -400,9 +421,9 @@ Calls \tcode{this->emit()}. If \tcode{rhs.get_wrapped() != nullptr}, the state n
 \tcode{rhs.get_wrapped() == nullptr}. If \tcode{allocator_traits<Allocator>::propagate_on_container_move_assignment::value == true}, then \tcode{this->get_allocator() == rhs.get_allocator();} otherwise the allocator is unchanged.
 
 \pnum
-\begin{note}
+\begin{remarks}
 This assignment operator disassociates \tcode{rhs} from its wrapped stream buffer ensuring destruction of other produces no output. 
-\end{note}
+\end{remarks}
 \end{itemdescr}
 
 \begin{itemdecl}
