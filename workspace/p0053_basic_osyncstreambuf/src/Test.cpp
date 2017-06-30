@@ -10,9 +10,9 @@
 
 using namespace std::experimental;
 
-template <class charT, class traits, class Allocator>
+template <class charT, class traits>
 std::basic_string<charT, traits>
-str(const basic_osyncstream<charT, traits, Allocator>& oss)
+str(const basic_osyncstream<charT, traits>& oss)
 {
 	return dynamic_cast<std::basic_stringbuf<charT, traits>*>(oss.rdbuf())->str();
 }

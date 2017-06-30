@@ -1,7 +1,6 @@
 <testsuites>
-	<testsuite name="AllTests" tests="10">
+	<testsuite name="AllTests" tests="11">
 		<testcase classname="AllTests" name="thisIsATest"/>
-		<testcase classname="AllTests" name="time_many_in_conversions"/>
 		<testcase classname="AllTests" name="test_to_stringview_from_stringbuf"/>
 		<testcase classname="AllTests" name="test_to_stringview_from_ostream"/>
 		<testcase classname="AllTests" name="test_to_stringview_from_partially_read_written_stringstream"/>
@@ -10,5 +9,7 @@
 		<testcase classname="AllTests" name="test_str_from_rvalue_moved_out_output_only"/>
 		<testcase classname="AllTests" name="test_str_from_rvalue_moved_out_frombuf"/>
 		<testcase classname="AllTests" name="test_str_from_rvalue_moved_out_with_seek"/>
+		<testcase classname="AllTests" name="time_many_in_conversions"/>
+		<testcase classname="AllTests" name="time_many_out_conversions"/>
 	</testsuite>
 </testsuites>

@@ -1,5 +1,3 @@
-#include "string"
-#include <experimental/string_view>
 #include "sstream"
 #include "cute.h"
 #include "ide_listener.h"
@@ -9,24 +7,53 @@
 
 void thisIsATest() {
 	std::string s{"input"};
-	auto x = [](auto i){return ++i;}(41);
 	std::istringstream in{std::move(s)};
 	in >> s;
 	ASSERT_EQUAL("input",s);
 }
 
-void time_many_in_conversions(){
-	using namespace std::chrono_literals;
-	auto now =std::chrono::system_clock::now();
-
-	for(int i=0;i < 10000; ++i){
-		std::string s{"here is a very long input."};
-		std::istringstream in{std::move(s)}; // move about 20% faster than copy for this loop
-		in >> s;
+template <typename F>
+std::chrono::microseconds time_n_calls(size_t n, F&& fun){
+	std::chrono::high_resolution_clock clock{};
+	auto start=clock.now();
+	while(n-->0){
+		fun(n);
 	}
-	std::chrono::nanoseconds dur=std::chrono::system_clock::now()-now;
-	//ASSERT_EQUAL(1, dur.count()/1000); // forces failure and output
+	return std::chrono::duration_cast<std::chrono::microseconds>(clock.now()-start);
 }
+
+void time_many_in_conversions(){
+	const std::chrono::microseconds tcopy = time_n_calls(1000, [] (int n){
+			std::string s{"here is a very long input."+std::to_string(n)};
+			std::istringstream in{s};
+			in >> s;
+	});
+	const std::chrono::microseconds tmove = time_n_calls(1000, [] (int n) {
+			std::string s{"here is a very long input."+std::to_string(n)};
+			std::istringstream in{std::move(s)};
+			in >> s;
+	});
+	ASSERT_GREATER(tcopy.count()*0.9,tmove.count()*1.0); // at least 10% gain assumed
+	//ASSERT_EQUAL(tcopy.count(),tmove.count()); // uncomment to see the real values
+}
+void time_many_out_conversions(){
+	const std::chrono::microseconds tcopy = time_n_calls(1000, [] (int n) {
+			std::ostringstream out{};
+			out << "hello world a bit longer to prevent sso." << n;
+			std::string s{out.str()};
+			s.front() = s.back();;
+	});
+	const std::chrono::microseconds tmove = time_n_calls(1000, [] (int n){
+			std::ostringstream out{};
+			out << "hello world a bit longer to prevent sso." << n;
+			std::string s{out.pilfer()};
+			s.front()=s.back();
+	});
+	ASSERT_GREATER(tcopy.count()*0.9,tmove.count()*1.0); // at least 10% gain assumed
+	//ASSERT_EQUAL(tcopy.count(),tmove.count()); // uncomment to see the real values
+
+}
+
 
 void test_to_stringview_from_stringbuf(){
 	std::ostringstream out{};
@@ -67,7 +94,7 @@ void test_str_from_rvalue_moved_out_output_only(){
 	char const * const msg="hello, world\n";
 	std::stringstream out{};
 	out << msg;
-	std::string s{out.pilfer()};
+	std::string s{std::move(out).pilfer()};
 	ASSERT_EQUAL(msg,s);
 	ASSERT_EQUAL(0,out.str().size());
 }
@@ -86,7 +113,7 @@ void test_str_from_rvalue_moved_out_with_seek(){
 	out << msg;
 	out.seekp(0,std::ios::beg);
 	out << "hello";
-	std::string s{out.pilfer()};
+	std::string s{std::move(out).pilfer()};
 	ASSERT_EQUAL("hello, world\n",s);
 	ASSERT_EQUAL(0,out.view().size());
 }
@@ -99,7 +126,6 @@ void runAllTests(int argc, char const *argv[]){
 	cute::suite s;
 	//TODO add your test here
 	s.push_back(CUTE(thisIsATest));
-	s.push_back(CUTE(time_many_in_conversions));
 	s.push_back(CUTE(test_to_stringview_from_stringbuf));
 	s.push_back(CUTE(test_to_stringview_from_ostream));
 	s.push_back(CUTE(test_to_stringview_from_partially_read_written_stringstream));
@@ -108,6 +134,8 @@ void runAllTests(int argc, char const *argv[]){
 	s.push_back(CUTE(test_str_from_rvalue_moved_out_output_only));
 	s.push_back(CUTE(test_str_from_rvalue_moved_out_frombuf));
 	s.push_back(CUTE(test_str_from_rvalue_moved_out_with_seek));
+	s.push_back(CUTE(time_many_in_conversions));
+	s.push_back(CUTE(time_many_out_conversions));
 	cute::xml_file_opener xmlfile(argc,argv);
 	cute::xml_listener<cute::ide_listener<> >  lis(xmlfile.out);
 	cute::makeRunner(lis,argc,argv)(s, "AllTests");
