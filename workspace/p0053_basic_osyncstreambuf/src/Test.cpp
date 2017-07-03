@@ -14,7 +14,7 @@ template <class charT, class traits>
 std::basic_string<charT, traits>
 str(const basic_osyncstream<charT, traits>& oss)
 {
-	return dynamic_cast<std::basic_stringbuf<charT, traits>*>(oss.rdbuf())->str();
+	return oss.str();
 }
 
 void testlockmapsimple(){
@@ -106,9 +106,11 @@ void testSeekingWithPotentialMissingOutput(){
 	{
 		osyncstream inner { outer };
 		inner << "hello world\n";
+		ASSERT_EQUAL("hello world\n",inner.str());
 		ASSERT_EQUAL("", outer.str());
 		inner.seekp(0,std::ios::beg);
 		inner << "hi." << std::flush;
+		ASSERT_EQUAL("hi.lo world\n",inner.str());
 	}
 	outer << "hello lawrence\n";
 	ASSERT_EQUAL("hi.lo world\nhello lawrence\n", outer.str());
@@ -207,7 +209,7 @@ void manyThreadsOnSingleStream(){
 		}
 	}
 	ASSERT_EQUAL(sz,detail__::thelocks.size());
-	ASSERT_EQUAL("",out.str()+out2.str());
+	ASSERT_EQUAL("",out.str()+out2.str()); // intentionally fails
 }
 void trigger_assert_in_ctor(){
 	std::ostream noout{nullptr};
@@ -250,9 +252,10 @@ void runAllTests(int argc, char const *argv[]) {
 	s.push_back(CUTE(trigger_assert_in_ctor));
 	s.push_back(CUTE(testMoveConstruction));
 	s.push_back(CUTE(testMoveAssignment));
-	s.push_back(CUTE(manyThreadsOnSingleStream));
+	//s.push_back(CUTE(manyThreadsOnSingleStream));
 	s.push_back(CUTE(testMemberSwap));
 	s.push_back(CUTE(testmanipforimmedieateflush));
+	s.push_back(CUTE(manyThreadsOnSingleStream));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<> > lis(xmlfile.out);
 	cute::makeRunner(lis, argc, argv)(s, "AllTests");
