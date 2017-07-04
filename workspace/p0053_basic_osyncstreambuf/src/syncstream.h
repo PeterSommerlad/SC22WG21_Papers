@@ -6,7 +6,7 @@
 #include <cassert>
 #include <utility>
 #include "globalstreambuflocks.h"
-
+#include <iostream>
 namespace std {
 namespace experimental {
 inline namespace concurrency_v2 {
@@ -18,9 +18,26 @@ struct basic_osyncstream;
 template <class charT, class traits = char_traits<charT>>
 class __basic_syncbuf : public basic_streambuf<charT, traits> {
 	using base=basic_streambuf<charT, traits>;
+
+	template <class charT1, class traits1 >
+	friend
+		basic_ostream<charT1,traits1>&
+		emit_on_flush(basic_ostream<charT1,traits1>&out);
+	template <class charT1, class traits1>
+	friend
+		basic_ostream<charT1,traits1>&
+		no_emit_on_flush(basic_ostream<charT1,traits1>&out);
+	template <class charT1, class traits1 >
+	friend
+		basic_ostream<charT1,traits1>&
+		flush_emit(basic_ostream<charT1,traits1>&out);
+
+protected:
+	bool needs_flush=false; // exposition only
+	bool flush_immediate=false; // exposition only
+	virtual bool do_emit()=0; // implementation detail
+
 public:
-	bool                           needs_flush=false; // exposition only
-	bool                           flush_immediate=false; // exposition only
 	using basic_streambuf<charT,traits>::basic_streambuf;
     __basic_syncbuf()=default;
     __basic_syncbuf(__basic_syncbuf&& other)
@@ -39,6 +56,7 @@ public:
 		 needs_flush= other.needs_flush;
 		 flush_immediate=other.flush_immediate;
 	 }
+
 };
 template <class charT, class traits = char_traits<charT>,
 class Allocator=allocator<charT>>
@@ -65,18 +83,11 @@ private:
 	detail__::spmx                 mxptr;
     mutable __size_type      _M_hack_for_end{};
 
-	void _M_sync(){
-			  __size_type const __oldlen = this->pptr()-this->pbase();
-		      char_type* __endp = _M_string.data() + _M_string.capacity();
-		      assert(__oldlen <= _M_string.capacity());
-		      if (__oldlen){
-		    	  _M_pbump(__oldlen);
-		      } else if (_M_string.size()){
-		    	  _M_pbump(_M_string.size());
-		      } else {
-		    	  _M_pbump(0);
-		      }
-	}
+    void _M_sync(){
+    	__size_type const __oldlen = _M_end();
+    	assert(__oldlen <= _M_string.capacity());
+    	_M_pbump(__oldlen);
+    }
 	void
 	_M_pbump(off_type __off)
     {
@@ -94,11 +105,16 @@ private:
 		__size_type len=this->pptr()-this->pbase();
 		if (_M_string.size()>len) len =_M_string.size();
 		if (len < _M_hack_for_end) len=_M_hack_for_end;
-		else _M_hack_for_end=len;
+		else {
+			_M_hack_for_end=len;
+			std::cerr << _M_string.size() <<":"<<_M_hack_for_end <<" of "<<_M_string.capacity()<< std::endl;
+		}
 		assert(len <= _M_string.capacity());
 		return len;
 	}
-
+	bool do_emit() override final {
+		return this->emit();
+	}
 public:
 
 
@@ -110,6 +126,7 @@ public:
 		, wrapped{obuf}
 		, mxptr{detail__::thelocks.get_lock(wrapped)}
 		{
+			//_M_string.reserve(256);
 			_M_sync();
 		}
 	
@@ -169,9 +186,8 @@ public:
 
 	bool emit() {
 		bool result = wrapped != nullptr && mxptr!=nullptr ;
-		this->pubseekoff(0, ios::end, ios_base::out);
 		streamsize len= _M_end();
-
+std::cout << len << std::endl;
 		if (result && (len>0||this->needs_flush) )
 		{
 			lock_guard<mutex> lk{*mxptr};
@@ -185,7 +201,8 @@ public:
 		}// UNLOCK
 		this->needs_flush = false;
 		this->_M_string.clear();
-		this->setp(_M_string.data(),_M_string.data()+_M_string.capacity());
+		this->_M_hack_for_end=0;
+		this->_M_pbump(0);
 		return result;
 	}
 
@@ -204,9 +221,10 @@ protected:
 		int_type
 		overflow(int_type __c) override
 		{
+			std::cerr << "overflow:"<<_M_end()<<std::endl;
 			if (nullptr == wrapped)	return traits_type::eof();
 		    const bool __testeof = traits_type::eq_int_type(__c, traits_type::eof());
-		    if (not __testeof) return traits_type::not_eof(__c);
+		    if (__testeof) return traits_type::not_eof(__c);
 
 			const __size_type __capacity = _M_string.capacity();
 			const __size_type __max_size = _M_string.max_size();
@@ -227,26 +245,26 @@ protected:
 				const __size_type __len = std::min(__opt_len, __max_size);
 				__string_type __tmp {_M_string.get_allocator()};
 				__tmp.reserve(__len);
-				if (this->pbase() && this->pptr()!=this->pbase())
+				if (this->pbase() && this->epptr()!=this->pbase())
 					__tmp.assign(this->pbase(), this->epptr() - this->pbase());
 				__tmp.push_back(__conv);
 				_M_string.swap(__tmp);
-				_M_sync(); // already bumped
+				_M_sync(); // will bump base on _M_string.size() here!
 			}
-			else{ // hack to adjust string length
+			else{ // hack needed to adjust maximum string length in _M_end()
 				*this->pptr() = __conv;
 				this->pbump(1);
 			}
 			return __c;
 		}
 	int_type sync() override {
+		this->needs_flush = true;
 		if(this->flush_immediate) {
 			if (this->emit()){
 				return 0;
 			}
 			return traits::eof();
 		}
-		this->needs_flush = true;
 		return 0;
 	}
 	pos_type seekoff(off_type __off, ios_base::seekdir __way, ios_base::openmode __mode) override {
@@ -284,33 +302,8 @@ protected:
 	}
     streamsize
     xsputn(const char_type* __s, streamsize __n) override{
-        streamsize __ret = 0;
-        while (__ret < __n)
-  	{
-  	  const streamsize __buf_len = this->epptr() - this->pptr();
-  	  if (__buf_len)
-  	    {
-  	      const streamsize __remaining = __n - __ret;
-  	      const streamsize __len = std::min(__buf_len, __remaining);
-  	      traits_type::copy(this->pptr(), __s, __len);
-  	      __ret += __len;
-  	      __s += __len;
-  	      this->__safe_pbump(__len);
-  	    }
-
-  	  if (__ret < __n)
-  	    {
-  	      int_type __c = this->overflow(traits_type::to_int_type(*__s));
-  	      if (!traits_type::eq_int_type(__c, traits_type::eof()))
-  		{
-  		  ++__ret;
-  		  ++__s;
-  		}
-  	      else
-  		break;
-  	    }
-  	}
-        _M_end();
+        streamsize __ret = base::xsputn(__s,__n);
+        _M_end(); // hack _M_hack_for_end update
         return __ret;
 
     }
@@ -410,7 +403,7 @@ public:
 
 template <class charT, class traits = char_traits<charT>>
 	basic_ostream<charT,traits>&
-	immediateflush(basic_ostream<charT,traits>&out){ // doesn't work along with Allocator awareness!!!
+	emit_on_flush(basic_ostream<charT,traits>&out){
 		auto syncbuf=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
 		if (syncbuf){
 			syncbuf->flush_immediate=true;
@@ -419,7 +412,7 @@ template <class charT, class traits = char_traits<charT>>
 	}
 template <class charT, class traits = char_traits<charT>>
 	basic_ostream<charT,traits>&
-	noimmediateflush(basic_ostream<charT,traits>&out){ // doesn't work along with Allocator awareness!!!
+	no_emit_on_flush(basic_ostream<charT,traits>&out){
 		auto syncbuf=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
 		if (syncbuf){
 			syncbuf->flush_immediate=false;
@@ -427,6 +420,17 @@ template <class charT, class traits = char_traits<charT>>
 		return out;
 	}
 
+template <class charT, class traits = char_traits<charT>>
+	basic_ostream<charT,traits>&
+	flush_emit(basic_ostream<charT,traits>&out){
+		out.flush();
+		auto syncbuf=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
+		if (syncbuf){
+			if (not syncbuf->do_emit())
+				out.setstate(ios_base::badbit);
+		}
+		return out;
+	}
 
 
 using osyncstream = basic_osyncstream<char>;

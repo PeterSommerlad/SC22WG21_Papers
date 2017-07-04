@@ -213,26 +213,35 @@ void manyThreadsOnSingleStream(){
 }
 void trigger_assert_in_ctor(){
 	std::ostream noout{nullptr};
-//	osyncstream sync(noout); // should abort
+	osyncstream sync(noout); // should abort
 }
 
-void testmanipforimmedieateflush(){
+void testmanipulators(){
 	std::ostringstream outer { };
 	{
 		osyncstream inner { outer };
-		inner << std::experimental::immediateflush;
+		inner << std::experimental::emit_on_flush;
 		inner << "hello world";
 		inner << std::endl;
 		outer << "within ";
-		inner << std::experimental::noimmediateflush;
+		inner << std::experimental::no_emit_on_flush;
 		inner << "hello world 2"<< std::endl;
 		ASSERT_EQUAL("hello world\nwithin ", outer.str());
+		inner << "something else\n"<< std::experimental::flush_emit ;
+		ASSERT_EQUAL("hello world\nwithin hello world 2\nsomething else\n",outer.str());
 	}
 	outer << "hello lawrence\n";
-	ASSERT_EQUAL("hello world\nwithin hello world 2\nhello lawrence\n", outer.str());
+	ASSERT_EQUAL("hello world\nwithin hello world 2\nsomething else\nhello lawrence\n", outer.str());
+}
 
-
-
+void testmanipulatorsforregularostream(){
+	std::ostringstream outer { };
+	outer << "hello" << std::experimental::emit_on_flush << std::endl;
+	ASSERT_EQUAL("hello\n",outer.str());
+	outer << "world" << std::experimental::no_emit_on_flush << std::endl;
+	ASSERT_EQUAL("hello\nworld\n",outer.str());
+	outer << "can not test flush" << std::experimental::flush_emit ;
+	ASSERT_EQUAL("hello\nworld\ncan not test flush",outer.str());
 }
 
 
@@ -252,9 +261,9 @@ void runAllTests(int argc, char const *argv[]) {
 	s.push_back(CUTE(trigger_assert_in_ctor));
 	s.push_back(CUTE(testMoveConstruction));
 	s.push_back(CUTE(testMoveAssignment));
-	//s.push_back(CUTE(manyThreadsOnSingleStream));
 	s.push_back(CUTE(testMemberSwap));
-	s.push_back(CUTE(testmanipforimmedieateflush));
+	s.push_back(CUTE(testmanipulators));
+	s.push_back(CUTE(testmanipulatorsforregularostream));
 	s.push_back(CUTE(manyThreadsOnSingleStream));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<> > lis(xmlfile.out);
