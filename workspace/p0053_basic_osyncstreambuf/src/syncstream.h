@@ -361,7 +361,7 @@ public:
 		: mybuf_t{std::move(*static_cast<mybuf_t*>(&other))}
 		, base{std::move(*static_cast<base *>(&other))}
 	{
-		assert(this->rdbuf()==nullptr); // sanity check. base move ctor doesn't xfer streambuf ptr
+		assert(static_cast<base*>(this)->rdbuf()==nullptr); // sanity check. base move ctor doesn't xfer streambuf ptr
 		base::init(static_cast<mybuf_t*>(this));
 	}
 
@@ -385,7 +385,9 @@ public:
 	streambuf_type* get_wrapped() const noexcept {
 		return mybuf_t::get_wrapped();
 	}
-
+	mybuf_t*   rdbuf() const noexcept  {
+		return const_cast<mybuf_t*>(static_cast<mybuf_t const *>(this)) ;
+	}
 	void emit(){
 		using sentry=typename basic_ostream<charT,traits>::sentry;
 		sentry s{*this};

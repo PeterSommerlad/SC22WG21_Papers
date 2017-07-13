@@ -195,7 +195,8 @@ void swap(unique_resource<R, D> &lhs, unique_resource<R, D> &rhs)
     lhs.swap(rhs);
 }
 template<typename R, typename D>
-unique_resource(R &&r, D &&d) -> unique_resource<std::decay_t<R>, std::decay_t<D>>;
+unique_resource(R &&r, D &&d)
+-> unique_resource<std::decay_t<R>, std::decay_t<D>>;
 
 template<typename R, typename D>
 auto make_unique_resource(R &&r, D &&d)
@@ -206,7 +207,8 @@ auto make_unique_resource(R &&r, D &&d)
         std::forward<R>(r), std::forward<D>(d)};
 }
 template<typename R, typename D>
-unique_resource(std::reference_wrapper<R> r, D &&d) -> unique_resource<R &, std::decay_t<D>>; // should need to unwrap, but how?
+unique_resource(std::reference_wrapper<R> r, D &&d)
+-> unique_resource<R &, std::decay_t<D>>; // should need to unwrap, but how?
 
 template<typename R, typename D>
 auto make_unique_resource(std::reference_wrapper<R> r, D &&d)
@@ -225,7 +227,6 @@ noexcept(noexcept(make_unique_resource(std::forward<R>(r), std::forward<D>(d))))
         ur.release();
     return ur;
 }
-
 
 // end of (c) Eric Niebler part
 

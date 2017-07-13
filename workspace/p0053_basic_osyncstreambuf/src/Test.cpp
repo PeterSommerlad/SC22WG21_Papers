@@ -19,7 +19,7 @@ str(const basic_osyncstream<charT, traits>& oss)
 
 void testlockmapsimple(){
 	auto const sz=detail__::thelocks.size();
-	std::ostringstream out;
+	std::ostringstream out { };
 	{
 		auto mx=detail__::thelocks.get_lock(out.rdbuf());
 		{
