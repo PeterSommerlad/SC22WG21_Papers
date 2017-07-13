@@ -54,8 +54,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0053r5}
-\newcommand{\paperdate}{2017-06-19}
+\newcommand{\papernumber}{p0053r6}
+\newcommand{\paperdate}{2017-07-13}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -114,7 +114,7 @@ To support all existing and user-defined output operators, osyncstream must be a
 \item[Can you make a flush of the osyncstream mean transfer the characters and flush the underlying stream?
 ] 
 No, because the point of the osyncstream is to collect text into an atomic unit. Flushes are often emitted in calls where the body is not visible, and hence unintentionally break up the text. Furthermore, there may be more than one flush within the lifetime of an osyncstream, which would impose a performance loss when an atomic unit of text needs only one flush. The design decision is only to flush the underlying stream if the osyncstream was flushed, and only once per atomic transfer of the character sequence.
-\added{ p0052r5 introduced manipulators to allow both ways, but the default remains not to flush immediately.}
+\added{ p0053r5 introduced manipulators to allow both ways, but the default remains not to flush immediately.}
 
 \item[Can flush just transfer the characters and not flush the underlying stream?] 
 The flush intends an effect on visible to the user. So, we should preserve at least one flush. The flush may not be visible to the code around the osyncstream, and so its programmer cannot do a manual flush, because attempting to flush the underlying stream that is shared among threads will introduce a data race.
@@ -139,11 +139,11 @@ The wording below permits implementation of \tcode{basic_osyncstream} with eithe
 \section{Items to be discussed by LEWG/LWG}
 \begin{itemize}
 \item Naming of the manipulators
-\item Should the manipulators be in header \tcode{<osyncstream>} instead of globally available?
+\item Should the manipulators be in header \tcode{<osyncstream>} instead of globally available in \tcode{<ostream>} as are \tcode{flush} and \tcode{endl}?
 \item Should the manipulator-hook member function of \tcode{basic_syncbuf} be public, or should the manipulators be made friends instead. However, without the accessor users can not directly force the stream buffer to pass through every sync.
-\item re-check wording.
-\item Should the \tcode{Allocator} be part of the stream type, or should it simply use \tcode{polymorphic_allocator<CharT>}, consistent with P0339? Pablo thinks the latter would be easier to use.
-\item What should be the delivery vehicle for this feature: C++20 or the concurrency TS?
+\item re-check wording (done be LWG in Toronto)
+\item Should the \tcode{Allocator} be part of the stream type (LWG in Toronto: \textbf{YES}), or should it simply use \tcode{polymorphic_allocator<CharT>}, consistent with P0339? Pablo thinks the latter would be easier to use. LWG: keep like in the paper, polymorphic allocators should be applied throughout.
+\item What should be the delivery vehicle for this feature: C++20 or the concurrency TS? still TBD.
 \end{itemize}
 
 
@@ -182,8 +182,8 @@ template <class charT,
           class traits = char_traits<charT>,
           class Allocator = allocator<charT> >
   class basic_osyncstream;
-typedef basic_osyncstream<char> osyncstream;
-typedef basic_osyncstream<wchar_t> wosyncstream; 
+using osyncstream = basic_osyncstream<char>;
+using wosyncstream = basic_osyncstream<wchar_t>; 
 \end{codeblock}
 \end{addedblock}
 
@@ -198,7 +198,7 @@ template <class charT, class traits>
 \begin{itemdescr}
 \pnum
 \effects
-If \tcode{os} is a \tcode{basic_osyncstream<charT, traits, Allocator>} reference, calls \tcode{dynamic_cast<basic_osyncbuf<charT, traits, Allocator>*>(os.rdbuf())->set_emit_on_sync(true)}. Otherwise this manipulator has no effect. 
+If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, calls \tcode{buf->set_emit_on_sync(true)}. Otherwise this manipulator has no effect. 
 \begin{note}
 To work around the issue that the \tcode{Allocator} template argument can not be deduced, implementations can introduce an intermediate base class to \tcode{basic_osyncbuf} that takes care its \tcode{emit_on_sync} flag.
 \end{note}
@@ -216,7 +216,7 @@ template <class charT, class traits>
 \begin{itemdescr}
 \pnum
 \effects
-If \tcode{os} is a \tcode{basic_osyncstream<charT, traits, Allocator>} reference, calls \tcode{dynamic_cast<basic_osyncbuf<charT, traits, Allocator>*>(os.rdbuf())->set_emit_on_sync(false)}. Otherwise this manipulator has no effect. 
+If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, calls \tcode{buf->set_emit_on_sync(false)}. Otherwise this manipulator has no effect. 
 
 \pnum
 \returns
@@ -231,7 +231,10 @@ template <class charT, class traits>
 \begin{itemdescr}
 \pnum
 \effects
-\tcode{flush(os)}, if \tcode{os} is a \tcode{basic_osyncstream<charT, traits, Allocator>} reference,  \tcode{dynamic_cast<basic_osyncbuf<charT, traits, Allocator>*>(os.rdbuf())->emit(),}. 
+\tcode{flush(os)}. Further
+if \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, 
+calls \tcode{buf->emit()}. 
+ 
 \pnum
 \returns
 \tcode{os}.
@@ -240,13 +243,13 @@ template <class charT, class traits>
 
 \section{30.x Synchronized output stream [syncstream]}
 \emph{Insert this new section 30.x in chapter 30 [input.output] }
-\subsection{30.x.1 Header <synstream> synopsis [syncstream.syn]}
+\subsection{30.x.1 Header <syncstream> synopsis [syncstream.syn]}
 \begin{addedblock}
 \begin{codeblock}
 namespace std {
 template <class charT,
-          class traits = char_traits<charT>,
-          class Allocator = allocator<charT>>
+          class traits,
+          class Allocator>
   class basic_syncbuf;
 using syncbuf  = basic_syncbuf<char>;
 using wsyncbuf = basic_syncbuf<wchar_t>;
@@ -255,15 +258,16 @@ template <class charT,
           class traits,
           class Allocator>
   class basic_osyncstream;
-typedef basic_osyncstream<char> osyncstream;
-typedef basic_osyncstream<wchar_t> wosyncstream; 
+using osyncstream = basic_osyncstream<char>;
+using wosyncstream = basic_osyncstream<wchar_t>; 
 }
 \end{codeblock}
 \end{addedblock}
 
 \begin{addedblock}
+\pnum
 The header \tcode{<syncstream>} provides a mechanism to synchronize execution agents writing to the same stream. 
-It defines a class template \tcode{basic_osyncstream} to buffer output and transfer the buffered content into an object of type \tcode{basic_streambuf<charT,traits>} atomically with respect to such transfers by other \tcode{basic_osyncstream<charT,traits,Allocator>} objects referring to the same \tcode{basic_streambuf<charT,traits>} object. The transfer occurs when \tcode{emit()} is called and when the \tcode{basic_osyncstream<chart,traits,Allocator>} object is destroyed.
+It defines class templates \tcode{basic_osyncstream} and \tcode{basic_syncbuf}. The latter buffers output and transfer the buffered content into an object of type \tcode{basic_streambuf<charT,traits>} atomically with respect to such transfers by other \tcode{basic_syncbuf<charT,traits,Allocator>} objects referring to the same \tcode{basic_streambuf<charT,traits>} object. The transfer occurs when \tcode{emit()} is called and when the \tcode{basic_syncbuf<charT,traits,Allocator>} object is destroyed.
 
 
 \end{addedblock}
@@ -271,10 +275,10 @@ It defines a class template \tcode{basic_osyncstream} to buffer output and trans
 \begin{addedblock}
 \begin{codeblock}
 template <class charT,
-          class traits = char_traits<charT>,
-          class Allocator = allocator<charT>>
+          class traits,
+          class Allocator>
 class basic_syncbuf
-  : public std::basic_streambuf<charT, traits> {
+  : public basic_streambuf<charT, traits> {
 
 public:
   using char_type      = charT;
@@ -288,9 +292,9 @@ public:
 
   explicit
   basic_syncbuf(streambuf_type* obuf = nullptr)
-  : basic_syncbuf(obuf,Allocator{});
+    : basic_syncbuf(obuf,Allocator{}) {}
   basic_syncbuf(streambuf_type* obuf,
-                Allocator const &allocator);
+                const Allocator &allocator);
   basic_syncbuf(basic_syncbuf&& other);
   ~basic_syncbuf();
 
@@ -307,7 +311,7 @@ protected:
 
 private:
   streambuf_type *wrapped;       // exposition only
-  bool            emit_on_sync{} // exposition only
+  bool            emit_on_sync{};// exposition only
 };
 
 template <class charT, class traits, class Allocator>
@@ -323,27 +327,22 @@ inline void swap(basic_syncbuf<charT,traits,Allocator>& a,
 \indexlibrary{\idxcode{basic_syncbuf}!constructor}%
 \begin{addedblock}
 \begin{itemdecl}
-explicit basic_syncbuf(
-  streambuf_type* obuf = nullptr,
-  Allocator const &allocator = Allocator());
+basic_syncbuf(
+  streambuf_type* obuf,
+  const Allocator &allocator);
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \effects
-Constructs the \tcode{basic_syncbuf} object and sets \tcode{wrapped} to \tcode{obuf} which will be the final destination of characters inserted into the stream.
+Constructs the \tcode{basic_syncbuf} object and sets \tcode{wrapped} to \tcode{obuf} which will be the final destination of associated output.
 
 \remarks
-If \tcode{obuf == nullptr}, output operations on \tcode{*this} will fail. A copy of \tcode{allocator} is used to allocate memory for internal buffers.
+A copy of \tcode{allocator} is used to allocate memory for internal buffers holding the associated output.
 
 \pnum
 \throws
 Nothing unless constructing a mutex or allocating memory throws.
-
-\pnum
-\begin{note}
-Subsequent calls to \tcode{emit()} might result in member functions being called on the user-provided stream buffer while a lock is held. 
-\end{note}
 
 \pnum
 \postconditions
@@ -359,7 +358,7 @@ basic_syncbuf(basic_syncbuf&& other);
 \begin{itemdescr}
 \pnum
 \effects
-If \tcode{other.get_wrapped() == nullptr}, equivalent to \tcode{basic_syncbuf(nullptr, other.get_allocator())} otherwise the state necessary to perform \tcode{other.emit()} is moved to \tcode{*this}.
+Move constructs from other (Table 23 [moveconstructable]).
 
 \pnum
 \postconditions
@@ -368,7 +367,7 @@ The value returned by \tcode{this->get_wrapped()} is the value returned by \tcod
 
 \pnum
 \begin{remarks}
-This constructor disassociates \tcode{other} from its wrapped stream buffer ensuring destruction of other produces no output. 
+This constructor disassociates \tcode{other} from its wrapped stream buffer, ensuring destruction of \tcode{other} produces no output. 
 \end{remarks}
 \end{itemdescr}
 
@@ -386,12 +385,12 @@ This constructor disassociates \tcode{other} from its wrapped stream buffer ensu
 \begin{itemdescr}
 \pnum
 \effects
-Calls \tcode{this->emit()}.
+Calls \tcode{emit()}.
 
 \pnum
 \throws
 Nothing. 
-If an exception is thrown while writing to the wrapped buffer, that exception is caught and ignored.
+If an exception is thrown from \tcode{emit()}, that exception is caught and ignored.
 
 \end{itemdescr}
 
@@ -410,7 +409,7 @@ basic_syncbuf& operator=(basic_syncbuf&& rhs) noexcept;
 \begin{itemdescr}
 \pnum
 \effects 
-Calls \tcode{this->emit()}. If \tcode{rhs.get_wrapped() != nullptr}, the state necessary to perform \tcode{rhs.emit()} is moved to \tcode{*this}.
+Calls \tcode{emit()} then move assigns from \tcode{rhs}. After the move assignment \tcode{*this} has the observable state it would have had if it had been move constructed from \tcode{rhs} (see [syncstream.syncbuf.ctor]).
 
 
 \pnum
@@ -422,7 +421,7 @@ Calls \tcode{this->emit()}. If \tcode{rhs.get_wrapped() != nullptr}, the state n
 
 \pnum
 \begin{remarks}
-This assignment operator disassociates \tcode{rhs} from its wrapped stream buffer ensuring destruction of other produces no output. 
+This assignment operator disassociates \tcode{rhs} from its wrapped stream buffer ensuring destruction of \tcode{other} produces no output. 
 \end{remarks}
 \end{itemdescr}
 
@@ -432,6 +431,7 @@ void swap(basic_syncbuf& other) noexcept;
 \begin{itemdescr}
 \pnum
 \requires
+\tcode{allocator_traits<Allocator>::propagate_on_container_swap::value ||}\\
 \tcode{this->get_allocator() == other.get_allocator()}.
 
 \pnum
@@ -448,7 +448,7 @@ void swap(basic_syncbuf<charT,traits,Allocator>& a,
 
 \pnum
 \effects
-As if by \tcode{a.swap(b)}.
+Equivalent to \tcode{a.swap(b)}.
 \end{itemdescr}
 
 \end{addedblock}
@@ -465,11 +465,19 @@ bool emit();
 \begin{itemdescr}
 \pnum
 \effects 
-Atomically transfers the contents of the internal buffer to the stream buffer \tcode{*wrapped}, so that they appear in the output stream as a contiguous sequence of characters. If and only if a call was made to \tcode{this->sync()},  \tcode{wrapped->pubsync()} is called.
+Atomically transfers the contents of the internal buffer to the stream buffer \tcode{*wrapped}, so that they appear in the output stream as a contiguous sequence of characters. If and only if a call was made to \tcode{sync()} since the last call of \tcode{emit()},  \tcode{wrapped->pubsync()} is called.
 
 \pnum
-\returns \tcode{true} if \tcode{wrapped != nullptr}, all of the buffered characters were successfully transferred, and the call to \tcode{wrapped->pubsync()} (if any) succeeded; otherwise \tcode{false}.
+\returns \tcode{true} if all of the following conditions hold; otherwise false:
+\begin{itemize}
+\item \tcode{wrapped != nullptr}.
+\item All of the characters in the associated output were successfully transferred.
+\item The call to \tcode{wrapped->pubsync()} (if any) succeeded.
+\end{itemize}
 
+\pnum
+\postconditions
+On the success the associated output is empty.
 
 \pnum
 {\Fundesc{Synchronization}}
@@ -524,13 +532,15 @@ int sync() override;
 \begin{itemdescr}
 \pnum
 \effects 
-Record the fact that user desires that the wrapped buffer be flushed. 
-If \tcode{emit_on_sync == true}, calls \tcode{emit()}, otherwise
-the actual flush is delayed until a call to \tcode{emit()}.
+Record that the wrapped stream buffer is to be flushed. 
+Then, if \tcode{emit_on_sync == true}, calls \tcode{emit()}.
+\begin{note}
+If \tcode{emit_on_sync == false}, the actual flush is delayed until a call to \tcode{emit()}.
+\end{note}
 
 \pnum
 \returns
-if \tcode{emit()} was called and returned \tcode{false}, returns \tcode{-1} otherwise \tcode{0}.
+If \tcode{emit()} was called and returned \tcode{false}, returns \tcode{-1}; otherwise \tcode{0}.
 \end{itemdescr}
 
 \end{addedblock}
@@ -559,19 +569,19 @@ public:
   using streambuf_type = basic_streambuf<charT,traits>;
   using syncbuf_type   = basic_syncbuf<charT,traits, Allocator>;
 
-  basic_osyncstream(streambuf_type *obuf, Allocator const &allocator);
+  basic_osyncstream(streambuf_type *obuf, const Allocator &allocator);
   explicit basic_osyncstream(streambuf_type *obuf)
-  :basic_osyncstream{obuf, Allocator{}}{}
-  basic_osyncstream(basic_ostream<charT,traits> &os, Allocator const &allocator)
-  :basic_osyncstream{os.rdbuf(),allocator}{}
+    : basic_osyncstream{obuf, Allocator{}}{}
+  basic_osyncstream(basic_ostream<charT,traits> &os, const Allocator &allocator)
+    : basic_osyncstream{os.rdbuf(), allocator}{}
   explicit basic_osyncstream(basic_ostream<charT,traits> &os)
-  :basic_osyncstream{os,Allocator{}}{}
+    : basic_osyncstream{os, Allocator{}}{}
   basic_osyncstream(basic_osyncstream&&) noexcept;
   ~basic_osyncstream();
   basic_osyncstream& operator=(basic_osyncstream&&) noexcept;
-  void emit();
+  void            emit();
   streambuf_type* get_wrapped() const noexcept;
-  syncbuf_type*   rdbuf() const noexcept override { return &sb ; }
+  syncbuf_type*   rdbuf() const noexcept { return &sb ; }
 private:
   syncbuf_type sb; // exposition only
 };
@@ -643,7 +653,7 @@ Move constructs from \tcode{other}. This is accomplished by move constructing th
 
 \pnum
 \postconditions
-The value returned by \tcode{this->get_wrapped()} is the value returned by \tcode{os.get_wrapped()} prior to calling this constructor. \tcode{nullptr == os.get_wrapped()}.
+The value returned by \tcode{get_wrapped()} is the value returned by \tcode{os.get_wrapped()} prior to calling this constructor. \tcode{nullptr == os.get_wrapped()}.
 \end{itemdescr}
 
 \end{addedblock}
@@ -660,7 +670,8 @@ The value returned by \tcode{this->get_wrapped()} is the value returned by \tcod
 \begin{itemdescr}
 \pnum
 \effects 
-Calls \tcode{emit()} and swallows any exceptions arising.
+Calls \tcode{emit()}.
+If an exception is thrown from \tcode{emit()}, that exception is caught and ignored.
 \end{itemdescr}
 
 
@@ -678,7 +689,9 @@ basic_osyncstream& operator=(basic_osyncstream&& other) noexcept;
 \begin{itemdescr}
 \pnum
 \effects 
-First, calls \tcode{this->emit()} and swallows any exceptions arising. Move assigns \tcode{sb} from \tcode{other.sb}.
+First, calls \tcode{emit()}. 
+If an exception is thrown from \tcode{emit()}, that exception is caught and ignored.
+Move assigns \tcode{sb} from \tcode{other.sb}.
 \begin{note}
 This disassociates \tcode{other} from its wrapped stream buffer ensuring destruction of other produces no output. 
 \end{note}
