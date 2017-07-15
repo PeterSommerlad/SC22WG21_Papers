@@ -56,7 +56,7 @@
 
 %%%%
 
-\newcommand{\papernumber}{P0052R5}
+\newcommand{\papernumber}{p0052r5}
 \newcommand{\paperdate}{2017-07-13}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
@@ -72,7 +72,7 @@
 Document Number: \papernumber &   (update of N4189, N3949, N3830, N3677)\\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
-Audience: & LWG/LEWG\\\hline
+Audience: & LWG\\\hline
 \end{tabular}
 
 \chapter{History}
@@ -254,7 +254,7 @@ void demo_scope_exit_fail_success(){
 
 
 \chapter{Impact on the Standard}
-This proposal is a pure library extension. A new header, \tcode{<scope>} is proposed, but it does not require changes to any standard classes or functions. Since it proposes a new header, no feature test macro seems required. It does not require any changes in the core language, and it has been implemented in standard C++ conforming to \removed{C++14, resp. draft} C++17. Depending on the timing of the acceptance of this proposal, it might go into a library fundamentals TS under the namespace std::experimental or directly in the working paper of the standard.
+This proposal is a pure library extension. A new header, \tcode{<scope>} is proposed, but it does not require changes to any standard classes or functions. Since it proposes a new header, no feature test macro seems required. It does not require any changes in the core language, and it has been implemented in standard C++ conforming to C++17. Depending on the timing of the acceptance of this proposal, it might go into a library fundamentals TS under the namespace std::experimental or directly in the working paper of the standard. I suggest both shipping vehicles.
 
 \chapter{Design Decisions}
 \section{General Principles}
@@ -421,7 +421,7 @@ private:
 };
 
 template <class EF>
-@\tcode{\textit{scope_guard}}@(EF &&ef) -> @\tcode{\textit{scope_guard}}@<std::decay_t<EF>>;
+@\tcode{\textit{scope_guard}}@(EF &&ef) -> @\tcode{\textit{scope_guard}}@<decay_t<EF>>;
 
 \end{codeblock}
 
@@ -514,7 +514,7 @@ scope_success(EFP&& f) ;
 \requires Given an lvalue \tcode{f} of type \tcode{remove_reference_t<EFP>}, the expression \tcode{f()} shall be well formed and shall have well-defined behavior.
 
 \pnum
-\effects If \tcode{EFP} is not an lvalue-reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, initialize  \tcode{exit_function} with \tcode{std::move(f)} otherwise initialize \tcode{exit_function} with \tcode{f}. \\
+\effects If \tcode{EFP} is not an lvalue-reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, initialize  \tcode{exit_function} with \tcode{std::move(f)} otherwise initialize \tcode{exit_function} with \tcode{f}. 
 \begin{note}
 If initialization of \tcode{exit_function} fails, \tcode{f()} won't be called.
 \end{note}
@@ -656,11 +656,11 @@ private:
 
 template<typename R, typename D>
   unique_resource(R &&r, D &&d) 
-    -> unique_resource<std::decay_t<R>, std::decay_t<D>>;
+    -> unique_resource<decay_t<R>, decay_t<D>>;
 
 template<typename R, typename D>
-  unique_resource(std::reference_wrapper<R> r, D &&d) 
-    -> unique_resource<R &, std::decay_t<D>>;
+  unique_resource(reference_wrapper<R> r, D &&d) 
+    -> unique_resource<R &, decay_t<D>>;
 
 \end{codeblock}
 
@@ -688,7 +688,7 @@ for which, given
 a value \tcode{d} of type \tcode{D} and a value
 \tcode{r} of type \tcode{R}, the expression
 \tcode{d(r)} shall be well formed, shall have well-defined behavior, and shall not throw an exception.
-\tcode{D} shall be CopyConstructible (Table 24
+\tcode{D} shall either be CopyConstructible (Table 24
 %\ref{copyconstructible}
 ) or \tcode{is_nothrow_move_constructible_v<D>} shall be \tcode{true}.
 
@@ -699,7 +699,7 @@ Destructible
 %\ref{destructible}
 ) object type 
 or an lvalue reference type.
-\tcode{R} shall be CopyConstructible (Table 24
+\tcode{R} shall either be CopyConstructible (Table 24
 %\ref{copyconstructible}
 ) or \tcode{is_nothrow_move_constructible_v<R>} shall be \tcode{true}.
 

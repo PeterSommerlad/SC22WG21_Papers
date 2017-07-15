@@ -55,7 +55,7 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{p0053r6}
-\newcommand{\paperdate}{2017-07-13}
+\newcommand{\paperdate}{2017-07-15}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -136,15 +136,11 @@ The constructor for \tcode{osyncstream} takes a non-const reference to a \tcode{
 
 The wording below permits implementation of \tcode{basic_osyncstream} with either a stream_mutex from \href{https://wg21.link/n3535}{N3535} or with implementations suitable for \href{https://wg21.link/N3665}{N3665}, e.g. with Posix file locks \href{http://pubs.opengroup.org/onlinepubs/009695399/functions/flockfile.html}{[PSL]}
 
-\section{Items to be discussed by LEWG/LWG}
+\section{Items to be discussed by LWG}
 \begin{itemize}
-\item Naming of the manipulators
-\item Should the manipulators be in header \tcode{<osyncstream>} instead of globally available in \tcode{<ostream>} as are \tcode{flush} and \tcode{endl}?
-\item Should the manipulator-hook member function of \tcode{basic_syncbuf} be public, or should the manipulators be made friends instead. However, without the accessor users can not directly force the stream buffer to pass through every sync.
-\item re-check wording (done be LWG in Toronto)
-\item Should the \tcode{Allocator} be part of the stream type (LWG in Toronto: \textbf{YES}), or should it simply use \tcode{polymorphic_allocator<CharT>}, consistent with P0339? Pablo thinks the latter would be easier to use. LWG: keep like in the paper, polymorphic allocators should be applied throughout.
-\item What should be the delivery vehicle for this feature: C++20 or the concurrency TS? still TBD.
-\end{itemize}
+\item \removed{Naming of the manipulators} (moved to separate paper p0753r0)
+\item re-check wording (done be LWG in Toronto once, Pablo confirmed my edits should be OK)
+\item What should be the delivery vehicle for this feature? I suggest both C++20 and the concurrency TS?\end{itemize}
 
 
 \chapter{Wording}
@@ -188,8 +184,8 @@ using wosyncstream = basic_osyncstream<wchar_t>;
 \end{addedblock}
 
 \section{30.7.5.4 Standard \tcode{basic_ostream} manipulators [ostream.manip]}
-Add the following two manipulators.
-\begin{addedblock}
+Another paper p0753r0 will suggest adding the following three manipulators. They are not part of this proposal anymore and are just presented here for convenience of reference.
+\begin{removedblock}
 \begin{itemdecl}
 template <class charT, class traits>
   basic_ostream<charT, traits>& emit_on_flush(basic_ostream<charT, traits>& os);
@@ -239,7 +235,7 @@ calls \tcode{buf->emit()}.
 \returns
 \tcode{os}.
 \end{itemdescr}
-\end{addedblock}
+\end{removedblock}
 
 \section{30.x Synchronized output stream [syncstream]}
 \emph{Insert this new section 30.x in chapter 30 [input.output] }
@@ -293,18 +289,18 @@ public:
   explicit
   basic_syncbuf(streambuf_type* obuf = nullptr)
     : basic_syncbuf(obuf,Allocator{}) {}
-  basic_syncbuf(streambuf_type* obuf,
-                const Allocator &allocator);
-  basic_syncbuf(basic_syncbuf&& other);
+  basic_syncbuf(streambuf_type* ,
+                const Allocator&);
+  basic_syncbuf(basic_syncbuf&&);
   ~basic_syncbuf();
 
-  basic_syncbuf& operator=(basic_syncbuf&& rhs);
-  void swap(basic_syncbuf &other);
+  basic_syncbuf& operator=(basic_syncbuf&&);
+  void swap(basic_syncbuf &);
 
   bool emit();
   streambuf_type* get_wrapped()   const noexcept;
   allocator_type  get_allocator() const noexcept;
-  void            set_emit_on_sync(bool b) noexcept;
+  void            set_emit_on_sync(bool) noexcept;
 
 protected:
   int sync() override;
@@ -315,8 +311,8 @@ private:
 };
 
 template <class charT, class traits, class Allocator>
-inline void swap(basic_syncbuf<charT,traits,Allocator>& a,
-                 basic_syncbuf<charT,traits,Allocator>& b);
+inline void swap(basic_syncbuf<charT,traits,Allocator>&,
+                 basic_syncbuf<charT,traits,Allocator>&);
 
 \end{codeblock}
 \end{addedblock}
@@ -421,7 +417,7 @@ Calls \tcode{emit()} then move assigns from \tcode{rhs}. After the move assignme
 
 \pnum
 \begin{remarks}
-This assignment operator disassociates \tcode{rhs} from its wrapped stream buffer ensuring destruction of \tcode{other} produces no output. 
+This assignment operator disassociates \tcode{rhs} from its wrapped stream buffer ensuring destruction of \tcode{rhs} produces no output. 
 \end{remarks}
 \end{itemdescr}
 
@@ -569,7 +565,7 @@ public:
   using streambuf_type = basic_streambuf<charT,traits>;
   using syncbuf_type   = basic_syncbuf<charT,traits, Allocator>;
 
-  basic_osyncstream(streambuf_type *obuf, const Allocator &allocator);
+  basic_osyncstream(streambuf_type *, const Allocator &);
   explicit basic_osyncstream(streambuf_type *obuf)
     : basic_osyncstream{obuf, Allocator{}}{}
   basic_osyncstream(basic_ostream<charT,traits> &os, const Allocator &allocator)
@@ -653,7 +649,7 @@ Move constructs from \tcode{other}. This is accomplished by move constructing th
 
 \pnum
 \postconditions
-The value returned by \tcode{get_wrapped()} is the value returned by \tcode{os.get_wrapped()} prior to calling this constructor. \tcode{nullptr == os.get_wrapped()}.
+The value returned by \tcode{get_wrapped()} is the value returned by \tcode{os.get_wrapped()} prior to calling this constructor. \tcode{nullptr == other.get_wrapped()}.
 \end{itemdescr}
 
 \end{addedblock}
@@ -683,7 +679,7 @@ If an exception is thrown from \tcode{emit()}, that exception is caught and igno
 \begin{addedblock}
 
 \begin{itemdecl}
-basic_osyncstream& operator=(basic_osyncstream&& other) noexcept;
+basic_osyncstream& operator=(basic_osyncstream&& rhs) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -691,14 +687,14 @@ basic_osyncstream& operator=(basic_osyncstream&& other) noexcept;
 \effects 
 First, calls \tcode{emit()}. 
 If an exception is thrown from \tcode{emit()}, that exception is caught and ignored.
-Move assigns \tcode{sb} from \tcode{other.sb}.
+Move assigns \tcode{sb} from \tcode{rhs.sb}.
 \begin{note}
-This disassociates \tcode{other} from its wrapped stream buffer ensuring destruction of other produces no output. 
+This disassociates \tcode{rhs} from its wrapped stream buffer ensuring destruction of \tcode{rhs} produces no output. 
 \end{note}
 
 \pnum
 \postconditions
-Primarily, \tcode{nullptr == other.get_wrapped()}. Also, \tcode{get_wrapped()} returns the value previously returned by \tcode{other.get_wrapped()}.
+Primarily, \tcode{nullptr == rhs.get_wrapped()}. Also, \tcode{get_wrapped()} returns the value previously returned by \tcode{rhs.get_wrapped()}.
 \end{itemdescr}
 
 
@@ -788,8 +784,11 @@ An example implementation is availabile on \url{https://github.com/PeterSommerla
 
 \chapter{Revisions}
 Each section lists the revisions in the following version from the version given in the heading.
-\section{\href{http://wiki.edg.com/pub/Wg21kona2017/LibraryEvolutionWorkingGroup/p0053r4.html}{D0053R4}}
-This version was only published on the Kona Wiki.
+
+\section{\href{https://wg21.link/P0053R5}{P0053R5}}
+This paper was discussed by LWG in Toronto. All recommended changes have been incorporated into the next revision.
+\section{\href{http://wiki.edg.com/pub/Wg21kona2017/LibraryEvolutionWorkingGroup/p0053r4.html}{D0053R4 - P0053R4}}
+This version was only published on the Kona Wiki. The manipulators were extracted into a separate paper to ease forward progress with this paper, even though the wording of the manipulator specification was already reviewed by LWG.
 \begin{itemize}
 \item Translate text to LaTeX
 \item Added manipulator support so that logging frameworks that get an osyncstream passed can rely on flushes happening.

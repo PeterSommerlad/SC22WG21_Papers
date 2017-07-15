@@ -1,0 +1,155 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
+\usepackage[final]
+           {listings}     % code listings
+%\usepackage{longtable}    % auto-breaking tables
+%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+%\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+\usepackage[final]{microtype}
+%\usepackage{multicol}
+\usepackage{xspace}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+
+%%%% reuse all three from std.tex:
+\input{macros}
+\input{layout}
+\input{styles}
+
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{p0573r0}
+\newcommand{\paperdate}{2017-07-15}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - Manipulators for C++ Synchronized Buffered Ostream (see p0053)}
+\author{Peter Sommerlad, Pablo Halpern}
+\date{\paperdate}                % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{center}
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number:&  \papernumber \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++\\\hline 
+Audience: & LEWG (LWG to re-check the wording)\\\hline
+\end{tabular}
+\end{center}
+\chapter{Introduction}
+After Kona, Pablo asked me to add \tcode{ostream} manipulators for \tcode{basic_osyncstream} to allow users of such streams to modify their flushing behavior, when those stream objects are only know via \tcode{ostream\&} down the call chain.
+
+The wording for these manipulators was reviewed by LWG in Toronto (p0053r5), but their names were never discussed in LEWG, therefore I followed Jeffrey's suggestion to split them from p0053r6. For more information see that paper.
+
+
+\section{Items to be discussed by LEWG}
+\begin{itemize}
+\item Naming of the manipulators
+\item Should the manipulators be in header \tcode{<osyncstream>} instead of globally available in \tcode{<ostream>} as are \tcode{flush} and \tcode{endl}? Putting them in \tcode{<osyncstream>} (only), will increase dependence on \tcode{basic_osyncstream}, where \tcode{basic_syncbuf} would suffice for inline implementation of the manipulators. That dependency could even be mitigated by non-inline implementations of the manipulators (providing their instantiations for the supported character types as is done with many other things in the iostream implementaions).
+\item re-check wording (done be LWG in Toronto, but minor adaptations were made, because of LWG's feedback. Pablo is OK with the edits)
+\item What should be the delivery vehicle for this feature: C++20 or the concurrency TS? I believe both should be addressed when moved, like with p0053.
+\end{itemize}
+
+
+\chapter{Wording}
+
+This wording is relative to the current C++ working draft and refers to the specification in p0053r6. It could be integrated into a Concurrency TS  accordingly when p0053 gets adopted.
+
+\section{30.7.5.4 Standard \tcode{basic_ostream} manipulators [ostream.manip]}
+Add the following three manipulators.
+\begin{addedblock}
+\begin{itemdecl}
+template <class charT, class traits>
+  basic_ostream<charT, traits>& emit_on_flush(basic_ostream<charT, traits>& os);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, calls \tcode{buf->set_emit_on_sync(true)}. Otherwise this manipulator has no effect. 
+\begin{note}
+To work around the issue that the \tcode{Allocator} template argument can not be deduced, implementations can introduce an intermediate base class to \tcode{basic_osyncbuf} that takes care its \tcode{emit_on_sync} flag.
+\end{note}
+
+\pnum
+\returns
+\tcode{os}.
+\end{itemdescr}
+
+\begin{itemdecl}
+template <class charT, class traits>
+  basic_ostream<charT, traits>& noemit_on_flush(basic_ostream<charT, traits>& os);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, calls \tcode{buf->set_emit_on_sync(false)}. Otherwise this manipulator has no effect. 
+
+\pnum
+\returns
+\tcode{os}.
+\end{itemdescr}
+
+\begin{itemdecl}
+template <class charT, class traits>
+  basic_ostream<charT, traits>& flush_emit(basic_ostream<charT, traits>& os);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+\tcode{flush(os)}. Further
+if \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, 
+calls \tcode{buf->emit()}. 
+ 
+\pnum
+\returns
+\tcode{os}.
+\end{itemdescr}
+\end{addedblock}
+
+%%%%%%
+\section{Implementation}
+An example implementation is availabile on \url{https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/p0053_basic_osyncstreambuf}
+
+\end{document}
+
