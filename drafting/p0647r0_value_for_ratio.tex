@@ -37,8 +37,8 @@
 %%%%%
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0647r0}
-\newcommand{\paperdate}{2017-05-20}
+\newcommand{\papernumber}{p0647r1}
+\newcommand{\paperdate}{2017-07-21}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -60,24 +60,197 @@
 Document Number:& \papernumber  \\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
-Audience: & LWG/LEWG\\\hline
+Audience: & LEWG/LWG/SG6(numerics)\\\hline
 Target: & C++20\\\hline
 \end{tabular}
 
 \chapter{Motivation}
 
-Preparing for standardizing units and using std::ratio for keeping track of fractions often one needs to get the quotient as a floating point number or as a number of a type underlying a quantity, e.g., a fixpoint type. Doing that manually means adding a cast before doing the division. This is tedious and it would be nice to just access the value, as one can do with std::integral_constant. I believe that omission is just a historical accident, because it was not possible to do compile-time computation with floating point values when ratio was invented. There are some options on how to access the fraction as a compile-time entity. I chose to make the value member a long double and provide a templatized explicit conversion operator for accessing the fraction.
+Preparing for standardizing units and using \tcode{std::ratio} for keeping track of fractions often one needs to get the quotient as a floating point number or as a number of a type underlying a quantity, e.g., a fixpoint type. Doing that manually means adding a cast before doing the division. This is tedious and it would be nice to just access the value, as one can do with std::integral_constant. I believe that omission is just a historical accident, because it was not possible to do compile-time computation with floating point values when ratio was invented. There are some options on how to access the fraction as a compile-time entity. In the first revision I chose to make the value member a long double and provide a templatized explicit conversion operator for accessing the fraction.
+
+However, SG6 was not completely happy and suggested a variable template instead, which would require to use \tcode{template} in front of the variable in deduced contexts, that others didn't like. Therefore, I decided to think a bit more about it and provide some more alternatives with their individual advantages and disadvantages and hope LEWG is able to judge and guide further direction. The ultimate connection between compile-time/run-time-like values would be to go into the direction of boost::hana, by providing operator overloads to allow computation with ratio values (at compile time) to determine the ratio template instance in the end. One can even provide a constructor taking two \tcode{integral_constant}s with a deduction guide to guarantee that only simplified ratios would be created.
+
+A further observation by SG6 was, that most of the time you need the quotient of a ratio for further computation, you want to scale a factor. At least that is the case in the units library that is my use case. Therefore, I also provide the alternative for a scale member function that would allow slightly more precise computation, by first multiplying the numerator with the factor and then dividing by the denominator. A problem might be integral factors that can lead to integral overflow raising undefined behavior, but I consider that use case rare.
+
+\section{Questions to LEWG}
+\begin{itemize}
+\item Is the \tcode{scale()} static member function template approach OK? Is the name appropriate?
+\item Are any other options worth considering, esp. moving forward towards value-based computation?
+\end{itemize}
+
+
+\chapter{Design Options}
+
+This section lists several of the non-exclusive options on implementation. LEWG can easily pick-and chose from them, where I consider the \tcode{scale(factor)} function essential, all other things are optional.
+
+\section{Scaling a factor}
+Add the following static constexpr member function to the \tcode{std::ratio} class template:
+\begin{codeblock}
+      template<typename NUMERIC> //requires multiplication, division, and conversion from intmax_t
+      static constexpr
+	  auto scale(NUMERIC factor) {
+          return (factor*static_cast<NUMERIC>(num))/static_cast<NUMERIC>(den);
+      }
+\end{codeblock}
+
+Consequences: 
+\begin{itemize}
+\item This is the most common use case.
+\item Can increase precision by first multiplying, risking integral overflow.
+\item Can lead to integer division surprises if \tcode{factor} is an integral value.
+\item Division by zero is a non-issue, there can not be such a \tcode{ratio} type.
+\end{itemize}
+
+\section{Access to quotient through a variable template}
+This was suggested by SG6. Add the following member variable template to the \tcode{std::ratio} class template:
+\begin{codeblock}
+      template<typename NUMERIC>
+      static inline constexpr NUMERIC quotient{
+          static_cast<NUMERIC>(num)/static_cast<NUMERIC>(den)
+      }; 
+\end{codeblock}
+
+Consequences:
+\begin{itemize}
+\item Allows quotient access in any type of user's choice that allows division
+\item Can lead to integer division surprises if \tcode{NUMERIC} is an integral type.
+\item A big potential disadvantage is the need to use template keyword in a deduced context:
+\tcode{std::ratio<N,D>::template quotient<double>} to access the quotient. This could be very common in a units library, that makes intensive use of templates.
+\item Should not be the only option to access the quotient.
+\end{itemize}
+
+\section{Access to quotient as a long double}
+This was rejected by SG6. Add the following static constexpr inline member variable  to the \tcode{std::ratio} class template:
+\begin{codeblock}
+      static inline constexpr 
+      long double value { static_cast<long double>(num)/den }; 
+\end{codeblock}
+
+Consequences:
+\begin{itemize}
+\item uses the type implied for compile-time floating point literals giving the most precision
+\item SG6 noted that the name value should be reserved for a future, where we have an exact means to represent arbitrary fractions at run-time (beyond an \tcode{intmax_t} pair).
+\item if this is the only means of value access would prohibit using fixed point types for fractions easily (they would do what everyone needs to do with \tcode{ratio} today).
+\end{itemize}
+
+
+\section{A generic explicit type conversion operator}
+This was suggested in R0 and is repeated here, because it will make the use of \tcode{std::ratio} value objects (that are empty), like boost::hana would do very rational. Whenever you need the quotient, just \tcode{static_cast} the ratio value to the type you need the quotient in. However, to make that use more effective, would require to provide a full set of operators working on ratio values (and best also \tcode{integral_constant}), leading close to what boost::hana is doing in that area.
+
+\begin{codeblock}
+      template<typename NUMERIC>
+      explicit constexpr operator NUMERIC() const{
+           return static_cast<NUMERIC>(num)/static_cast<NUMERIC>(den);
+      }
+\end{codeblock}
+
+Consequences:
+\begin{itemize}
+\item Usage requires object instances of \tcode{std::ratio} types and static_cast, i.e. \\
+\tcode{static_cast<double>(std::ratio<42,5>\{\})}
+\item Allows quotient access in any type of user's choice that allows division
+\item Can lead to integer division surprises if \tcode{NUMERIC} is an integral type.
+\item Should not be the only option to access the quotient.
+\item Only makes real sense, when creation and computation of \tcode{std::ratio} values is syntactically pleasing.
+\end{itemize}
+
+\section{Moving \tcode{ratio} towards value-based computation}
+For the sake of completeness one might consider adding the following operators to the \tcode{<ratio>} header.
+\begin{codeblock}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator+(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_add<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator-(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_subtract<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator*(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_multiply<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator/(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_divide<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1>
+constexpr auto operator-(std::ratio<N1,D1>){
+	return std::ratio<-N1,D1>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator==(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_equal<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator!=(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_not_equal<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator<(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_less<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator<=(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_less_equal<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator>(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_greater<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+}
+template<intmax_t N1,intmax_t D1,intmax_t N2,intmax_t D2>
+constexpr auto operator>=(std::ratio<N1,D1>,std::ratio<N2,D2>){
+	return std::ratio_greater_equal<std::ratio<N1,D1>,std::ratio<N2,D2>>{};
+} 
+\end{codeblock}
+\subsection{ratio values from integral_constant}
+For completeness of value-based computation one can add the following constructors to std::ratio together with a deduction guide guaranteeing only simplified instances.
+\begin{codeblock}
+      constexpr ratio()noexcept=default;
+      template<intmax_t _Num_,intmax_t _Den_>
+      constexpr ratio(std::integral_constant<intmax_t,_Num_>,std::integral_constant<intmax_t,_Den_>)noexcept{
+	  	  static_assert(_Num==this->num,"should always be simplified");
+	  	  static_assert(_Den==this->den,"should always be simplified");
+      }
+//... and outside the deduction guide: (using libstdc++'s internals:)
+template <intmax_t _Num_, intmax_t _Den_>
+ratio(std::integral_constant<intmax_t,_Num_>,std::integral_constant<intmax_t,_Den_>)
+  ->ratio<_Num_ * __static_sign<_Den_>::value / __static_gcd<_Num_, _Den_>::value,
+          __static_abs<_Den_>::value / __static_gcd<_Num_, _Den_>::value>;
+\end{codeblock}
+
+To make this useful a UDL suffix operator converting integral literals to \tcode{std::integral_constant<intmax_t,N>} is useful, like boost::hana's \tcode{operator"" _c()} leading to the ability to write code like:
+\begin{example}
+\begin{codeblock}
+	using namespace std::literals;
+	using std::ratio;
+	constexpr ratio r{2_to_c,4_to_c};
+	constexpr auto fourth=r*r;
+	static_assert(std::is_same_v<ratio<1,2>,decltype(r)>,"argument deduction wrong");
+	static_assert(ratio<1>{}==ratio<1,2>{}+r,"add failed");
+	static_assert(ratio<1,4>{}==fourth,"mul failed");
+	ASSERT_EQUAL((ratio<1,4>{}),fourth);
+\end{codeblock}
+\end{example}
+
+\chapter{Changes from R0}
+SG6 in Toronto suggested to drop the template explicit conversion operator and make the accessor a variable template instead. Also the name \tcode{value} should be reserved for future arbitrary precision rational number type in the std to keep the quotient. %Take a look at \tcode{<chrono>} specification how it uses ratio in the spec?
+
+%% give an overview over all options and suggest one. I still think the value-based approach might be worth considering.
+
+It was noted that variable template will require \tcode{template} in front of \tcode{ratio<a,b>::template quotient<>}.
+
+Also someone suggested to provide a scale static member function template, because that is the most common use case and allow to deduce the floating point type to be used. I have chosen to suggest this variant, but also prepared other options for LEWG to consider for further guidance.
 
 \chapter{Acknowledgements}
 \begin{itemize}
 \item Authors of N2661: Howard Hinnant, Walter Brown, Jeff Garland, Marc Paterno.
 \item Members of the LiaW workshop "Towards Units" at C++Now 2017: Billy Baker, Charles Wilson, Daniel Pfeifer, Dave Jenkins, Manuel Bergler, Morris Hafner, Nicolas Holthaus, Peter Bindels, Steven Watanabe, Tuan Tran.
-
+\item Participants of SG6 in Toronto, mainly Walter Brown for leading that group's discussion.
 \end{itemize}
 
 \newpage
 \chapter{Changes Proposed}
-Modify section 23.26.3 by inserting floating point access to the fractional value represented.
+Modify section 23.26.3 by inserting access to the fractional value represented through a \tcode{scale} function.
 \rSec2[ratio.ratio]{Class template \tcode{ratio}}
 
 \indexlibrary{\idxcode{ratio}}%
@@ -93,11 +266,9 @@ namespace std {
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
-    static constexpr long double value{ static_cast<long double>(num)/den }; 
     template<typename R>   
-    explicit constexpr operator R() const noexcept { 
-        return static_cast<R>(num)/static_cast<R>(den);
-    }
+    static constexpr auto
+    scale(R factor) { return (factor * static_cast<R>(num)) / static_cast<R>(den) ; } 
 \end{codeblock}
 \end{addedblock}
 \begin{codeblock}
@@ -105,7 +276,19 @@ namespace std {
 }
 \end{codeblock}
 
+\pnum
+\pnum
+Add a new paragraph 3 to the section with the following example:
 
+\begin{addedblock}
+\pnum
+\begin{example} The \tcode{scale} static member function template can be used to scale a factor by the quotient represented by a \tcode{ratio}: 
+\begin{codeblock}
+ 	assert(3e12 == std::tera::scale(3.));
+	assert(10 == std::deci::scale(100));
+\end{codeblock}
+\end{example}
+\end{addedblock}
 
 
 
