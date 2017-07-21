@@ -133,18 +133,18 @@ void TypeTraits_has_linear_scale()
 
 void TypeTraits_has_decibel_scale()
 {
-	ASSERT(!(traits::has_decibel_scale<scalar_t>::value));
-	ASSERT(!(traits::has_decibel_scale<meter_t>::value));
-	ASSERT(!(traits::has_decibel_scale<foot_t>::value));
-	ASSERT((traits::has_decibel_scale<dB_t>::value));
-	ASSERT((traits::has_decibel_scale<dBW_t>::value));
+	ASSERT(!(traits::has_decibel_scale<scalar_t>));
+	ASSERT(!(traits::has_decibel_scale<meter_t>));
+	ASSERT(!(traits::has_decibel_scale<foot_t>));
+	ASSERT((traits::has_decibel_scale<dB_t>));
+	ASSERT((traits::has_decibel_scale<dBW_t>));
 
-	ASSERT((traits::has_decibel_scale<dBW_t, dB_t>::value));
-	ASSERT((traits::has_decibel_scale<dBW_t, dBm_t>::value));
-	ASSERT((traits::has_decibel_scale<dB_t, dB_t>::value));
-	ASSERT((traits::has_decibel_scale<dB_t, dB_t, dB_t>::value));
-	ASSERT(!(traits::has_decibel_scale<dB_t, dB_t, meter_t>::value));
-	ASSERT(!(traits::has_decibel_scale<meter_t, dB_t>::value));
+	ASSERT((traits::has_decibel_scale<dBW_t, dB_t>));
+	ASSERT((traits::has_decibel_scale<dBW_t, dBm_t>));
+	ASSERT((traits::has_decibel_scale<dB_t, dB_t>));
+	ASSERT((traits::has_decibel_scale<dB_t, dB_t, dB_t>));
+	ASSERT(!(traits::has_decibel_scale<dB_t, dB_t, meter_t>));
+	ASSERT(!(traits::has_decibel_scale<meter_t, dB_t>));
 }
 
 void TypeTraits_is_same_scale()

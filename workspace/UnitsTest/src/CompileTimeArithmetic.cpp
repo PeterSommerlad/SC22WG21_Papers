@@ -2,7 +2,7 @@
 #include "CompileTimeArithmetic.h"
 #include "cute.h"
 
-
+#ifndef DO_NOT_USE_COMPILE_TIME_ARITHMETIC
 void CompileTimeArithmetic_unit_value_t()
 {
 	typedef unit_value_t<meters, 3, 2> mRatio;
@@ -223,9 +223,10 @@ void CompileTimeArithmetic_unit_value_sqrt()
 	ASSERT_EQUAL_DELTA(76.870352574, rootr::value().convert<angle::degrees>().to<double>(), 5.0e-6);
 	ASSERT((traits::is_unit_value_t_category<category::angle_unit, rootr>));
 }
-
+#endif
 cute::suite make_suite_CompileTimeArithmetic() {
 	cute::suite s { };
+#ifndef DO_NOT_USE_COMPILE_TIME_ARITHMETIC
 	s.push_back(CUTE(CompileTimeArithmetic_unit_value_t));
 	s.push_back(CUTE(CompileTimeArithmetic_is_unit_value_t));
 	s.push_back(CUTE(CompileTimeArithmetic_is_unit_value_t_category));
@@ -235,5 +236,6 @@ cute::suite make_suite_CompileTimeArithmetic() {
 	s.push_back(CUTE(CompileTimeArithmetic_unit_value_divide));
 	s.push_back(CUTE(CompileTimeArithmetic_unit_value_power));
 	s.push_back(CUTE(CompileTimeArithmetic_unit_value_sqrt));
+#endif
 	return s;
 }

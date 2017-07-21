@@ -18,12 +18,6 @@
 
 
 
-
-
-
-
-
-
 void CaseStudies_radarRangeEquation()
 {
 	watt_t			P_t;				// transmit power
@@ -52,6 +46,7 @@ void CaseStudies_radarRangeEquation()
 
 void CaseStudies_pythagoreanTheorum()
 {
+#if 0
 	struct RightTriangle
 	{
 		using a = unit_value_t<meters, 3>;
@@ -64,6 +59,7 @@ void CaseStudies_pythagoreanTheorum()
 	ASSERT_EQUAL(meter_t(5), RightTriangle::c::value());
 	ASSERT(pow<2>(RightTriangle::a::value()) + pow<2>(RightTriangle::b::value())
 		== pow<2>(RightTriangle::c::value()));
+#endif
 }
 
 int main1(int argc, char* argv[])
