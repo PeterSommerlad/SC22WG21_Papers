@@ -1,0 +1,7 @@
+<testsuites>
+	<testsuite name="AllTests" tests="3">
+		<testcase classname="AllTests" name="thisIsATest"/>
+		<testcase classname="AllTests" name="test_ratio_scale"/>
+		<testcase classname="AllTests" name="test_integral_constant_negate"/>
+	</testsuite>
+</testsuites>
