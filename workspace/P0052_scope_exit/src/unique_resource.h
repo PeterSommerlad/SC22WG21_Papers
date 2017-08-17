@@ -71,10 +71,10 @@ class unique_resource
 {
     static_assert(std::is_nothrow_move_constructible_v<R> ||
                   std::is_copy_constructible_v<R>,
-				  "resource must be notrhow_move_constructible or copy_constructible");
+				  "resource must be nothrow_move_constructible or copy_constructible");
     static_assert(std::is_nothrow_move_constructible_v<D> ||
                   std::is_copy_constructible_v<D>,
-				  "deleter must be notrhow_move_constructible or copy_constructible");
+				  "deleter must be nothrow_move_constructible or copy_constructible");
 
 	static const unique_resource &this_; // never ODR used! Just for getting no_except() expr
 
