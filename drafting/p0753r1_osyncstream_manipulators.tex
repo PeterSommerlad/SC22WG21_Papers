@@ -54,8 +54,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0573r0}
-\newcommand{\paperdate}{2017-07-15}
+\newcommand{\papernumber}{p0753r1}
+\newcommand{\paperdate}{2017-10-15}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -75,6 +75,9 @@ Audience: & LEWG (LWG to re-check the wording)\\\hline
 \end{tabular}
 \end{center}
 \chapter{Introduction}
+\textbf{Note that this version is identical to p0753r0 except for the typo in the paper number in that version.}
+
+
 After Kona, Pablo asked me to add \tcode{ostream} manipulators for \tcode{basic_osyncstream} to allow users of such streams to modify their flushing behavior, when those stream objects are only know via \tcode{ostream\&} down the call chain.
 
 The wording for these manipulators was reviewed by LWG in Toronto (p0053r5), but their names were never discussed in LEWG, therefore I followed Jeffrey's suggestion to split them from p0053r6. For more information see that paper.

@@ -4,23 +4,26 @@
 %\geometry{landscape}  % Activate for for rotated page geometry
 %\usepackage[parfill]{parskip}  % Activate to begin paragraphs with an empty line rather than an indent
 
-%\usepackage[final]
-%           {listings}     % code listings
 %\usepackage{color}        % define colors for strikeouts and underlines
 %\usepackage{underscore}   % remove special status of '_' in ordinary text
 %\usepackage{xspace}
 %\usepackage[normalem]{ulem}
 %%%%% from std.tex:
+\usepackage[american]
+           {babel}        % needed for iso dates
+\usepackage[iso,american]
+           {isodate}      % use iso format for dates
 \usepackage[final]
            {listings}     % code listings
-%\usepackage{longtable}    % auto-breaking tables
-%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{longtable}    % auto-breaking tables
+\usepackage{ltcaption}    % fix captions for long tables
 \usepackage{relsize}      % provide relative font size changes
 \usepackage{textcomp}     % provide \text{l,r}angle
 \usepackage{underscore}   % remove special status of '_' in ordinary text
 \usepackage{parskip}      % handle non-indented paragraphs "properly"
 \usepackage{array}        % new column definitions for tables
 \usepackage[normalem]{ulem}
+\usepackage{enumitem}
 \usepackage{color}        % define colors for strikeouts and underlines
 \usepackage{amsmath}      % additional math symbols
 \usepackage{mathrsfs}     % mathscr font
@@ -30,14 +33,29 @@
 \usepackage{lmodern}
 \usepackage[T1]{fontenc}
 \usepackage[pdftex, final]{graphicx}
-\usepackage{enumitem}
-
+%\usepackage[pdftex,
+%%            pdftitle={C++ International Standard},
+%%            pdfsubject={C++ International Standard},
+%%            pdfcreator={Richard Smith},
+%            bookmarks=true,
+%            bookmarksnumbered=true,
+%            pdfpagelabels=true,
+%            pdfpagemode=UseOutlines,
+%            pdfstartview=FitH,
+%            linktocpage=true,
+%            colorlinks=true,
+%            linkcolor=blue,
+%            plainpages=false
+%           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
 %%%%%
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0506r1}
-\newcommand{\paperdate}{2017-06-06}
+\newcommand{\papernumber}{p0506r2}
+\newcommand{\paperdate}{2017-10-06}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\removed}[1]{\textcolor{red}{\sout{#1}}}
@@ -50,6 +68,7 @@
 \input{macros}
 \input{styles}
 \input{layout}
+\input{tables}
 
 \title{\papernumber{} - use string\_view for library function parameters instead of const string \&/const char *}
 \author{Peter Sommerlad}
@@ -77,14 +96,27 @@ It might be doubted that the non-null termination of \tcode{string_view} could b
 
 Proposed change: "Provide the overloads for \tcode{std::regex}, the exception classes, \tcode{std::bitset}, \tcode{std::locale} and more."
 
-by providing changes for library sections 22, 23.9, 25 and 31. The "and more" part is in 30.7.1/30.7.6 with respect to the quoted output manipulator and the application of string view to string streams is given in p0408.
+by providing changes for library sections 22, 23.9, 24.3.4, 25 and 31. The "and more" part is in 30.7.1/30.7.6 with respect to the quoted output manipulator and the application of string view to string streams is given in p0408.
 
 \chapter{Acknowledgements}
 \begin{itemize}
 \item LEWG in Issaquah for proposing me to write this paper, even when it can not make it into C++17.
+\item Alisdair Meredith for extensive review and suggestions by email in July 2017.
+\item Arthur O'Dwyer for suggesting numeric conversions to use \tcode{string_view} as well.
 \end{itemize}
 
 \chapter{Changes from previous versions}
+\section{p0506r1} 
+\begin{itemize}
+\item include section 24.3.4 numeric conversions to employ \tcode{string_view} instead of \tcode{const string\&} as suggested by Arthur O. Dwyer.
+\item Among some things Alisdair pointed out several places where deduction is incomplete, or an \tcode{Allocator} template parameter was sticking around. After thinking about that, I figured that \tcode{bitset} requires to keep a \tcode{char const *} constructor overload and just should replace the \tcode{const string \&} overload with a \tcode{string_view} overload
+\item Alisdair further pointed out, that quoted will not work with a basic_string_view overload only. Also the standard text changed in between the version when this paper was started wrt LWG2785 to add an additional quoted overload for \tcode{basic_string_view}. I tried to implement it and figured out, that template argument deduction won't work nicely with implicit conversions, without all 3 template versions. So I suggest to sidestep from templatizing \tcode{quoted} for output and provide deliberate overloads for the relevant stream character types (\tcode{char}, \tcode{wchar_t}) in the standard. With such an implementation one \tcode{string_view} overload is sufficient to cover arguments of all kinds of string representations (character pointers, string, string view). This results in only two overloads instead of three templated overloads for output. We won't have streams for other character types than \tcode{char} and \tcode{wchar_t} in the foreseeable future, I believe. Unfortuntely C++17 shipped with the three template overloads for quoted output (sadly).
+
+\item As Alisdair suggested I removed reference to construction from nullptr from the locale section.
+
+\item According to Alisdair 22.5.7 system error and filesystem error needs to be adapted as well to reduce the number of ctor overloads (didn't have time to specify it yet).
+
+\end{itemize}
 
 \section{p0506r0} 
 \begin{itemize}
@@ -111,7 +143,7 @@ A separate paper p0408 specifies the application of \tcode{basic_string_view} fo
 The following is relative to the CD/current working draft.
 
 \section{22.2 {Exception classes} [std.exceptions]}
-For all subclasses of std::exception, std::logic_error, and std::runtime_error specified in section 19.2 apply the following changes respectively by replacing \emph{\tcode{std_exception}} with the corresponding class and \emph{\tcode{base_exception}} by its respective base class:
+For all subclasses of std::exception, std::logic_error, and std::runtime_error specified in section 22.2 [stdexcept.syn] apply the following changes respectively by replacing \emph{\tcode{std_exception}} with the corresponding class and \emph{\tcode{base_exception}} by its respective base class:
 
 
 %\rSec2[logic.error]{Class \tcode{logic_error}}
@@ -167,6 +199,217 @@ Constructs an object of class
 \end{itemdescr}
 \end{removedblock}
 
+
+\section{22.5.7 {Class \tcode{system_error}} [syserr.syserr]}
+Change the class definition in 22.5.7.1 [syserr.syserr.overview] as follows:
+\indexlibrary{\idxcode{system_error}}%
+\begin{codeblock}
+namespace std {
+  class system_error : public runtime_error {
+  public:
+    system_error(error_code ec, @\removed{const }@string@\added{_view}\removed{\&}@ what_arg);
+    @\removed{system_error(error_code ec, const char* what_arg);}@
+    system_error(error_code ec);
+    system_error(int ev, const error_category& ecat, @\removed{const }@string@\added{_view}\removed{\&}@ what_arg);
+    @\removed{system_error(int ev, const error_category\& ecat, const char* what_arg);}@
+    system_error(int ev, const error_category& ecat);
+    const error_code& code() const noexcept;
+    const char* what() const noexcept override;
+  };
+}
+\end{codeblock}
+
+Change the constructor definitions in 22.5.7.2 [syserr.syserr.members] {Class \tcode{system_error} members} 
+accordingly:
+
+\indexlibrary{\idxcode{system_error}!constructor}%
+\begin{itemdecl}
+system_error(error_code ec,  @\removed{const }@string@\added{_view}\removed{\&}@ what_arg);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{system_error}.
+
+\pnum
+\postconditions \tcode{code() == ec} and
+\tcode{string(what()).find(what_arg) != string::npos}.
+\end{itemdescr}
+
+\begin{removedblock}
+\indexlibrary{\idxcode{system_error}!constructor}%
+\begin{itemdecl}
+system_error(error_code ec, const char* what_arg);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{system_error}.
+
+\pnum
+\postconditions \tcode{code() == ec} and
+\tcode{string(what()).find(what_arg) != string::npos}.
+\end{itemdescr}
+\end{removedblock}
+
+\indexlibrary{\idxcode{system_error}!constructor}%
+\begin{itemdecl}
+system_error(error_code ec);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{system_error}.
+
+\pnum
+\postconditions \tcode{code() == ec}.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{system_error}!constructor}%
+\begin{itemdecl}
+system_error(int ev, const error_category& ecat,  @\removed{const }@string@\added{_view}\removed{\&}@ what_arg);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{system_error}.
+
+\pnum
+\postconditions \raggedright \tcode{code() == error_code(ev, ecat)} and\linebreak
+\tcode{string(what()).find(what_arg) != string::npos}.
+\end{itemdescr}
+
+\begin{removedblock}
+\indexlibrary{\idxcode{system_error}!constructor}%
+\begin{itemdecl}
+system_error(int ev, const error_category& ecat, const char* what_arg);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{system_error}.
+
+\pnum
+\postconditions \raggedright \tcode{code() == error_code(ev, ecat)} and\linebreak
+\tcode{string(what()).find(what_arg) != string::npos}.
+\end{itemdescr}
+\end{removedblock}
+
+\indexlibrary{\idxcode{system_error}!constructor}%
+\begin{itemdecl}
+system_error(int ev, const error_category& ecat);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{system_error}.
+
+\pnum
+\postconditions \tcode{code() == error_code(ev, ecat)}.
+\end{itemdescr}
+
+%%%%%%%%%%
+\section{ 30.10.8 Class filesystem_error [fs.class.filesystem_error]}
+Change the const string reference parameters of \tcode{filesystem_error} constructors to \tcode{string_view} to sidestep extra string temporaries. LEWG should discuss if this is beneficial enough to warrant an ABI breaking change. 
+
+Change the definition of class filesystem_error as follows:
+\indexlibrary{\idxcode{filesystem_error}}%
+\begin{codeblock}
+namespace std::filesystem {
+  class filesystem_error : public system_error {
+  public:
+    filesystem_error(@\removed{const }@string@\added{_view}\removed{\&}@ what_arg, error_code ec);
+    filesystem_error(@\removed{const }@string@\added{_view}\removed{\&}@ what_arg,
+                     const path& p1, error_code ec);
+    filesystem_error(@\removed{const }@string@\added{_view}\removed{\&}@ what_arg,
+                     const path& p1, const path& p2, error_code ec);
+
+    const path& path1() const noexcept;
+    const path& path2() const noexcept;
+    const char* what() const noexcept override;
+  };
+}
+\end{codeblock}
+\pnum
+The class \tcode{filesystem_error} defines the type of
+objects thrown as exceptions to report file system errors from functions described in this
+subclause.
+
+\subsection{30.10.8.1 [fs.filesystem_error.members]{\tcode{filesystem_error} members} }
+
+In section 30.10.8.1 [fs.filesystem_error.members]{\tcode{filesystem_error} members} change the constructors accordingly:
+
+\pnum
+ Constructors are provided that store zero, one, or two paths associated with
+an error.
+
+\indexlibrary{\idxcode{filesystem_error}!constructor}%
+\begin{itemdecl}
+filesystem_error(@\removed{const }@string@\added{_view}\removed{\&}@ what_arg, error_code ec);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\postconditions The postconditions of this function are indicated in
+Table~\ref{tab:filesystem_error.1}.
+\end{itemdescr}
+
+\begin{floattable}
+{\tcode{filesystem_error(\removed{const }string\added{_view}\removed{\&} , error_code)} effects}{tab:filesystem_error.1}
+{ll}
+\topline
+\lhdr{Expression}		& \rhdr{Value} \\ \capsep
+\tcode{\added{what_arg.compare(}runtime_error::what()\added{)}}	& \tcode{\removed{what_arg.c_str()}\added{0}} \\ \rowsep
+\tcode{code()}			& \tcode{ec}	\\ \rowsep
+\tcode{path1().empty()}		& \tcode{true}	\\ \rowsep
+\tcode{path2().empty()}		& \tcode{true}	\\ \rowsep
+\end{floattable}
+
+\indexlibrary{\idxcode{filesystem_error}!constructor}%
+\begin{itemdecl}
+filesystem_error(@\removed{const }@string@\added{_view}\removed{\&}@ what_arg, const path& p1, error_code ec);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\postconditions The postconditions of this function are indicated in
+Table~\ref{tab:filesystem_error.2}.
+
+\begin{floattable}
+{\tcode{filesystem_error(\removed{const }string\added{_view}\removed{\&} , const path\&, error_code)} effects}{tab:filesystem_error.2}
+{ll}
+\topline
+\lhdr{Expression}		& \rhdr{Value} \\ \capsep
+\tcode{\added{what_arg.compare(}runtime_error::what()\added{)}}	& \tcode{\removed{what_arg.c_str()}\added{0}} \\ \rowsep
+\tcode{code()}			& \tcode{ec}	\\ \rowsep
+\tcode{path1()}			& Reference to stored copy of \tcode{p1}	\\ \rowsep
+\tcode{path2().empty()}		& \tcode{true}	\\ \rowsep
+\end{floattable}
+\end{itemdescr}
+
+\indexlibrary{\idxcode{filesystem_error}!constructor}%
+\begin{itemdecl}
+filesystem_error(@\removed{const }@string@\added{_view}\removed{\&}@ what_arg, const path& p1, const path& p2, error_code ec);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\postconditions The postconditions of this function are indicated in
+Table~\ref{tab:filesystem_error.3}.
+
+\begin{floattable}
+{\tcode{filesystem_error(\removed{const }string\added{_view}\removed{\&}, const path\&, const path\&, error_code)} effects}{tab:filesystem_error.3}
+{ll}
+\topline
+\lhdr{Expression}		& \rhdr{Value} \\ \capsep
+\tcode{\added{what_arg.compare(}runtime_error::what()\added{)}}	& \tcode{\removed{what_arg.c_str()}\added{0}} \\ \rowsep
+\tcode{code()}			& \tcode{ec}	\\ \rowsep
+\tcode{path1()}			& Reference to stored copy of \tcode{p1}	\\ \rowsep
+\tcode{path2()}			& Reference to stored copy of \tcode{p2}	\\ \rowsep
+\end{floattable}
+\end{itemdescr}
+
+
 %%%%%%%%%%
 \section{ 23.9 Class template \tcode{bitset}  [template.bitset]}%
 
@@ -205,19 +448,19 @@ namespace std {
         typename basic_string<charT, traits, Allocator>::size_type n =
           basic_string<charT, traits, Allocator>::npos,
           charT zero = charT('0'), charT one = charT('1'));
-    template <class charT>
-      explicit bitset(
-        const charT* str,
-        typename basic_string<charT>::size_type n = basic_string<charT>::npos,
-        charT zero = charT('0'), charT one = charT('1'));
 \end{codeblock}
 \end{removedblock}
 \begin{codeblock}
+    template <class charT>
+      explicit bitset(
+        const charT* str,
+        typename basic_string@\added{_view}@<charT>::size_type n = basic_string@\added{_view}@<charT>::npos,
+        charT zero = charT('0'), charT one = charT('1'));
         //...
         };
 \end{codeblock}
 
-In 23.9.1 replace p3 to p7 defining the two removed constructors by the following:
+In 23.9.1 replace p3 to p6 defining the removed constructor by the following:
 
 %%%%%%%%%\indexlibrary{\idxcode{bitset}!constructor}%
 \begin{addedblock}
@@ -276,6 +519,170 @@ If \tcode{M < N}, remaining bit positions are initialized to zero.
 \end{itemdescr}
 \end{addedblock}
 
+In 23.9.1 change p7 defining the changed constructor as follows:
+
+\begin{itemdecl}
+template <class charT>
+  explicit bitset(
+    const charT* str,
+    typename basic_string@\added{_view}@<charT>::size_type n = basic_string@\added{_view}@<charT>::npos,
+    charT zero = charT('0'),
+    charT one = charT('1'));
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Constructs an object of class \tcode{bitset<N>} as if by:
+\begin{codeblock}
+bitset(n == basic_string@\added{_view}@<charT>::npos
+          ? basic_string@\added{_view}@<charT>(str)
+          : basic_string@\added{_view}@<charT>(str, n),
+       0, n, zero, one)
+\end{codeblock}
+\end{itemdescr}
+
+
+%%%%%%%%
+\section{24.3.4 Numeric conversions [string.confersions]}
+Change the section as follows, by replacing all \tcode{const string \&} with \tcode{string_view} instead and 
+all \tcode{const wstring \&} with \tcode{wstring_view}. Accordingly change the header in 24.3.1 accordingly and LEWG should consider moving the \tcode{sto}\textit{x} \tcode{wsto}\textit{x} functions to the \tcode{<string_view>} header 24.4.1 instead and splitting 24.3.4 into two sections and put the "to" functions to a new section in 24.4. I wait for that guidance before taking everything into account.
+
+%\rSec2[string.conversions]{Numeric conversions}
+
+%\indexlibrary{\idxcode{stoi}}%
+%\indexlibrary{\idxcode{stol}}%
+%\indexlibrary{\idxcode{stoul}}%
+%\indexlibrary{\idxcode{stoll}}%
+%\indexlibrary{\idxcode{stoull}}%
+\begin{itemdecl}
+int stoi(@\added{string_view}\removed{const string\&}@ str, size_t* idx = nullptr, int base = 10);
+long stol(@\added{string_view}\removed{const string\&}@ str, size_t* idx = nullptr, int base = 10);
+unsigned long stoul(@\added{string_view}\removed{const string\&}@ str, size_t* idx = nullptr, int base = 10);
+long long stoll(@\added{string_view}\removed{const string\&}@ str, size_t* idx = nullptr, int base = 10);
+unsigned long long stoull(@\added{string_view}\removed{const string\&}@ str, size_t* idx = nullptr, int base = 10);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects \added{The functions behave as if the character sequence denoted by \tcode{str} is null-terminated while the following calls happen.} The first two functions call \tcode{strtol(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr, base)},
+and the last three functions call \tcode{strtoul(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr, base)},
+\tcode{strtoll(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr, base)}, and \tcode{strtoull(\brk{}str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr,
+base)}, respectively. Each function returns the converted result, if any. The
+argument \tcode{ptr} designates a pointer to an object internal to the function
+that is used to determine what to store at \tcode{*idx}. If the function does
+not throw an exception and \tcode{idx != 0}, the function stores in \tcode{*idx}
+the index of the first unconverted element of \tcode{str}.
+
+\pnum
+\returns The converted result.
+
+\pnum
+\throws \tcode{invalid_argument} if \tcode{strtol}, \tcode{strtoul},
+\tcode{strtoll}, or \tcode{strtoull} reports that no conversion could be
+performed. Throws \tcode{out_of_range} if \tcode{strtol}, \tcode{strtoul},
+\tcode{strtoll} or \tcode{strtoull} sets \tcode{errno} to \tcode{ERANGE},
+or if the converted value is outside the range of representable values
+for the return type.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{stof}}%
+\indexlibrary{\idxcode{stod}}%
+\indexlibrary{\idxcode{stold}}%
+\begin{itemdecl}
+float stof(@\added{string_view}\removed{const string\&}@ str, size_t* idx = nullptr);
+double stod(@\added{string_view}\removed{const string\&}@ str, size_t* idx = nullptr);
+long double stold(@\added{string_view}\removed{const string\&}@ str, size_t* idx = nullptr);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects \added{Theses functions behave as if the character sequence denoted by \tcode{str} is null-terminated while the following calls happen.} These functions call
+\tcode{strtof(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr)}, \tcode{strtod(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr)}, and
+\tcode{strtold(\brk{}str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr)}, respectively. Each function returns
+the converted result, if any. The argument \tcode{ptr} designates a pointer to
+an object internal to the function that is used to determine what to store at
+\tcode{*idx}. If the function does not throw an exception and \tcode{idx != 0},
+the function stores in \tcode{*idx} the index of the first unconverted element
+of \tcode{str}.
+
+\pnum
+\returns The converted result.
+
+\pnum
+\throws \tcode{invalid_argument} if \tcode{strtof}, \tcode{strtod}, or
+\tcode{strtold} reports that no conversion could be performed. Throws
+\tcode{out_of_range} if \tcode{strtof}, \tcode{strtod}, or
+\tcode{strtold} sets \tcode{errno} to \tcode{ERANGE}
+or if the converted value is outside the range of representable
+values for the return type.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{stoi}}%
+\indexlibrary{\idxcode{stol}}%
+\indexlibrary{\idxcode{stoul}}%
+\indexlibrary{\idxcode{stoll}}%
+\indexlibrary{\idxcode{stoull}}%
+\begin{itemdecl}
+int stoi(@\added{wstring_view}\removed{const wstring\&}@ str, size_t* idx = nullptr, int base = 10);
+long stol(@\added{wstring_view}\removed{const wstring\&}@ str, size_t* idx = nullptr, int base = 10);
+unsigned long stoul(@\added{wstring_view}\removed{const wstring\&}@ str, size_t* idx = nullptr, int base = 10);
+long long stoll(@\added{wstring_view}\removed{const wstring\&}@ str, size_t* idx = nullptr, int base = 10);
+unsigned long long stoull(@\added{wstring_view}\removed{const wstring\&}@ str, size_t* idx = nullptr, int base = 10);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects \added{Theses functions behave as if the character sequence denoted by \tcode{str} is null-terminated while the following calls happen.}
+The first two functions call \tcode{wcstol(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr, base)},
+and the last three functions call \tcode{wcstoul(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr, base)},
+\tcode{wcstoll(str.c_str(), ptr, base)}, and \tcode{wcstoull(\brk{}str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr,
+base)}, respectively. Each function returns the converted result, if any. The
+argument \tcode{ptr} designates a pointer to an object internal to the function
+that is used to determine what to store at \tcode{*idx}. If the function does
+not throw an exception and \tcode{idx != 0}, the function stores in \tcode{*idx}
+the index of the first unconverted element of \tcode{str}.
+
+\pnum
+\returns The converted result.
+
+\pnum
+\throws \tcode{invalid_argument} if \tcode{wcstol}, \tcode{wcstoul}, \tcode{wcstoll}, or
+\tcode{wcstoull} reports that no conversion could be performed. Throws
+\tcode{out_of_range} if the converted value is outside the range of representable values
+for the return type.
+\end{itemdescr}
+
+\indexlibrary{\idxcode{stof}}%
+\indexlibrary{\idxcode{stod}}%
+\indexlibrary{\idxcode{stold}}%
+\begin{itemdecl}
+float stof(@\added{wstring_view}\removed{const wstring\&}@ str, size_t* idx = nullptr);
+double stod(@\added{wstring_view}\removed{const wstring\&}@ str, size_t* idx = nullptr);
+long double stold(@\added{wstring_view}\removed{const wstring\&}@ str, size_t* idx = nullptr);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects \added{Theses functions behave as if the character sequence denoted by \tcode{str} is null-terminated while the following calls happen.}
+These functions call \tcode{wcstof(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr)},
+\tcode{wcstod(str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr)}, and \tcode{wcstold(\brk{}str.}\added{\tcode{data()}}\removed{\tcode{c_str()}}\tcode{, ptr)},
+respectively. Each function returns the converted
+result, if any. The argument \tcode{ptr} designates a pointer to an object internal to
+the function that is used to determine what to store at \tcode{*idx}. If the function
+does not throw an exception and \tcode{idx != 0}, the function stores in \tcode{*idx}
+the index of the first unconverted element of \tcode{str}.
+
+\pnum
+\returns The converted result.
+
+\pnum
+\throws \tcode{invalid_argument} if \tcode{wcstof}, \tcode{wcstod}, or \tcode{wcstold} reports that no
+conversion could be performed. Throws \tcode{out_of_range} if \tcode{wcstof}, \tcode{wcstod}, or
+\tcode{wcstold} sets \tcode{errno} to \tcode{ERANGE}.
+\end{itemdescr}
+
+
+
 %%%%%%%%
 \section{25.3 Locale}
 The following things could be adapted:
@@ -322,6 +729,8 @@ namespace std {
     bool operator==(const locale& other) const;
     bool operator!=(const locale& other) const;
 
+// note: this change might require 3 overloads for charT pointers, basic_string and basic_string_view
+// because template argument deduction will fail. is that used at all somewhere?
     template <class charT, class traits@\removed{, class Allocator}@>
       bool operator()(@\removed{const }@basic_string@\added{_view}@<charT,traits@\removed{,Allocator}@>@\removed{\&}@ s1,
                       @\removed{const }@basic_string@\added{_view}@<charT,traits@\removed{,Allocator}@>@\removed{\&}@ s2) const;
@@ -374,7 +783,7 @@ with that name.
 \pnum
 \throws
 \tcode{runtime_error}
-if the argument is not valid, or is \removed{null}\added{constructed from \tcode{nullptr}}.
+if the argument is not valid\removed{, or is null}.
 
 \pnum
 \remarks
@@ -412,7 +821,7 @@ argument, which instead implement the same semantics as
 \pnum
 \throws
 \tcode{runtime_error}
-if the argument is not valid, or is  \removed{null}\added{constructed from \tcode{nullptr}}.
+if the argument is not valid\removed{, or is  null}.
 
 \pnum
 \remarks
@@ -542,16 +951,34 @@ namespace std {
 \begin{codeblock}
   template <class charT>
     @\textit{T11}@ quoted(const charT* s, charT delim = charT('"'), charT escape = charT('\\'));
+  template <class charT, class traits, class Allocator>
+    @\textit{T12}@ quoted(const basic_string<charT, traits, Allocator>& s,
+    @\itcorr@           charT delim = charT('"'), charT escape = charT('\\'));
 \end{codeblock}
 \end{removedblock}
+\begin{addedblock}
 \begin{codeblock}
-  template <class charT, class traits@\removed{, class Allocator}@>
-    @\textit{T12}@ quoted(@\removed{const }@basic_string@\added{_view}@<charT, traits@\removed{, Allocator}@>@\removed{\&}@ s,
-    @\itcorr@           charT delim = charT('"'), charT escape = charT('\\'));
+    @\textit{T11}@ quoted(string_view s,
+    @\itcorr@           char delim = '"', char escape = '\\');
 
+    @\textit{T12}@ quoted(wstring_view s,
+    @\itcorr@           wchar_t delim = L'"', wchar_t escape = L'\\');
+\end{codeblock}
+\end{addedblock}
+\begin{codeblock}
   template <class charT, class traits, class Allocator>
     @\textit{T13}@ quoted(basic_string<charT, traits, Allocator>& s,
     @\itcorr@           charT delim = charT('"'), charT escape = charT('\\'));
+
+\end{codeblock}
+\begin{removedblock}
+\begin{codeblock}
+  template <class charT, class traits>
+    @\textit{T14}@ quoted(basic_string_view<charT, traits> s,
+    @\itcorr@           charT delim = charT('"'), charT escape = charT('\\'));
+\end{codeblock}
+\end{removedblock}
+\begin{codeblock}
 }
 \end{codeblock}
 \subsection{30.7.6 Quoted manipulators[quoted.manip]}
@@ -560,20 +987,31 @@ Change the specification for the output manipulator as follows:
 \begin{itemdecl}
 template <class charT>
   @\unspec@ quoted(const charT* s, charT delim = charT('"'), charT escape = charT('\\'));
-\end{itemdecl}
-\end{removedblock}
-\begin{itemdecl}
-template <class charT, class traits@\removed{, class Allocator}@>
-  @\unspec@ quoted(@\removed{const }@basic_string@\added{_view}@<charT, traits@\removed{, Allocator}@>@\removed{\&}@ s,
+template <class charT, class traits, class Allocator>
+  @\unspec@ quoted(const basic_string<charT, traits, Allocator>& s,
+  @\itcorr@                   charT delim = charT('"'), charT escape = charT('\\'));
+template <class charT, class traits>
+  @\unspec@ quoted(basic_string_view<charT, traits> s,
   @\itcorr@                   charT delim = charT('"'), charT escape = charT('\\'));
 \end{itemdecl}
+\end{removedblock}
+\begin{addedblock}
+\begin{itemdecl}
+  @\unspec@ quoted(string_view s,
+  @\itcorr@                   char delim = '"', char escape = '\\');
+  @\unspec@ quoted(wstring_view s,
+  @\itcorr@                   wchar_t delim = L'"', wchar_t escape = L'\\');
+\end{itemdecl}
+\end{addedblock}
+
 
 \begin{itemdescr}
 \pnum
 \returns An object of unspecified type such that if \tcode{out} is an instance
-of \tcode{basic_ostream} \removed{with member type \tcode{char_type} the same as
-\tcode{charT} and }with member type \tcode{traits_type}, which \removed{in the second
-form }is the same as \tcode{traits}, then the expression
+of \tcode{basic_ostream} with \added{corresponding} member type\added{s} \tcode{char_type} 
+\removed{the same as
+\tcode{charT}} and \removed{with member type} \tcode{traits_type}\added{ as the type of parameter \tcode{s}}\removed{, which in the second and third
+form is the same as \tcode{traits}}, then the expression
 \tcode{out << quoted(s, delim, escape)}
 behaves as a formatted output function~(\ref{ostream.formatted.reqmts})
 of \tcode{out}. This forms a character sequence \tcode{seq}, initially
