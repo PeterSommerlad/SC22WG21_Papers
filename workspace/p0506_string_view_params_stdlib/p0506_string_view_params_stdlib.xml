@@ -1,0 +1,8 @@
+<testsuites>
+	<testsuite name="AllTests" tests="4">
+		<testcase classname="AllTests" name="thisIsATest"/>
+		<testcase classname="AllTests" name="testQuotedSV"/>
+		<testcase classname="AllTests" name="testQuotedSVcharPtr"/>
+		<testcase classname="AllTests" name="testQuotedSVstring"/>
+	</testsuite>
+</testsuites>
