@@ -47,6 +47,9 @@
 \renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
 
 
+%%% use space after & * not before
+%%% 
+
 %%%% reuse all three from std.tex:
 \input{macros}
 \input{layout}
@@ -54,8 +57,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0053r6}
-\newcommand{\paperdate}{2017-07-15}
+\newcommand{\papernumber}{p0053r7}
+\newcommand{\paperdate}{2017-11-07}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -139,8 +142,9 @@ The wording below permits implementation of \tcode{basic_osyncstream} with eithe
 \section{Items to be discussed by LWG}
 \begin{itemize}
 \item \removed{Naming of the manipulators} (moved to separate paper p0753r0)
-\item re-check wording (done be LWG in Toronto once, Pablo confirmed my edits should be OK)
-\item What should be the delivery vehicle for this feature? I suggest both C++20 and the concurrency TS?\end{itemize}
+\item What should be the delivery vehicle for this feature? I suggest both C++20 and the concurrency TS?
+\textbf{should be moved to C++-next working paper in Albuquerque.}
+\end{itemize}
 
 
 \chapter{Wording}
@@ -149,7 +153,7 @@ This wording is relative to the current C++ working draft. It could be integrate
 
 Changes will happen in section 30 mainly.
 
-In section 20.5.1.1 Library contents [contents] add an entry to table 16 (cpp.library.headers) for the new header \tcode{<syncstream>}. Because of the new header, there is no need for a feature test macro.
+In section 20.5.1.1 Library contents [contents] add an entry to table 16 (cpp.library.headers) for the new header \tcode{<syncstream>}. 
 
 \section{30.1 General [input.output.general]}
 Insert a new entry in table 106 Input/output library summary (tab:iostreams.lib.summary) 
@@ -183,59 +187,6 @@ using wosyncstream = basic_osyncstream<wchar_t>;
 \end{codeblock}
 \end{addedblock}
 
-\section{30.7.5.4 Standard \tcode{basic_ostream} manipulators [ostream.manip]}
-Another paper p0753r0 will suggest adding the following three manipulators. They are not part of this proposal anymore and are just presented here for convenience of reference.
-\begin{removedblock}
-\begin{itemdecl}
-template <class charT, class traits>
-  basic_ostream<charT, traits>& emit_on_flush(basic_ostream<charT, traits>& os);
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\effects
-If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, calls \tcode{buf->set_emit_on_sync(true)}. Otherwise this manipulator has no effect. 
-\begin{note}
-To work around the issue that the \tcode{Allocator} template argument can not be deduced, implementations can introduce an intermediate base class to \tcode{basic_osyncbuf} that takes care its \tcode{emit_on_sync} flag.
-\end{note}
-
-\pnum
-\returns
-\tcode{os}.
-\end{itemdescr}
-
-\begin{itemdecl}
-template <class charT, class traits>
-  basic_ostream<charT, traits>& noemit_on_flush(basic_ostream<charT, traits>& os);
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\effects
-If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, calls \tcode{buf->set_emit_on_sync(false)}. Otherwise this manipulator has no effect. 
-
-\pnum
-\returns
-\tcode{os}.
-\end{itemdescr}
-
-\begin{itemdecl}
-template <class charT, class traits>
-  basic_ostream<charT, traits>& flush_emit(basic_ostream<charT, traits>& os);
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\effects
-\tcode{flush(os)}. Further
-if \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, 
-calls \tcode{buf->emit()}. 
- 
-\pnum
-\returns
-\tcode{os}.
-\end{itemdescr}
-\end{removedblock}
 
 \section{30.x Synchronized output stream [syncstream]}
 \emph{Insert this new section 30.x in chapter 30 [input.output] }
@@ -263,10 +214,10 @@ using wosyncstream = basic_osyncstream<wchar_t>;
 \begin{addedblock}
 \pnum
 The header \tcode{<syncstream>} provides a mechanism to synchronize execution agents writing to the same stream. 
-It defines class templates \tcode{basic_osyncstream} and \tcode{basic_syncbuf}. The latter buffers output and transfer the buffered content into an object of type \tcode{basic_streambuf<charT,traits>} atomically with respect to such transfers by other \tcode{basic_syncbuf<charT,traits,Allocator>} objects referring to the same \tcode{basic_streambuf<charT,traits>} object. The transfer occurs when \tcode{emit()} is called and when the \tcode{basic_syncbuf<charT,traits,Allocator>} object is destroyed.
-
-
+It defines class templates \tcode{basic_osyncstream} and \tcode{basic_syncbuf}. The latter buffers output and transfer the buffered content into an object of type \tcode{basic_streambuf<charT, traits>} atomically with respect to such transfers by other \tcode{basic_syncbuf<charT, traits, Allocator>} objects referring to the same \tcode{basic_streambuf<charT, traits>} object. The transfer occurs when \tcode{emit()} is called and when the \tcode{basic_syncbuf<charT, traits, Allocator>} object is destroyed.
 \end{addedblock}
+
+\newpage
 \subsection{30.x.2 Class template basic_syncbuf [syncstream.syncbuf]}
 \begin{addedblock}
 \begin{codeblock}
@@ -284,18 +235,17 @@ public:
   using traits_type    = traits;
   using allocator_type = Allocator;
 
-  using streambuf_type = basic_streambuf<charT,traits>;
+  using streambuf_type = basic_streambuf<charT, traits>;
 
   explicit
   basic_syncbuf(streambuf_type* obuf = nullptr)
-    : basic_syncbuf(obuf,Allocator{}) {}
-  basic_syncbuf(streambuf_type* ,
-                const Allocator&);
+    : basic_syncbuf(obuf, Allocator()) { }
+  basic_syncbuf(streambuf_type*, const Allocator&);
   basic_syncbuf(basic_syncbuf&&);
   ~basic_syncbuf();
 
   basic_syncbuf& operator=(basic_syncbuf&&);
-  void swap(basic_syncbuf &);
+  void swap(basic_syncbuf&);
 
   bool emit();
   streambuf_type* get_wrapped()   const noexcept;
@@ -306,26 +256,25 @@ protected:
   int sync() override;
 
 private:
-  streambuf_type *wrapped;       // exposition only
-  bool            emit_on_sync{};// exposition only
+  streambuf_type* wrapped;         // exposition only
+  bool            emit_on_sync{}; // exposition only
 };
 
 template <class charT, class traits, class Allocator>
-inline void swap(basic_syncbuf<charT,traits,Allocator>&,
-                 basic_syncbuf<charT,traits,Allocator>&);
+void swap(basic_syncbuf<charT, traits, Allocator>&,
+          basic_syncbuf<charT, traits, Allocator>&);
 
 \end{codeblock}
 \end{addedblock}
 
+\newpage
 \section{30.x.2.1 \tcode{basic_syncbuf} constructors [syncstream.syncbuf.cons]}
 %\rSec3[syncbuf.cons]{\tcode{basic_syncbuf}  constructors}
 
 \indexlibrary{\idxcode{basic_syncbuf}!constructor}%
 \begin{addedblock}
 \begin{itemdecl}
-basic_syncbuf(
-  streambuf_type* obuf,
-  const Allocator &allocator);
+basic_syncbuf(streambuf_type* obuf, const Allocator& allocator);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -333,6 +282,7 @@ basic_syncbuf(
 \effects
 Constructs the \tcode{basic_syncbuf} object and sets \tcode{wrapped} to \tcode{obuf} which will be the final destination of associated output.
 
+\pnum %% was missing
 \remarks
 A copy of \tcode{allocator} is used to allocate memory for internal buffers holding the associated output.
 
@@ -354,7 +304,7 @@ basic_syncbuf(basic_syncbuf&& other);
 \begin{itemdescr}
 \pnum
 \effects
-Move constructs from other (Table 23 [moveconstructable]).
+Move constructs from \tcode{other} (Table 23 [moveconstructable]).
 
 \pnum
 \postconditions
@@ -437,8 +387,8 @@ Exchanges the state of \tcode{*this} and \tcode{other}.
 
 \begin{itemdecl}
 template <class charT, class traits, class Allocator>
-void swap(basic_syncbuf<charT,traits,Allocator>& a, 
-          basic_syncbuf<charT,traits,Allocator>& b) noexcept;
+void swap(basic_syncbuf<charT, traits, Allocator>& a, 
+          basic_syncbuf<charT, traits, Allocator>& b) noexcept;
 \end{itemdecl}
 \begin{itemdescr}
 
@@ -462,6 +412,7 @@ bool emit();
 \pnum
 \effects 
 Atomically transfers the contents of the internal buffer to the stream buffer \tcode{*wrapped}, so that they appear in the output stream as a contiguous sequence of characters. If and only if a call was made to \tcode{sync()} since the last call of \tcode{emit()},  \tcode{wrapped->pubsync()} is called.
+%roger orr: is called afterwards.
 
 \pnum
 \returns \tcode{true} if all of the following conditions hold; otherwise false:
@@ -473,7 +424,7 @@ Atomically transfers the contents of the internal buffer to the stream buffer \t
 
 \pnum
 \postconditions
-On the success the associated output is empty.
+On success the associated output is empty.
 
 \pnum
 {\Fundesc{Synchronization}}
@@ -541,6 +492,7 @@ If \tcode{emit()} was called and returned \tcode{false}, returns \tcode{-1}; oth
 
 \end{addedblock}
 
+\newpage
 %\rSec2[syncstream.osyncstream]{Class template \tcode{basic_osyncstream}}
 \section{30.x.3 Class template \tcode{basic_osyncstream} [syncstream.osyncstream] }
 
@@ -553,7 +505,7 @@ template <class charT,
           class traits,
           class Allocator>
 class basic_osyncstream
-  : public basic_ostream<charT,traits>
+  : public basic_ostream<charT, traits>
 {
 public:
   using char_type      = charT;
@@ -562,16 +514,16 @@ public:
   using off_type       = typename traits::off_type;
   using traits_type    = traits;
   using allocator_type = Allocator;
-  using streambuf_type = basic_streambuf<charT,traits>;
-  using syncbuf_type   = basic_syncbuf<charT,traits, Allocator>;
+  using streambuf_type = basic_streambuf<charT, traits>;
+  using syncbuf_type   = basic_syncbuf<charT, traits, Allocator>;
 
-  basic_osyncstream(streambuf_type *, const Allocator &);
-  explicit basic_osyncstream(streambuf_type *obuf)
-    : basic_osyncstream{obuf, Allocator{}}{}
-  basic_osyncstream(basic_ostream<charT,traits> &os, const Allocator &allocator)
-    : basic_osyncstream{os.rdbuf(), allocator}{}
-  explicit basic_osyncstream(basic_ostream<charT,traits> &os)
-    : basic_osyncstream{os, Allocator{}}{}
+  basic_osyncstream(streambuf_type*, const Allocator&);
+  explicit basic_osyncstream(streambuf_type* obuf)
+    : basic_osyncstream(obuf, Allocator()) { }
+  basic_osyncstream(basic_ostream<charT, traits>& os, const Allocator& allocator)
+    : basic_osyncstream(os.rdbuf(), allocator) { }
+  explicit basic_osyncstream(basic_ostream<charT, traits>& os)
+    : basic_osyncstream(os, Allocator()) { }
   basic_osyncstream(basic_osyncstream&&) noexcept;
   ~basic_osyncstream();
   basic_osyncstream& operator=(basic_osyncstream&&) noexcept;
@@ -607,7 +559,6 @@ Use a temporary object for streaming within a single statement. \tcode{cout} is 
 osyncstream(cout) << "Hello, " << "World!" << '\n';
 \end{codeblock}
 \end{example}
-% basic_ostream& operator<<(basic_ostream&&, T const &) exists, so this is fine!
 \end{addedblock}
 
 
@@ -617,9 +568,7 @@ osyncstream(cout) << "Hello, " << "World!" << '\n';
 \begin{addedblock}
 
 \begin{itemdecl}
-basic_osyncstream(
-  streambuf_type  *buf, 
-  Allocator const &allocator);
+basic_osyncstream(streambuf_type* buf, const Allocator& allocator);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -776,7 +725,8 @@ Hello, World!
 
 \end{addedblock}
 
-
+\section {Feature test macro}
+For the purposes of SG10, we recommend the feature-testing macro name \tcode{__cpp_lib_syncstream}.
 
 %%%%%%
 \section{Implementation}
@@ -784,6 +734,12 @@ An example implementation is availabile on \url{https://github.com/PeterSommerla
 
 \chapter{Revisions}
 Each section lists the revisions in the following version from the version given in the heading.
+
+\section{\href{https://wg21.link/P0053R7}{P0053R7}}
+Final finishing touches to wording and layout based on LWG feedback. Added feature test macro
+
+\section{\href{https://wg21.link/P0053R6}{P0053R6}}
+Revisions based on feedback from LWG in Toronto. Extracted the manipulators to p0753, so that they can be reconsidered by LEWG. 
 
 \section{\href{https://wg21.link/P0053R5}{P0053R5}}
 This paper was discussed by LWG in Toronto. All recommended changes have been incorporated into the next revision.
