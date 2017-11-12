@@ -23,8 +23,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
-#include <type_traits>
 #include "_scope_guard_common.h"
+#include <type_traits>
+
+#include <utility>
+
 namespace std{
 namespace experimental{
 namespace detail {
@@ -87,6 +90,25 @@ class unique_resource
     static constexpr auto is_nothrow_swappable_v=detail::_bool<is_nothrow_delete_v &&
             detail::_is_nothrow_movable_v<R> &&
             detail::_is_nothrow_movable_v<D>>::value;
+public://should be private
+    template<typename RR, typename DD,
+        typename = std::enable_if_t<std::is_constructible<detail::_box<R>, RR, detail::_empty_scope_exit>::value &&
+                                    std::is_constructible<detail::_box<D>, DD, detail::_empty_scope_exit>::value>>
+    explicit unique_resource(RR &&r, DD &&d, bool should_run)
+	noexcept(noexcept(detail::_box<R>(static_cast<RR &&>(r), detail::_empty_scope_exit {})) &&
+			noexcept(detail::_box<D>(static_cast<DD &&>(d), detail::_empty_scope_exit {})))
+      :
+			resource(static_cast<RR &&>(r),
+					scope_exit([&] {if (should_run) d(r);}))
+      , deleter(static_cast<DD &&>(d),
+					scope_exit([&, this] {if (should_run) d(get());}))
+	  , execute_on_destruction { should_run }
+    {}
+    // the following ICEs my g++
+//    template<typename RM, typename DM, typename S>
+//    friend
+//    auto make_unique_resource_checked(RM &&r, const S &invalid, DM &&d)
+//    noexcept(noexcept(make_unique_resource(std::forward<RM>(r), std::forward<DM>(d))));
 
 public:
     template<typename RR, typename DD,
@@ -98,14 +120,14 @@ public:
       : resource((RR &&) r, make_scope_exit([&]{ d(r); }))
       , deleter((DD &&) d, make_scope_exit([&, this]{ d(get()); }))
     {}
-    unique_resource(unique_resource &&that)
-        noexcept(noexcept(detail::_box<R>(that.resource.move(), detail::_empty_scope_exit{})) &&
-                 noexcept(detail::_box<D>(that.deleter.move(), detail::_empty_scope_exit{})))
-      : resource(that.resource.move(), detail::_empty_scope_exit{})
-      , deleter(that.deleter.move(),
-                make_scope_exit([&, this]{ that.get_deleter()(get()); that.release(); }))
-      , execute_on_destruction(std::exchange(that.execute_on_destruction, false))
-    {}
+	unique_resource(	unique_resource&& that)
+			noexcept(noexcept(detail::_box<R>(that.resource.move(), detail::_empty_scope_exit {})) &&
+					noexcept(detail::_box<D>(that.deleter.move(), detail::_empty_scope_exit {}))) :
+			resource(that.resource.move(), detail::_empty_scope_exit { }), deleter(that.deleter.move(), make_scope_exit([&, this] {
+				that.get_deleter()(get());
+				that.release();
+			})), execute_on_destruction(std::exchange(that.execute_on_destruction, false)) {
+	}
 
     unique_resource &operator=(unique_resource &&that)
         noexcept(is_nothrow_delete_v &&
@@ -160,7 +182,7 @@ public:
         }
     }
     void reset()
-        noexcept(is_nothrow_delete_v)
+        noexcept
     {
         if(execute_on_destruction)
         {
@@ -228,9 +250,6 @@ auto make_unique_resource(R &&r, D &&d)
     return unique_resource<std::decay_t<R>, std::decay_t<D>>{
         std::forward<R>(r), std::forward<D>(d)};
 }
-template<typename R, typename D>
-unique_resource(std::reference_wrapper<R> r, D &&d)
--> unique_resource<R &, std::decay_t<D>>; // should need to unwrap, but how?
 
 template<typename R, typename D>
 auto make_unique_resource(std::reference_wrapper<R> r, D &&d)
@@ -243,7 +262,7 @@ template<typename R, typename D, typename S>
 auto make_unique_resource_checked(R &&r, const S &invalid, D &&d)
 noexcept(noexcept(make_unique_resource(std::forward<R>(r), std::forward<D>(d))))
 {
-    bool must_release = bool(r == invalid);
+    bool must_release = bool(r == invalid); // need to reestablish hidden var
     auto ur = make_unique_resource(std::forward<R>(r), std::forward<D>(d));
     if(must_release)
         ur.release();

@@ -31,8 +31,14 @@ SOFTWARE.
 #include <cstdio>
 #include <fcntl.h>
 #include <unistd.h>
-#include <memory>
-#include <exception>
+
+#include <string>
+
+#include <sstream>
+
+#include <functional>
+
+#include <ostream>
 
 //#define CHECK_COMPILE_ERRORS
 
@@ -69,7 +75,8 @@ void testScopeFailWithCPP17DeducingCtors(){
 	try {
 		scope_fail guard([&] {out << "done\n";});
 		throw 0;
-	} catch(int){}
+	} catch (const int) {
+	}
 	ASSERT_EQUAL("done\n", out.str());
 }
 void testScopeSuccessWithCPP17DeducingCtors(){
@@ -125,7 +132,7 @@ void testscopeExitWithNonAssignableResourceAndReset(){
 	const auto &lambda = [&](auto &&) {out << "lambda done.\n";};
 	{
 		auto guard=make_unique_resource(non_assignable_resource{},std::cref(lambda));
-		//guard.reset(2);//throws... need to figure out, what I wanted to trigger here.
+		//guard.reset(2);//throws... need to figure out, what I wanted to trigger here. AH, compile error?
 	}
 	ASSERT_EQUAL("lambda done.\n",out.str());
 }
@@ -233,21 +240,21 @@ void testsFromEricNiebler_scope_fail_with_throwing_function_object_Cpp17(){
 }
 
 
-#include <stdexcept>
 void testThrowOnUniqueResourceDoesntCrashIt() {
 	std::ostringstream out { };
 	{
 		auto guard = make_unique_resource(1, [&] (auto) {out << "done\n";});
-		try {
-			{
-				auto guard1 = make_unique_resource(2, [] (auto) noexcept(false) {throw 42;});
-				guard1.reset();
-			}
-			FAILM("didn't throw");
-		} catch (int) {
-		} catch (...) {
-			FAILM("threw unknown error");
-		}
+		// we do no longer allow that for unique_resource
+//		try {
+//			{
+//				auto guard1 = make_unique_resource(2, [] (auto) noexcept(false) {throw 42;});
+//				guard1.reset();
+//			}
+//			FAILM("didn't throw");
+//		} catch (int) {
+//		} catch (...) {
+//			FAILM("threw unknown error");
+//		}
 	}
 	ASSERT_EQUAL("done\n", out.str());
 
@@ -256,16 +263,17 @@ void testThrowOnUniqueResourceDoesntCrashIt_Cpp17() {
 	std::ostringstream out { };
 	{
 		unique_resource guard(1, [&] (auto) {out << "done\n";});
-		try {
-			{
-				unique_resource guard1(2, [] (auto) noexcept(false) {throw 42;});
-				guard1.reset();
-			}
-			FAILM("didn't throw");
-		} catch (int) {
-		} catch (...) {
-			FAILM("threw unknown error");
-		}
+		// we do no longer allow that for unique_resource
+//		try {
+//			{
+//				unique_resource guard1(2, [] (auto) noexcept(false) {throw 42;});
+//				guard1.reset();
+//			}
+//			FAILM("didn't throw");
+//		} catch (int) {
+//		} catch (...) {
+//			FAILM("threw unknown error");
+//		}
 	}
 	ASSERT_EQUAL("done\n", out.str());
 }
@@ -325,7 +333,7 @@ void demonstrate_unique_resource_with_stdio() {
 	}
 	::unlink(filename.c_str());
 	{
-		auto file = make_unique_resource_checked(::fopen("nonexistingfile.txt", "r"), (FILE*) NULL, &::fclose);
+		auto file = make_unique_resource_checked(::fopen("nonexistentfile.txt", "r"), nullptr, &::fclose);
 		ASSERT_EQUAL((FILE*)NULL, file.get());
 	}
 
@@ -347,7 +355,7 @@ void demonstrate_unique_resource_with_stdio_Cpp17() {
 	}
 	::unlink(filename.c_str());
 	{
-		auto file = make_unique_resource_checked(::fopen("nonexistingfile.txt", "r"), (FILE*) NULL, &::fclose);
+		auto file = make_unique_resource_checked(::fopen("nonexistentfile.txt", "r"), nullptr, &::fclose);
 		ASSERT_EQUAL((FILE*)NULL, file.get());
 	}
 
