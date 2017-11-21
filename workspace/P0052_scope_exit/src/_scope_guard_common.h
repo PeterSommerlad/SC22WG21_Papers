@@ -3,7 +3,7 @@
 /*
  * MIT License
 
-Copyright (c) 2016/2017 Eric Niebler, slightly adapted by Peter Sommerlad
+Copyright (c) 2016/2017 Eric Niebler, adapted by Peter Sommerlad
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,17 +25,20 @@ SOFTWARE.
  */
 #include <utility>
 
+#include <functional>
+
 namespace std{
 namespace experimental{
-// contribution by (c) Eric Niebler 2016, slightly adapted by Peter Sommerlad
+// contribution by (c) Eric Niebler 2016, adapted by (c) 2017 Peter Sommerlad
 namespace detail {
 namespace hidden{
+
+// should this helper be standardized? // write testcase where recognizable.
 template<typename T>
 constexpr std::conditional_t<
-    (!std::is_nothrow_move_assignable<T>::value &&
-      std::is_copy_assignable<T>::value),
-    T const &,
-    T &&>
+    std::is_nothrow_move_assignable_v<T>,
+    T &&,
+    T const &>
 _move_assign_if_noexcept(T &x) noexcept
 {
     return std::move(x);
@@ -54,9 +57,9 @@ class _box
 
 public:
     template<typename TT,
-        typename = std::enable_if_t<std::is_constructible<T, TT>::value>>
+        typename = std::enable_if_t<std::is_constructible_v<T, TT>>>
     explicit _box(TT &&t, auto &&guard) noexcept(noexcept(_box((T &&) t)))
-      : _box((T &&) t)
+      : _box(std::forward<TT>(t))
     {
         guard.release();
     }
@@ -89,7 +92,7 @@ class _box<T &>
     std::reference_wrapper<T> value;
 public:
     template<typename TT,
-        typename = std::enable_if_t<std::is_convertible<TT, T &>::value>>
+        typename = std::enable_if_t<std::is_convertible_v<TT, T &>>>
     _box(TT &&t, auto &&guard) noexcept(noexcept(static_cast<T &>((TT &&) t)))
       : value(static_cast<T &>(t))
     {
@@ -108,11 +111,6 @@ public:
         value = std::ref(t);
     }
 };
-
-
-template<bool B>
-using _bool = std::integral_constant<bool, B>;
-
 
 }}}
 
