@@ -56,8 +56,8 @@
 
 %%%%
 
-\newcommand{\papernumber}{D0052r6}
-\newcommand{\paperdate}{2017-11-08}
+\newcommand{\papernumber}{p0052r6}
+\newcommand{\paperdate}{2017-11-16}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -79,6 +79,7 @@ Audience: & LWG\\\hline
 \section{Changes from P0052R5}
 Wording reviewed and recommended on by LWG
 \begin{itemize}
+\item added noexcept specification for move assignment.
 \item feature test macro added \tcode{__cpp_lib_scope}
 \item drop \tcode{unique_resource} deduction guide that unwraps reference_wrapper
 \item add a non-normative note to explain potential scope guard misuse if capturing local by reference that is returned. BSI raised this issue, but does not intend to ask this paper to solve that corner case.
@@ -87,6 +88,7 @@ Wording reviewed and recommended on by LWG
 \item separated definitions of \tcode{unique_resource} member functions returning the resource.
 \item simplified specification of \tcode{reset} using \tcode{if constexpr} according to Jonathan Wakely without inventing an exposition only function. (this must be re-checked)
 \item more fancy attempt to specify the need for implementations to internally use \tcode{reference_wrapper} in \tcode{unique_resource} if the resource type is a reference (to support assignment) by specifying a separate type in the \tcode{unique_resource} synopsis for resource and clarifying the note saying to use reference_wrapper.
+\item removed remains of \tcode{swap()} that got not deleted.
 \end{itemize}
 
 \section{Changes from P0052R4}
@@ -198,7 +200,7 @@ The Standard Template Library provides RAII (resource acquisition is initializat
 \item Special thanks and recognition goes to OpenSpan, Inc. (http://www.openspan.com) for supporting the production of this proposal, and for sponsoring Andrew L. Sandoval's first proposal (N3677) and the trip to Chicago for the Fall 2013 LEWG meeting. \emph{Note: this version abandons the over-generic version from N3830 and comes back to two classes with one or no resource to be managed.}
 \item Thanks also to members of the mailing lists who gave feedback. Especially Zhihao Yuan, and Ville Voutilainen.
 \item Special thanks to Daniel Kr\"ugler for his deliberate review of the draft version of this paper (D3949).
-\item Thanks to participants in LWG in Toronto, especially Casey Carter and Marshall Clow for help with phrasing the wording.
+\item Thanks to participants in LWG in Toronto and Albuquerque, especially STL, Lisa Lippincott, Casey Carter, many others, and Marshall Clow for help with phrasing the wording.
 \end{itemize}
 \newpage
 \chapter{Motivation}
@@ -669,7 +671,7 @@ public:
     unique_resource(RR&& r, DD&& d) noexcept(@\seebelow@);
   unique_resource(unique_resource&& rhs) noexcept(@\seebelow@);
   ~unique_resource();
-  unique_resource& operator=(unique_resource&& rhs) ;
+  unique_resource& operator=(unique_resource&& rhs) noexcept(@\seebelow@);
   void reset() noexcept;
   template <class RR>
     void reset(RR&& r);
@@ -828,10 +830,15 @@ The explained mechanism ensures no leaking resources.
 \subsection {\tcode{unique_resource} assignment [scope.unique_resource.assign]}
 
 \begin{itemdecl}
-unique_resource& operator=(unique_resource&& rhs) ;
+unique_resource& operator=(unique_resource&& rhs) noexcept(@\seebelow@);
 \end{itemdecl}
 
 \begin{itemdescr}
+\pnum
+\remarks
+The expression inside \tcode{noexcept} is equivalent to \\
+\tcode{is_nothrow_assignable_v<R\&, R>} \tcode{\&\&} \tcode{is_nothrow_assignable_v<D\&, D>}.
+
 \pnum
 \requires \\\tcode{(is_nothrow_move_assignable_v<R> || is_copy_assignable_v<R>)} is \tcode{true}
 and\\
@@ -994,7 +1001,7 @@ This operator shall not participate in overload resolution unless \tcode{is_poin
 \pnum
 \effects 
 Equivalent to:\\
-\tcode{return *resource;} 
+\tcode{return *get();} 
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -1049,11 +1056,12 @@ noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
 %% EqualityComparable<R,S> is a concept in ranges TS and would make the paragraph go away.
 
 \pnum
-\effects Constructs and returns \tcode{unique_resource<decay_t<R>, decay_t<D>>\{std::forward<R>(resource), std::forward<D>(d)\}}. 
+\effects Constructs and returns \\
+\tcode{unique_resource<decay_t<R>, decay_t<D>>\{std::forward<R>(resource), std::forward<D>(d)\}}. 
 
 \pnum
 If \tcode{bool(resource == invalid)} evaluates to \tcode{true} before the construction, the returned \tcode{unique_resource} object's \tcode{execute_on_destruction} is \tcode{false}. 
-In that case, any failure during the construction of the return value will not call \tcode{d()}.
+In that case, any failure during the construction of the return value will not call \tcode{d(resource)}.
 
 \pnum
 \begin{note}
@@ -1065,7 +1073,7 @@ This factory function exists to avoid calling a deleter function with an invalid
 The following example shows its use to avoid calling \tcode{fclose} when \tcode{fopen} fails
 \begin{codeblock}
 auto file = make_unique_resource_checked(
-  ::fopen("potentially_nonexisting_file.txt", "r"), 
+  ::fopen("potentially_nonexistent_file.txt", "r"), 
   nullptr, &::fclose);
 \end{codeblock}
 \end{example}
