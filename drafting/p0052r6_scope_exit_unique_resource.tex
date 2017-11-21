@@ -57,7 +57,7 @@
 %%%%
 
 \newcommand{\papernumber}{p0052r6}
-\newcommand{\paperdate}{2017-11-16}
+\newcommand{\paperdate}{2017-11-21}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -89,6 +89,7 @@ Wording reviewed and recommended on by LWG
 \item simplified specification of \tcode{reset} using \tcode{if constexpr} according to Jonathan Wakely without inventing an exposition only function. (this must be re-checked)
 \item more fancy attempt to specify the need for implementations to internally use \tcode{reference_wrapper} in \tcode{unique_resource} if the resource type is a reference (to support assignment) by specifying a separate type in the \tcode{unique_resource} synopsis for resource and clarifying the note saying to use reference_wrapper.
 \item removed remains of \tcode{swap()} that got not deleted.
+\item simplified \tcode{unique_resource} specification as suggested by Stephan T. Lavavej
 \end{itemize}
 
 \section{Changes from P0052R4}
@@ -740,6 +741,7 @@ or an lvalue reference type.
 ) and
 \tcode{is_nothrow_move_constructible_v<R>} shall be \tcode{true}.
 
+\newpage
 %\rSec3[scope.unique_resource.ctor]{\tcode{unique_resource} constructors}}
 \subsection {\tcode{unique_resource} constructors [scope.unique_resource.ctor]}
 
@@ -769,9 +771,14 @@ and\\
 \tcode{\textit{is_nothrow_move_or_copy_constructible_from_v}<D, DD>} is \tcode{true}.
 
 \pnum
-\effects If RR is not an lvalue reference and \tcode{is_nothrow_constructible_v<R,RR>} is \tcode{true}, initializes \tcode{resource} with \tcode{std::move(r)}, otherwise initializes \tcode{resource} with \tcode{r}. Then, if \tcode{DD} is not an lvalue reference and \tcode{is_nothrow_constructible_v<D,DD>} is \tcode{true}, initializes  \tcode{deleter} with \tcode{std::move(d)}, otherwise initializes \tcode{deleter} with \tcode{d}. If initialization of \tcode{resource} throws an exception, calls \tcode{d(r)}.  If initialization of \tcode{deleter} throws an exception, calls \tcode{d(resource)}. 
+\effects 
+If \tcode{is_nothrow_constructible_v<R,RR>} is \tcode{true}, initializes \tcode{resource} with \tcode{std::forward<RR>(r)}, otherwise initializes \tcode{resource} with \tcode{r}.
+%If RR is not an lvalue reference and \tcode{is_nothrow_constructible_v<R,RR>} is \tcode{true}, initializes \tcode{resource} with \tcode{std::move(r)}, otherwise initializes \tcode{resource} with \tcode{r}. 
+Then, if \tcode{is_nothrow_constructible_v<D,DD>} is \tcode{true}, initializes \tcode{deleter} with \tcode{std::forward<DD>(d)}, otherwise initializes \tcode{deleter} with \tcode{d}.
+%Then, if \tcode{DD} is not an lvalue reference and \tcode{is_nothrow_constructible_v<D,DD>} is \tcode{true}, initializes  \tcode{deleter} with \tcode{std::move(d)}, otherwise initializes \tcode{deleter} with \tcode{d}.
+If initialization of \tcode{resource} throws an exception, calls \tcode{d(r)}.  If initialization of \tcode{deleter} throws an exception, calls \tcode{d(resource)}. 
 \begin{note}
-The explained mechanism ensures no leaking resources.
+The explained mechanism ensures no leaking of resources.
 \end{note}
 
 \pnum
@@ -822,7 +829,7 @@ Finally, \tcode{execute_on_destruction} is initialized with \tcode{exchange(rhs.
 
 \pnum
 \begin{note}
-The explained mechanism ensures no leaking resources.
+The explained mechanism ensures no leaking of resources.
 \end{note}
 \end{itemdescr}
 
