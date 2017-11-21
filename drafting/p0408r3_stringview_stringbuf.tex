@@ -55,8 +55,8 @@
 \pagestyle{myheadings}
 
 
-\newcommand{\papernumber}{p0408r2}
-\newcommand{\paperdate}{2017-06-07}
+\newcommand{\papernumber}{p0408r3}
+\newcommand{\paperdate}{2017-11-16}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -78,7 +78,7 @@
 Document Number: & \papernumber  \\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
-Audience: & LWG/LEWG\\\hline
+Audience: & LWG\\\hline
 Target: & C++20\\\hline
 \end{tabular}
 
@@ -97,8 +97,17 @@ C++17 and library TS have \tcode{basic_string_view} allowing an efficient read-o
 On the other hand, there is no means to construct a \tcode{basic_string} and move from it into a \tcode{basic_stringbuf} via a constructor or a move-enabled overload of \tcode{str(basic_string \&\&)}.
 
 \section{History}
-Discussed in LEWG Issaquah. Answering some questions and raising more. Reflected in this paper.
+
+\subsection{Changes from r2}
+Discussed in Albuquerque, where LEWG was in favor to forward it to LWG for IS with the following change.
+\begin{itemize}
+\item reestablish rvalue-ref qualified \tcode{str()} instead of the previously suggested \tcode{pilfer()}.
+\item address LWG only in document header.
+\end{itemize}
+
+
 \subsection{Changes from r1}
+Discussed in LEWG Issaquah. Answering some questions and raising more. Reflected in this paper.
 \begin{itemize}
 \item reflected new section numbers from the std. now relative to the current working draft.
 \item implementation is now working with gcc 7. (not relevant for this paper)
@@ -128,18 +137,18 @@ Discussed in LEWG Issaquah. Answering some questions and raising more. Reflected
 This is an extension to the API of \tcode{basic_stringbuf}, \tcode{basic_stringstream}, \tcode{basic_istringstream}, and \tcode{basic_ostringstream} class templates.
 
 This paper addresses both Library Fundamentals TS 3 and C++Next (2020?). 
-When added to the standard draft with p0448, section [depr.str.strstreams] should be removed.
+When added to the standard draft with p0448 (spanstream), section [depr.str.strstreams] should be removed.
 \chapter{Design Decisions}
 After experimentation I decided that substituting the \tcode{(basic_string<charT,traits,Allocator const \&)} constructors in favor of passing a \tcode{basic_string_view} would lead to ambiguities with the new move-from-string constructors.
-\section{Open Issues}
+\section{Open Issues discussed by LEWG in Albuquerque}
 \begin{itemize}
-\item Should pilfer() be rvalue-ref qualified to denote the "destruction" of the underlying buffer? LEWG in Issaquah didn't think so, but I'd like to ask again.
+\item Should pilfer() be rvalue-ref qualified to denote the "destruction" of the underlying buffer? LEWG in Issaquah didn't think so, but I'd like to ask again. LEWG small group in Albuquerque in favor of rvalue-ref qualification.\added{ Re-establish \tcode{str()\&\&}, drop \tcode{pilfer}}
 \end{itemize}
 
-\section{Open Issues discussed by LEWG in Issquah}
+\section{Open Issues discussed by LEWG in Issaquah and Albuquerque}
 \begin{itemize}
 \item Is the name of the \tcode{str_view()} member function ok? No. Renamed to \tcode{view()}
-\item Should the \tcode{str()\&\&} overload be provided for move-out? No. give it another name (\tcode{pilfer}) and remove rvalue-ref-qualification.
+\item Should the \tcode{str()\&\&} overload be provided for move-out? \removed{No. give it another name (\tcode{pilfer}) and remove rvalue-ref-qualification (Issaquah).}\added{ Re-establish \tcode{str()\&\&}, drop \tcode{pilfer}}
 \item Should \tcode{str()\&\&} empty the character sequence or leave it in an unspecified but valid state? Empty it, and specify.
 \item Provide guidance on validity lifetime of of the obtained \tcode{string_view} object.
 \end{itemize}
@@ -150,12 +159,14 @@ The following is relative to n4604.
 Remove section on \tcode{char*} streams [depr.str.strstreams] and all its subsections from appendix D.
 
 \section{30.8.2 Adjust synopsis of basic\_stringbuf [stringbuf]}
-Add a new constructor overload:
+Add a new constructor overload.
+
+\textit{Note that p0407 provides allocator support for \tcode{basic_stringbuf}, depending on acceptance sequence of the papers, some overloads need to be further added/adjusted and the wording also adjusted. At the time of p0408r3 that was forwarded to LWG, p0407 was not yet reviewed by LEWG.}
 \begin{codeblock}
     // \ref{stringbuf.cons}, constructors:
     explicit basic_stringbuf(
       ios_base::openmode which = ios_base::in | ios_base::out);
-    @\added{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc = Allocator>}@
     explicit basic_stringbuf(
       const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
       ios_base::openmode which = ios_base::in | ios_base::out);
@@ -170,23 +181,22 @@ Add a new constructor overload:
     basic_stringbuf(basic_stringbuf&& rhs);
 \end{codeblock}
 
-Change the getting \tcode{str()} overload to take an Allocator for the returned string. 
+Change the getting \tcode{str()} overload to take an Allocator for the returned string and add a reference qualification. Add an rvalue-ref overload of \tcode{str()}.
 Change the \tcode{str()} overload copying into the string buffer to take an allocator template parameter that could differ from the buffer's own \tcode{Allocator}. 
 Add a \tcode{str()} overload that moves from its string rvalue-reference argument into the internal buffer.
-Add the \tcode{pilfer()} member function obtaining a string from the internal buffer by moving from it. 
 Add the \tcode{view()} member function obtaining a \tcode{string_view} to the underlying internal buffer.
 
 \begin{codeblock}
     // \ref{stringbuf.members}, get and set:
-    @\added{template<class SAlloc=Allocator>}@
-    basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
-    @\added{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc = Allocator>}@
+    basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa = SAlloc()}@) const @\added{\&}@;
+    @\added{template<class SAlloc = Allocator>}@
     void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
     void str(basic_string<charT, traits, Allocator>&& s);
-    basic_string<charT,traits,Allocator> pilfer();
+    basic_string<charT, traits, Allocator> str() &&;
     basic_string_view<charT, traits> view() const;
 \end{codeblock}
 \end{addedblock}
@@ -194,7 +204,7 @@ Add the \tcode{view()} member function obtaining a \tcode{string_view} to the un
 \subsection{30.8.2.1 basic\_stringbuf constructors [stringbuf.cons]}
 Modify the following constructor specification:
 \begin{itemdecl}
-@\added{template<class SAlloc=Allocator>}@
+@\added{template<class SAlloc = Allocator>}@
 explicit basic_stringbuf(
   const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
   ios_base::openmode which = ios_base::in | ios_base::out);
@@ -210,28 +220,36 @@ initializing the base class with
 \tcode{mode}
 with \tcode{which}.
 Then calls \tcode{str(s)}.
+%% p0407: 
+%\added{, and initializing \tcode{buf} with \tcode{\{s,a\}}}.
+%\removed{Then calls \tcode{str(s)}.}
 \end{itemdescr}
 
 Add the following constructor specification:
+
 \begin{insrt}
 \begin{itemdecl}
-      explicit basic_stringbuf(
-        basic_string<charT, traits, Allocator>&& s,
-        ios_base::openmode which = ios_base::in | ios_base::out);
+explicit basic_stringbuf(
+    basic_string<charT, traits, Allocator>&& s,
+    ios_base::openmode which = ios_base::in | ios_base::out);
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} (30.6.3.1), and initializing \tcode{mode} with \tcode{which}. Then calls \tcode{str(std::move(s))}.
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} (30.6.3.1), and initializing \tcode{mode} with \tcode{which}. 
+%old:
+Then calls \tcode{str(std::move(s))}.
+%% p0407: 
+%\added{, and initializing \tcode{buf} with \tcode{\{std::move(s)\}}}.
 \end{itemdescr}
 \end{insrt}
 
 Note to editors: if p0407 is accepted the changes there for allocators apply here as well. However, different allocators for \tcode{s} and the \tcode{basic_stringbuf} will result in a copy instead of a move.
 
 \subsection{30.8.2.3 Member functions [stringbuf.members]}
-Add an allocator parameter for the copied from string to allow having a different allocator than the underlying stream.
+Add an allocator parameter for the copied from string to allow having a different allocator than the underlying stream and a ref-qualifier to avoid ambiguities with the rvalue-ref qualified overload.
 \begin{codeblock}
-@\added{template<class SAlloc=Allocator>}@
-basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
+@\added{template<class SAlloc = Allocator>}@
+basic_string<charT, traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa = SAlloc()}@) const @\added{\&};
 \end{codeblock}
 
 Change p1 to use plural for "\tcode{str(basic_string)} member functions" and refer to the allocator:
@@ -281,7 +299,7 @@ If \tcode{mode \& ios_base::out} is true, \tcode{pbase()} points to the first un
 \end{itemdescr}
 
 \begin{itemdecl}
-basic_string<charT, traits, Allocator> pilfer();
+basic_string<charT, traits, Allocator> str() &&;
 \end{itemdecl}
 \begin{itemdescr}
 
@@ -290,6 +308,12 @@ basic_string<charT, traits, Allocator> pilfer();
 
 \pnum
 \postconditions The underlying character sequence is empty.
+%% needed here? YES!!
+
+\pnum
+\begin{note}
+After calling this member function the \tcode{basic_stringbuf} object remains usable.
+\end{note}
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -313,7 +337,7 @@ Add a new constructor overload and change the one taking the string by copy to a
     // \ref{istringstream.cons}, constructors:
     explicit basic_istringstream(
       ios_base::openmode which = ios_base::in);
-    @\added{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc = Allocator>}@
     explicit basic_istringstream(
       const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
       ios_base::openmode which = ios_base::in);
@@ -324,28 +348,38 @@ Add a new constructor overload and change the one taking the string by copy to a
       basic_string<charT, traits, Allocator>&& str,
       ios_base::openmode which = ios_base::in);
 \end{codeblock}
+%% p0407 need overloads
+%    explicit basic_istringstream(
+%      basic_string<charT, traits, Allocator>&& str,
+%      ios_base::openmode which = ios_base::in,
+%      const Allocator& a = Allocator());
+%    explicit basic_istringstream(
+%      basic_string<charT, traits, Allocator>&& str,
+%      const Allocator& a)
+%      :basic_istringstream(std::move(str), ios_base::in, a) {}
 \end{addedblock}
 \begin{codeblock}
     basic_istringstream(const basic_istringstream& rhs) = delete;
     basic_istringstream(basic_istringstream&& rhs);
 \end{codeblock}
 
-Change the \tcode{str()} member function to allow different allocator argument for the new string to be used or the obtained string copy.
-Add an overload of the \tcode{str(s)} member function that moves from a string and add \tcode{pilfer()} and \tcode{view()} member function:
+Change the getting \tcode{str()} overload to take an Allocator for the returned string and add a reference qualification. Add an rvalue-ref overload of \tcode{str()}.
+Change the \tcode{str(s)} overload to take an allocator template parameter that could differ from the buffer's own \tcode{Allocator}. 
+Add a \tcode{str(s)} overload that moves from its string and a \tcode{view()} member function:
 
 \begin{codeblock}
     // \ref{istringstream.members}, members:
     basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
 
-    @\added{template<class SAlloc=Allocator>}@
-    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
-    @\added{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc = Allocator>}@
+    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const @\added{\&}@;
+    @\added{template<class SAlloc = Allocator>}@
     void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
     void str(basic_string<charT, traits, Allocator>&& s);
-    basic_string<charT,traits,Allocator> pilfer();
+    basic_string<charT,traits,Allocator> str() &&;
     basic_string_view<charT, traits> view() const;
 \end{codeblock}
 \end{addedblock}
@@ -353,7 +387,7 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \subsection{30.8.3.1 basic\_istringstream constructors [istringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
-@\added{template<class SAlloc=Allocator>}@
+@\added{template<class SAlloc = Allocator>}@
 explicit basic_istringstream(
   const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
   ios_base::openmode which = ios_base::in);
@@ -389,8 +423,8 @@ explicit basic_istringstream(
 \subsection{30.8.3.3 Member functions [istringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
-@\added{template<class SAlloc=Allocator>}@
-basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
+@\added{template<class SAlloc = Allocator>}@
+basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa = SAlloc()}@) const @\added{\&}@;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
@@ -399,8 +433,8 @@ basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SA
 \end{itemdescr}
 
 \begin{itemdecl}
-    @\added{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
+@\added{template<class SAlloc = Allocator>}@
+void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -422,11 +456,16 @@ void str(basic_string<charT, traits, Allocator>&& s);
 \effects \tcode{rdbuf()->str(std::move(s))}.
 \end{itemdescr}
 \begin{itemdecl}
-basic_string<charT,traits,Allocator> pilfer();
+basic_string<charT,traits,Allocator> str() &&;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\returns \tcode{rdbuf()->pilfer()}.
+\returns \tcode{std::move(*rdbuf()).str()}.
+
+\pnum
+\begin{note}
+Calling this member function leaves the stream object in a usable state with an emptied underlying \tcode{basic_stringbuf}.
+\end{note}
 \end{itemdescr}
 \begin{itemdecl}
 basic_string_view<charT, traits> view() const;
@@ -445,7 +484,7 @@ Add a new constructor overload and change the one taking the string by copy to a
     // \ref{ostringstream.cons}, constructors:
     explicit basic_ostringstream(
       ios_base::openmode which = ios_base::out);
-    @\added{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc = Allocator>}@
     explicit basic_ostringstream(
       const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
       ios_base::openmode which = ios_base::out);
@@ -456,28 +495,38 @@ Add a new constructor overload and change the one taking the string by copy to a
       basic_string<charT, traits, Allocator>&& str,
       ios_base::openmode which = ios_base::out);
 \end{codeblock}
+%% p0407 need overloads
+%    explicit basic_ostringstream(
+%      basic_string<charT, traits, Allocator>&& str,
+%      ios_base::openmode which = ios_base::out,
+%      const Allocator& a = Allocator());
+%    explicit basic_ostringstream(
+%      basic_string<charT, traits, Allocator>&& str,
+%      const Allocator& a)
+%      :basic_ostringstream(std::move(str), ios_base::out, a) {}
 \end{addedblock}
 \begin{codeblock}
     basic_ostringstream(const basic_ostringstream& rhs) = delete;
     basic_ostringstream(basic_ostringstream&& rhs);
 \end{codeblock}
 
-Change the \tcode{str()} member function to allow different allocator argument for the new string to be used or the obtained string copy.
-Add an overload of the \tcode{str(s)} member function that moves from a string and add \tcode{pilfer()} and \tcode{view()} member function:
+Change the getting \tcode{str()} overload to take an Allocator for the returned string and add a reference qualification. Add an rvalue-ref overload of \tcode{str()}.
+Change the \tcode{str(s)} overload to take an allocator template parameter that could differ from the buffer's own \tcode{Allocator}. 
+Add a \tcode{str(s)} overload that moves from its string and a \tcode{view()} member function:
 
 \begin{codeblock}
     // \ref{ostringstream.members}, members:
     basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
 
-    @\added{template<class SAlloc=Allocator>}@
-    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
-    @\added{template<class SAlloc=Allocator>}@
+    @\added{template<class SAlloc = Allocator>}@
+    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa = SAlloc()}@) const @\added{\&}@;
+    @\added{template<class SAlloc = Allocator>}@
     void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
     void str(basic_string<charT, traits, Allocator>&& s);
-    basic_string<charT,traits,Allocator> pilfer();
+    basic_string<charT, traits, Allocator> str() &&;
     basic_string_view<charT, traits> view() const;
 \end{codeblock}
 \end{addedblock}
@@ -485,7 +534,7 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \subsection{30.8.4.1 basic\_ostringstream constructors [ostringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
-@\added{template<class SAlloc=Allocator>}@
+@\added{template<class SAlloc = Allocator>}@
 explicit basic_ostringstream(
   const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
   ios_base::openmode which = ios_base::out);
@@ -518,8 +567,8 @@ explicit basic_ostringstream(
 \subsection{30.8.4.3 Member functions [ostringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
-@\added{template<class SAlloc=Allocator>}@
-basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
+@\added{template<class SAlloc = Allocator>}@
+basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa = SAlloc()}@) const @\added{\&}@;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
@@ -528,8 +577,8 @@ basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SA
 \end{itemdescr}
 
 \begin{itemdecl}
-    @\added{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
+@\added{template<class SAlloc = Allocator>}@
+void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -551,11 +600,16 @@ void str(basic_string<charT, traits, Allocator>&& s);
 \effects \tcode{rdbuf()->str(std::move(s))}.
 \end{itemdescr}
 \begin{itemdecl}
-basic_string<charT,traits,Allocator> pilfer();
+basic_string<charT,traits,Allocator> str() &&;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\returns \tcode{rdbuf()->pilfer()}.
+\returns \tcode{std::move(*rdbuf()).str()}.
+
+\pnum
+\begin{note}
+Calling this member function leaves the stream object in a usable state with an emptied underlying \tcode{basic_stringbuf}.
+\end{note}
 \end{itemdescr}
 \begin{itemdecl}
 basic_string_view<charT, traits> view() const;
@@ -585,28 +639,38 @@ Add a new constructor overload and change the one taking the string by copy to a
       basic_string<charT, traits, Allocator>&& str,
       ios_base::openmode which = ios_base::in | ios_base::out);
 \end{codeblock}
+%% p0407 need overloads
+%    explicit basic_stringstream(
+%      basic_string<charT, traits, Allocator>&& str,
+%      ios_base::openmode which = ios_base::in | ios_base::out,
+%      const Allocator& a = Allocator());
+%    explicit basic_stringstream(
+%      basic_string<charT, traits, Allocator>&& str,
+%      const Allocator& a)
+%      :basic_stringstream(std::move(str), ios_base::in | ios_base::out, a) {}
 \end{addedblock}
 \begin{codeblock}
     basic_stringstream(const basic_stringstream& rhs) = delete;
     basic_stringstream(basic_stringstream&& rhs);
 \end{codeblock}
 
-Change the \tcode{str()} member function to allow different allocator argument for the new string to be used or the obtained string copy.
-Add an overload of the \tcode{str(s)} member function that moves from a string and add \tcode{pilfer()} and \tcode{view()} member function:
+Change the getting \tcode{str()} overload to take an Allocator for the returned string and add a reference qualification. Add an rvalue-ref overload of \tcode{str()}.
+Change the \tcode{str(s)} overload to take an allocator template parameter that could differ from the buffer's own \tcode{Allocator}. 
+Add a \tcode{str(s)} overload that moves from its string and a \tcode{view()} member function:
 
 \begin{codeblock}
-    // \ref{stringstream.members}, members:
+    // \ref{ostringstream.members}, members:
     basic_stringbuf<charT, traits, Allocator>* rdbuf() const;
 
     @\added{template<class SAlloc=Allocator>}@
-    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
-    @\added{template<class SAlloc=Allocator>}@
+    basic_string<charT,traits,@\removed{Allocator}\added{SAlloc}@> str(@\added{const SAlloc\& sa = SAlloc()}@) const @\added{\&}@;
+    @\added{template<class SAlloc = Allocator>}@
     void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
     void str(basic_string<charT, traits, Allocator>&& s);
-    basic_string<charT,traits,Allocator> pilfer();
+    basic_string<charT, traits, Allocator> str() &&;
     basic_string_view<charT, traits> view() const;
 \end{codeblock}
 \end{addedblock}
@@ -614,7 +678,7 @@ Add an overload of the \tcode{str(s)} member function that moves from a string a
 \subsection{30.8.4.1 basic\_stringstream constructors [stringstream.cons]}
 Change the constructor specification to allow a string copy with a different allocator.
 \begin{itemdecl}
-@\added{template<class SAlloc=Allocator>}@
+@\added{template<class SAlloc = Allocator>}@
 explicit basic_stringstream(
   const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str,
   ios_base::openmode which = ios_base::out | ios_base::in);
@@ -649,8 +713,8 @@ explicit basic_stringstream(
 \subsection{30.8.4.3 Member functions [stringstream.members]}
 Add the allocator parameter to the following str() overloads:
 \begin{itemdecl}
-@\added{template<class SAlloc=Allocator>}@
-basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa=SAlloc()}@) const;
+@\added{template<class SAlloc = Allocator>}@
+basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa = SAlloc()}@) const @\added{\&}@;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
@@ -659,8 +723,8 @@ basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SA
 \end{itemdescr}
 
 \begin{itemdecl}
-    @\added{template<class SAlloc=Allocator>}@
-    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
+@\added{template<class SAlloc = Allocator>}@
+void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -682,11 +746,16 @@ void str(basic_string<charT, traits, Allocator>&& s);
 \effects \tcode{rdbuf()->str(std::move(s))}.
 \end{itemdescr}
 \begin{itemdecl}
-basic_string<charT,traits,Allocator> pilfer();
+basic_string<charT,traits,Allocator> str() &&;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\returns \tcode{rdbuf()->pilfer()}.
+\returns \tcode{std::move(*rdbuf()).str()}.
+
+\pnum
+\begin{note}
+Calling this member function leaves the stream object in a usable state with an emptied underlying \tcode{basic_stringbuf}.
+\end{note}
 \end{itemdescr}
 \begin{itemdecl}
 basic_string_view<charT, traits> view() const;
