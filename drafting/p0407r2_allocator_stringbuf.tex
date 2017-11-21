@@ -86,7 +86,7 @@ Since this paper has not yet really been discussed by LEWG or LWG this update ma
 \section{p0407r1}
 Thanks to sweat-dripping effort by Pablo Halpern, I was able to come up with an easier way to correctly specify allocator support by introducing an addition exposition-only \tcode{basic_string} member variable to the \tcode{basic_stringbuf}. Also added an overload of the move constructor with an additional allocator parameter.
 
-Since p0408 overtook this paper in LEWG I now provide the move-ctor overloads accordingly.
+The paper p0408 (efficient buffer access) needs to be slightly adopted according to this paper if accepted before this paper (this paper passed p0408 in LEWG in Albuquerque).
 
 
 \chapter{Introduction}
@@ -113,7 +113,7 @@ Allocator support in the standard library is lacking for string-based streams an
 \section{Open Issues to be Discussed by LEWG / LWG}
 \begin{itemize}
 \item Does it make sense to add \tcode{noexcept} specifications for \tcode{move()} and \tcode{swap()} members, since the base classes and other streams do not. At least it does not make sense so for stream objects, since the base classes do not specify that.
-\item Are there other functions with respect to string streams that would require an allocator parameter? I do not think so. For further stuff, see  \href{https://wg21.link/P0408}{P0408}.
+\item Are there other functions with respect to string streams that would require an allocator parameter? I do not think so, except move (from string) constructors in \href{https://wg21.link/P0408}{P0408} which require additional overloads along the lines of the constructors extended here.
 \item There is some overlap with P0408, how to deal with that overlap?
 \end{itemize}
 
@@ -375,7 +375,7 @@ template <class SAllocator>
 explicit basic_istringstream(
              const basic_string<charT, traits,SAllocator>& str,
              const Allocator& a)
-         : basic_istringstream(std, ios_base::in, a) {}
+         : basic_istringstream(str, ios_base::in, a) {}
 \end{codeblock}\end{addedblock}
 
 
