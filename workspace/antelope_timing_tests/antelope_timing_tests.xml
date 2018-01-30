@@ -1,0 +1,31 @@
+<testsuites>
+	<testsuite name="AllTests" tests="7">
+		<testcase classname="AllTests" name="thisIsATest"/>
+		<testcase classname="AllTests" name="testSameResult"/>
+		<testcase classname="AllTests" name="timeSomeStringFunctions">
+			<failure message="../src/Test.cpp:46 timeSomeStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	181.29	">
+timeSomeStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	181.29	
+			</failure>
+		</testcase>
+		<testcase classname="AllTests" name="timeSomeFasterStringFunctions">
+			<failure message="../src/Test.cpp:53 timeSomeFasterStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	1.46035	">
+timeSomeFasterStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	1.46035	
+			</failure>
+		</testcase>
+		<testcase classname="AllTests" name="timeSomeFasterEraseStringFunctions">
+			<failure message="../src/Test.cpp:67 timeSomeFasterEraseStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	1.08752	">
+timeSomeFasterEraseStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	1.08752	
+			</failure>
+		</testcase>
+		<testcase classname="AllTests" name="timeRemCtrlBlocksStringFunctions">
+			<failure message="../src/Test.cpp:73 timeRemCtrlBlocksStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	1.06432	">
+timeRemCtrlBlocksStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	1.06432	
+			</failure>
+		</testcase>
+		<testcase classname="AllTests" name="timeSomeFasterIndexingStringFunctions">
+			<failure message="../src/Test.cpp:59 timeSomeFasterIndexingStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	1.41713	">
+timeSomeFasterIndexingStringFunctions: 1.0 == double(slow.count())/fast.count() expected:	1	but was:	1.41713	
+			</failure>
+		</testcase>
+	</testsuite>
+</testsuites>
