@@ -55,6 +55,7 @@ public:
 		 base::operator=(static_cast<base const &>(other));
 		 needs_flush= other.needs_flush;
 		 flush_immediate=other.flush_immediate;
+		 return *this;
 	 }
 
 };
@@ -406,18 +407,18 @@ public:
 template <class charT, class traits = char_traits<charT>>
 	basic_ostream<charT,traits>&
 	emit_on_flush(basic_ostream<charT,traits>&out){
-		auto syncbuf=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
-		if (syncbuf){
-			syncbuf->flush_immediate=true;
+		auto syncbuffer=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
+		if (syncbuffer){
+			syncbuffer->flush_immediate=true;
 		}
 		return out;
 	}
 template <class charT, class traits = char_traits<charT>>
 	basic_ostream<charT,traits>&
 	no_emit_on_flush(basic_ostream<charT,traits>&out){
-		auto syncbuf=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
-		if (syncbuf){
-			syncbuf->flush_immediate=false;
+		auto syncbuffer=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
+		if (syncbuffer){
+			syncbuffer->flush_immediate=false;
 		}
 		return out;
 	}
@@ -426,9 +427,9 @@ template <class charT, class traits = char_traits<charT>>
 	basic_ostream<charT,traits>&
 	flush_emit(basic_ostream<charT,traits>&out){
 		out.flush();
-		auto syncbuf=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
-		if (syncbuf){
-			if (not syncbuf->do_emit())
+		auto syncbuffer=dynamic_cast<__basic_syncbuf<charT,traits>*>(out.rdbuf());
+		if (syncbuffer){
+			if (not syncbuffer->do_emit())
 				out.setstate(ios_base::badbit);
 		}
 		return out;
