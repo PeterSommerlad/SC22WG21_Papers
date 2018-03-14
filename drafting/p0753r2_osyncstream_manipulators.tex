@@ -54,8 +54,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0753r1}
-\newcommand{\paperdate}{2017-10-15}
+\newcommand{\papernumber}{p0753r2}
+\newcommand{\paperdate}{2018-03-14}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -71,30 +71,71 @@
 Document Number:&  \papernumber \\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
-Audience: & LEWG (LWG to re-check the wording)\\\hline
+Audience: & LWG to bless the wording\\\hline
 \end{tabular}
 \end{center}
 \chapter{Introduction}
-\textbf{Note that this version is identical to p0753r0 except for the typo in the paper number in that version.}
-
 
 After Kona, Pablo asked me to add \tcode{ostream} manipulators for \tcode{basic_osyncstream} to allow users of such streams to modify their flushing behavior, when those stream objects are only know via \tcode{ostream\&} down the call chain.
 
 The wording for these manipulators was reviewed by LWG in Toronto (p0053r5), but their names were never discussed in LEWG, therefore I followed Jeffrey's suggestion to split them from p0053r6. For more information see that paper.
 
+After the blessing of the names by LEWG in Albuquerque, LWG looked at it again in Jacksonville where this version was prepared to be put in the working draft.
 
-\section{Items to be discussed by LEWG}
+\section{Items discussed by LEWG/LWG}
 \begin{itemize}
-\item Naming of the manipulators
-\item Should the manipulators be in header \tcode{<osyncstream>} instead of globally available in \tcode{<ostream>} as are \tcode{flush} and \tcode{endl}? Putting them in \tcode{<osyncstream>} (only), will increase dependence on \tcode{basic_osyncstream}, where \tcode{basic_syncbuf} would suffice for inline implementation of the manipulators. That dependency could even be mitigated by non-inline implementations of the manipulators (providing their instantiations for the supported character types as is done with many other things in the iostream implementaions).
+\item Naming of the manipulators (in ABQ). OK.
+\item Should the manipulators be in header \tcode{<osyncstream>} instead of globally available in \tcode{<ostream>} as are \tcode{flush} and \tcode{endl}? Putting them in \tcode{<osyncstream>} (only), will increase dependence on \tcode{basic_osyncstream}, where \tcode{basic_syncbuf} would suffice for inline implementation of the manipulators. That dependency could even be mitigated by non-inline implementations of the manipulators (providing their instantiations for the supported character types as is done with many other things in the iostream implementaions). \emph{LEWG could not answer it, but LWG confirmed putting them in \tcode{<ostream>} is the way.}
 \item re-check wording (done be LWG in Toronto, but minor adaptations were made, because of LWG's feedback. Pablo is OK with the edits)
-\item What should be the delivery vehicle for this feature: C++20 or the concurrency TS? I believe both should be addressed when moved, like with p0053.
+\item What should be the delivery vehicle for this feature: C++20 or the concurrency TS? working draft of the standard, because p0053 was put there already in ABQ.
 \end{itemize}
 
+\section{Changes from r0/r1 - as given by LWG in Jacksonville}
+\begin{itemize}
+\item replaced pointer with \tcode{*} in manipulator specification
+\item direct call \tcode{flush()} member instead of manipulator function \tcode{std::flush(os)}
+\item add to synopsis of \tcode{<ostream>} part for putting the manipulators in 
+\item check with Jonathan Coe wrt BSI (TBD)
+\item add \tcode{\#include <ostream>} header to \tcode{<osynstream>} synopsis as a fly-by fix to get the manipulators whenever \tcode{<osyncstream>} is used.
+\end{itemize}
 
 \chapter{Wording}
 
-This wording is relative to the current C++ working draft and refers to the specification in p0053r6. It could be integrated into a Concurrency TS  accordingly when p0053 gets adopted.
+This wording is relative to the current C++ working draft.
+
+\section{30.7.2 Header \tcode{<ostream>} synopsis [ostream.syn]}
+Add the following manipulator declarations to the synopsis of the header <ostream>
+\begin{codeblock}
+  namespace std {
+    template<class charT, class traits = char_traits<charT>>
+      class basic_ostream;
+      
+    using ostream  = basic_ostream<char>;
+    using wostream = basic_ostream<wchar_t>;
+
+    template<class charT, class traits>
+      basic_ostream<charT, traits>& endl(basic_ostream<charT, traits>& os);
+    template<class charT, class traits>
+      basic_ostream<charT, traits>& ends(basic_ostream<charT, traits>& os);
+    template<class charT, class traits>
+      basic_ostream<charT, traits>& flush(basic_ostream<charT, traits>& os);
+\end{codeblock}
+\begin{addedblock}
+\begin{codeblock}
+    template <class charT, class traits>
+      basic_ostream<charT, traits>& emit_on_flush(basic_ostream<charT, traits>& os);
+    template <class charT, class traits>
+      basic_ostream<charT, traits>& noemit_on_flush(basic_ostream<charT, traits>& os);
+    template <class charT, class traits>
+      basic_ostream<charT, traits>& flush_emit(basic_ostream<charT, traits>& os);
+\end{codeblock}
+\end{addedblock}
+    
+\begin{codeblock}
+    template<class charT, class traits, class T>
+      basic_ostream<charT, traits>& operator<<(basic_ostream<charT, traits>&& os, const T& x);
+  }
+\end{codeblock}
 
 \section{30.7.5.4 Standard \tcode{basic_ostream} manipulators [ostream.manip]}
 Add the following three manipulators.
@@ -107,9 +148,9 @@ template <class charT, class traits>
 \begin{itemdescr}
 \pnum
 \effects
-If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, calls \tcode{buf->set_emit_on_sync(true)}. Otherwise this manipulator has no effect. 
+If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>*} \tcode{buf}, calls \tcode{buf->set_emit_on_sync(true)}. Otherwise this manipulator has no effect. 
 \begin{note}
-To work around the issue that the \tcode{Allocator} template argument can not be deduced, implementations can introduce an intermediate base class to \tcode{basic_osyncbuf} that takes care its \tcode{emit_on_sync} flag.
+To work around the issue that the \tcode{Allocator} template argument can not be deduced, implementations can introduce an intermediate base class to \tcode{basic_osyncbuf} that manages its \tcode{emit_on_sync} flag.
 \end{note}
 
 \pnum
@@ -125,7 +166,7 @@ template <class charT, class traits>
 \begin{itemdescr}
 \pnum
 \effects
-If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, calls \tcode{buf->set_emit_on_sync(false)}. Otherwise this manipulator has no effect. 
+If \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>*} \tcode{buf}, calls \tcode{buf->set_emit_on_sync(false)}. Otherwise this manipulator has no effect. 
 
 \pnum
 \returns
@@ -140,8 +181,8 @@ template <class charT, class traits>
 \begin{itemdescr}
 \pnum
 \effects
-\tcode{flush(os)}. Further
-if \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>} pointer \tcode{buf}, 
+\tcode{os.flush()}. Then,
+if \tcode{os.rdbuf()} is a \tcode{basic_osyncbuf<charT, traits, Allocator>*} \tcode{buf}, 
 calls \tcode{buf->emit()}. 
  
 \pnum
@@ -149,6 +190,22 @@ calls \tcode{buf->emit()}.
 \tcode{os}.
 \end{itemdescr}
 \end{addedblock}
+
+\section{30.10.1 Header \tcode{<syncstream>} synopsis [syncstream.syn]}
+Add the following header include directive to the synopsis:
+
+\begin{addedblock}
+\begin{codeblock}
+#include <ostream> // see 30.7.2 [ostream.syn]
+\end{codeblock}
+\end{addedblock}
+\begin{codeblock}
+namespace std {
+    template<class charT, class traits, class Allocator>
+      class basic_syncbuf;
+...
+\end{codeblock}
+
 
 %%%%%%
 \section{Implementation}
