@@ -96,8 +96,8 @@ public:
 
     unique_resource &operator=(unique_resource &&that)
         noexcept(is_nothrow_delete_v &&
-                 std::is_nothrow_move_assignable<R>::value &&
-                 std::is_nothrow_move_assignable<D>::value)
+                 std::is_nothrow_move_assignable_v<R> &&
+                 std::is_nothrow_move_assignable_v<D>)
     {
         static_assert(std::is_nothrow_move_assignable<R>::value ||
                       std::is_copy_assignable<R>::value,
@@ -111,19 +111,19 @@ public:
         if constexpr (std::is_nothrow_move_assignable_v<detail::_box<R>>)
             if constexpr (is_nothrow_move_assignable_v<detail::_box<D>>)
             	{
-            		resource = std::forward<detail::_box<R>>(that.resource);
-            		deleter = std::forward<detail::_box<D>>(that.deleter);
+            		resource = std::move(that.resource);//std::forward<detail::_box<R>>(that.resource);
+            		deleter = std::move(that.deleter);//std::forward<detail::_box<D>>(that.deleter);
             	}
             else
             {
         			deleter = _as_const(that.deleter);
-        			resource = std::forward<detail::_box<R>>(that.resource);
+        			resource = std::move(that.resource);//std::forward<detail::_box<R>>(that.resource);
             }
         else
         	    if constexpr (is_nothrow_move_assignable_v<detail::_box<D>>)
             {
                 resource = _as_const(that.resource);
-                deleter = std::forward<detail::_box<D>>(that.deleter);
+                deleter = std::move(that.deleter);//std::forward<detail::_box<D>>(that.deleter);
             }
 			else
 			{
@@ -190,14 +190,23 @@ public:
 template<typename R, typename D>
 unique_resource(R, D)
 -> unique_resource<R, D>;
+template<typename R, typename D>
+unique_resource(R, D, bool)
+-> unique_resource<R, D>;
 
 template<typename R, typename D, typename S>
 auto make_unique_resource_checked(R &&r, const S &invalid, D &&d)
 noexcept(std::is_nothrow_constructible_v<std::decay_t<R>,R> &&
 		std::is_nothrow_constructible_v<std::decay_t<D>,D>)
-->unique_resource<std::decay_t<R>,std::decay_t<D>>
+//->unique_resource<std::decay_t<R>,std::decay_t<D>>
 {
-	return {std::forward<R>(r), std::forward<D>(d), ! bool(r == invalid)};
+	bool const mustrelease(r == invalid);
+	//return //unique_resource
+//			unique_resource<std::decay_t<R>,std::decay_t<D>>{std::forward<R>(r), std::forward<D>(d), ! bool(r == invalid)};
+//	unique_resource<R,std::decay_t<D>>
+	unique_resource resource{std::forward<R>(r), std::forward<D>(d),!mustrelease};
+	return resource;
+
 }
 
 // end of (c) Eric Niebler part

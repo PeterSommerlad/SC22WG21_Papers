@@ -145,16 +145,30 @@ struct throwing_copy
 	throwing_copy(const throwing_copy &other) :
 			out { other.out }
     {
-        throw 42;
+    		using namespace std::literals;
+        throw "throwing_copy copy attempt:"s+sz_;
     }
     void operator()() const
     {
         out << sz_ << std::endl;
     }
+    template <typename RES>
+    void operator()(RES const &res) const
+    {
+        out << sz_ << res<< std::endl;
+    }
+
+    bool operator==(int i)const &{
+    		return i==0;
+    }
+    friend std::ostream& operator<<(std::ostream &os,throwing_copy const &t){
+    		return os << t.sz_ ;
+    }
 private:
 	const char *sz_ { "" };
     std::ostream &out;
 };
+
 
 
 void testsFromEricNiebler_scope_exit_with_throwing_function_object(){
@@ -229,7 +243,18 @@ void testUniqueResourceSimple() {
 
 	const std::string msg { " deleted resource\n" };
 	{
-		auto res = unique_resource(std::ref(msg), [&out](string msg) {out << msg<< flush;});
+		auto res = unique_resource(std::ref(msg), [&out](string msg) {out << msg<<flush;});
+	}
+	ASSERT_EQUAL(msg, out.str());
+}
+void testUniqueResourceByReference() {
+	using namespace std;
+	std::ostringstream out { };
+
+	const std::string msg { " deleted resource\n" };
+	{
+		auto res = unique_resource<std::string const &
+				,std::function<void(string)>>(msg, [&out](string msg) {out << msg<< flush;});
 	}
 	ASSERT_EQUAL(msg, out.str());
 }
@@ -312,6 +337,34 @@ void demontrate_unique_resource_with_POSIX_IO() {
 
 }
 
+void demontrate_unique_resource_with_POSIX_IO_lvalue() {
+	const std::string filename = "./hello1.txt";
+	{
+		auto fd = ::open(filename.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666);
+
+		auto file = make_unique_resource_checked(fd,-1, &::close);
+		ASSERT(fd!=-1);
+		::write(file.get(), "Hello World!\n", 12u);
+		ASSERT(file.get() != -1);
+	}
+	{
+		std::ifstream input { filename };
+		std::string line { };
+		getline(input, line);
+		ASSERT_EQUAL("Hello World!", line);
+		getline(input, line);
+		ASSERT(input.eof());
+	}
+	::unlink(filename.c_str());
+	{
+		auto fd=::open("nonexistingfile.txt", O_RDONLY);
+		auto file = make_unique_resource_checked(fd, -1, &::close);
+		ASSERT_EQUAL(-1, file.get());
+	}
+
+}
+
+
 void test_make_unique_resource_checked(){
 	std::ostringstream out{};
 
@@ -321,6 +374,82 @@ void test_make_unique_resource_checked(){
 	}
 	ASSERT_EQUAL("called",out.str());
 
+}
+
+struct throwing_copy_movable_resource
+{
+	throwing_copy_movable_resource(const char* sz, std::ostream &os) :
+	sz_ { sz }, out { os } {
+	}
+	throwing_copy_movable_resource(const throwing_copy_movable_resource &other) :
+	out { other.out }
+    {
+    		using namespace std::literals;
+        throw "throwing_copy copy attempt:"s+sz_;
+    }
+	throwing_copy_movable_resource(throwing_copy_movable_resource && other) noexcept = default;
+    bool operator==(int i)const &{
+    		return i==0;
+    }
+    friend std::ostream& operator<<(std::ostream &os,throwing_copy_movable_resource const &t){
+    		return os << t.sz_ ;
+    }
+private:
+	const char *sz_ { "" };
+    std::ostream &out;
+};
+
+bool operator==(std::reference_wrapper<throwing_copy_movable_resource>const&,int i){
+		return i==0;
+}
+
+void test_make_unique_resource_checked_lvalue(){
+	std::ostringstream out{};
+
+	{
+		//throwing_copy r{"",out}; // this does not work, make_unique_resource_checked only works for copies
+		auto r{0LL};
+		auto bar=make_unique_resource_checked(r,0,[&out](auto & i){out << "not called";});
+		auto foo=make_unique_resource_checked(r,1,[&out](auto & i){out << "called\n";});
+	}
+	ASSERT_EQUAL("called\n",out.str());
+}
+void test_make_unique_resource_checked_failing_copy(){
+	std::ostringstream out{};
+	{
+		throwing_copy_movable_resource x{"x by ref ",out};
+		auto bar=make_unique_resource_checked(std::ref(x),0,
+				[&out](auto const & i){out << i.get()<<"not called";});
+		auto foo=make_unique_resource_checked(std::ref(x),1,
+				[&out](auto const & i){out <<i.get() << "called\n";});
+	}
+	throwing_copy x{"x by value",out};
+	try {
+		auto bar=make_unique_resource_checked(x,0,[&out](auto const & i){out << i <<"not called";});
+	} catch(...){
+		out << "expected\n";
+	}
+	try {
+		auto bar=make_unique_resource_checked(x,1,[&out](auto const & i){out << i <<" called\n";});
+	} catch(...){
+		out << "expected2\n";
+	}
+	ASSERT_EQUAL("x by ref called\nexpected\nx by value called\nexpected2\n",out.str());
+
+}
+void test_make_unique_resource_checked_with_deleter_throwing_on_copy(){
+	std::ostringstream out{};
+	try {
+		auto notcalled=make_unique_resource_checked(0,0,throwing_copy("notcalled",out));
+	} catch (...){
+		out << "expected\n";
+	}
+	try{
+		auto called   =make_unique_resource_checked(42,0,throwing_copy("called ",out));
+	}catch(...){
+		out << "expected2\n";
+	}
+	ASSERT_EQUAL("expected\ncalled 42\nexpected2\n",out.str());
 }
 
 void testReferenceWrapper(){
@@ -534,6 +663,7 @@ void runAllTests(int argc, const char *argv[]) {
 	s.push_back(CUTE(testCompilabilityGuardForPointerTypes));
 	s.push_back(CUTE(testTalkToTheWorld));
 	s.push_back(CUTE(demontrate_unique_resource_with_POSIX_IO));
+	s.push_back(CUTE(demontrate_unique_resource_with_POSIX_IO_lvalue));
 	s.push_back(CUTE(demonstrate_unique_resource_with_stdio));
 	s.push_back(CUTE(demonstrate_unique_resource_with_stdio_Cpp17));
 	s.push_back(CUTE(test_unique_resource_semantics_reset));
@@ -541,6 +671,7 @@ void runAllTests(int argc, const char *argv[]) {
 	s.push_back(CUTE(testThrowOnUniqueResourceDoesntCrashIt));
 	s.push_back(CUTE(testThrowDoesntCrashIt));
 	s.push_back(CUTE(testDismissedGuard));
+	s.push_back(CUTE(testUniqueResourceByReference));
 	s.push_back(CUTE(test_scope_exit_with_throwing_fun_copy));
 	s.push_back(CUTE(test_scope_success_with_side_effect));
 	s.push_back(CUTE(demo_scope_exit_fail_success));
@@ -548,6 +679,9 @@ void runAllTests(int argc, const char *argv[]) {
 	s.push_back(CUTE(test_scope_exit_lvalue_ref_passing_rvalue_fails_to_compile));
 	s.push_back(CUTE(test_scope_success_might_throw));
 	s.push_back(CUTE(test_make_unique_resource_checked));
+	s.push_back(CUTE(test_make_unique_resource_checked_lvalue));
+	s.push_back(CUTE(test_make_unique_resource_checked_failing_copy));
+	s.push_back(CUTE(test_make_unique_resource_checked_with_deleter_throwing_on_copy));
 	s.push_back(CUTE(testReferenceWrapper));
 	s.push_back(CUTE(testScopeExitWithReferenceWrapper));
 	s.push_back(CUTE(testsFromEricNiebler_scope_exit_with_throwing_function_object));
