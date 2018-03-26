@@ -80,26 +80,27 @@ Audience: & LWG\\\hline
 While no semantic changes, review by LWG and several other people, most notably Tim Song, suggested many improvements to the wording.
 \begin{itemize}
 \item remove the phrasing for potentially targeting a TS and minor editorial fixes, i.e., moving the Remarks sections towards the end of a description.
-\item rephrased general requirement to the constructor parameter f for the scope guard classes' constructors according to Tim Song's suggestions. [scope.scope_guard] p4. Do not require \tcode{f()} be valid for \tcode{scope_success}, because it will never be called directly.
+\item rephrased general requirement to the constructor parameter f for the scope guard classes' constructors according to Tim Song's suggestions. [scope.scope_guard] p4. Do not require \tcode{f()} to not throw exceptions for \tcode{scope_success}, because it will never be called directly, still require it to be valid, because we no longer require well-defined behavior in general (several iterations with Tim Song).
 \item added \tcode{|| is_nothrow_constructible_v<EF,EFP\&>} to the noexcept constructor condition for scope guards to match the actual behavior (Tim Song).
-\item require \tcode{is_constructible_v<X,XX>} for \tcode{<EF, EFP>}, and \tcode{<R1,RR>} and \tcode{<D,DD>} in the constructors of the classes to avoid initializing a reference from a then dangling rvalue-reference, even if the actual initialization is done differently (Tim Song). 
+\item require \tcode{is_constructible_v<X,XX>} for \tcode{<EF, EFP>}, and \tcode{<R1,RR>} and \tcode{<D,DD>} in the constructors of the classes to avoid initializing a reference from a then dangling rvalue-reference, even if the actual initialization is done differently and provide a note explaining the motivation (Tim Song). 
 \item spell out in detail what \tcode{scope_guard(scope_guard\&\&)} is doing. (Tim Song)
-\item added a requirement on type \tcode{EF} to be \lstinline{MoveConstructible} or \tcode{CopyConstructible} for \tcode{\textit{scope_guard}}'s move constructors if \tcode{EF} is an object type.(Tim Song's suggestion)
+\item added a requirement on type \tcode{EF} to be \tcode{MoveConstructible} or \tcode{CopyConstructible} for \tcode{\textit{scope_guard}}'s move constructors if \tcode{EF} is an object type.(Tim Song's suggestion)
 \item Fixed the missing \tcode{remove_reference_t<>} around \tcode{R} when defining \tcode{R1} to be a \tcode{reference_wrapper} (Tim Song).
 \item rephrased p3 in [scope.unique_resource.class] according to Alisdair Meredith's suggestion.
 \item corrected code in specification of \tcode{unique_resource} move assignment operator to use \tcode{R1} instead of R, since R1 is the type of the member \tcode{resource}, and replace \tcode{std::forward()} with \tcode{std::move()} and to rely only on \tcode{std::is_nothrow_move_assignable_v} in noexcept specification explanation and \tcode{if constexpr} condition.
 \item simplified and corrected overload restriction in constructor of unique_resource by getting rid of the exposition only variable template,  according to Tim Song's feedback.
-\item add "calls" to deleter() in reset()
+\item add "calls" to \tcode{deleter()} in \tcode{reset()}
 \item added requirement to \tcode{unique_resource} constructor to clarify that calling \tcode{d()} is always possible and fixed effects to unwrap \tcode{resource}, if it is stored in a \tcode{reference_wrapper} (thanks Tim Song).
-\item change the requirements of \tcode{unique_resource::operator=} to use \tcode{MoveAssignable}/\tcode{CopyAssignable} instead of the traits.
-\item changed \tcode{std::forward<D>(rhs.deleter)} to \tcode{std::move(rhs.deleter)} in the effects of the move-constructor of \tcode{unique_resource}, because \tcode{D} can not be a reference type. (thanks Tim Song). Can not do that for \tcode{resource}, because the member variable might be a \tcode{reference_wrapper}.
+\item change the requirements of \tcode{unique_resource::operator=} to use \tcode{MoveAssignable}/\tcode{CopyAssignable} instead of the traits (Tim Song)
+\item changed \tcode{std::forward<D>(rhs.deleter)} to \tcode{std::move(rhs.deleter)} in the effects of the move-constructor of \tcode{unique_resource}, because \tcode{D} can not be a reference type. (thanks Tim Song). Can do that also for \tcode{resource}, because if \tcode{R} is a reference the member variable is a \tcode{reference_wrapper}. (changed at least twice, but now move should be OK, since \tcode{R1} can never be a reference type).
 \item simplify \tcode{get()} because \tcode{reference_wrapper} auto-converts to const reference.
 \item adjust title of [scope.make_unique_resource]
 \item added requires clause to \tcode{unique_resource::reset(RR)} to allow for running the deleter on the function argument in case of an exception (thanks Tim Song).
 \item default argument for template parameter \tcode{S} in \tcode{make_unique_resource_checked} is now \tcode{decay_t<R>} (thanks Tim Song).
 \item comparison in \tcode{make_unique_resource_checked} is now required to not throw an exception.
 \item In Jacksonville LWG was discussion the need for \tcode{decay_t<R>} in \tcode{make_unique_resource_checked} and asked for an lvalue version of a call in the example. That is not what it should be used for anyway. I made some experiments and made the decision that was already previously made (if I remember correctly) to only support copying of the resource in that factory function. Therefore, \tcode{decay_t} is IMHO the right thing to do. and therefore I also did not add an example using an lvalue for its first argument.
-\item Tim Song recognized that the remarks and requires clauses of the scope guard constructors are written like they would be always perfect forwarding, which they are not (when move construction could fail they copy). I do not know if and what to do about it. 
+\item Tim Song recognized that the remarks and requires clauses of the scope guard constructors are written like they would be always perfect forwarding, which they are not (when move construction could fail they copy). I split the cases to show forwarding (which is actually moving when possible without throwing) vs. copying.
+\item Since Tim Song convinced me that taking the address of \tcode{fclose} or \tcode{close} is not allowed by C++ (or at least will no longer with C++20 as of Jacksonville, I changed the examples and also my test code to wrap them in lambdas instead.
 \end{itemize}
 
 \section{Changes from P0052R5}
@@ -227,7 +228,7 @@ The Standard Template Library provides RAII (resource acquisition is initializat
 \item Special thanks and recognition goes to OpenSpan, Inc. (http://www.openspan.com) for supporting the production of this proposal, and for sponsoring Andrew L. Sandoval's first proposal (N3677) and the trip to Chicago for the Fall 2013 LEWG meeting. \emph{Note: this version abandons the over-generic version from N3830 and comes back to two classes with one or no resource to be managed.}
 \item Thanks also to members of the mailing lists who gave feedback. Especially Zhihao Yuan, and Ville Voutilainen.
 \item Special thanks to Daniel Kr\"ugler for his deliberate review of the draft version of this paper (D3949).
-\item Thanks to participants in LWG in Jacksonville, Toronto and Albuquerque, especially STL, Lisa Lippincott, Casey Carter, many others, and Marshall Clow for help with phrasing the wording.
+\item Thanks to participants in LWG in various meetings, especially STL, Lisa Lippincott, Casey Carter, many others, and Marshall Clow for help with phrasing the wording.
 \item Very special thanks to Tim Song for his elaborate feedback on the wording after Jacksonville and his willingness to go over it several times. Hopefully R7 of this paper will be close enough to make it into the standard.
 \end{itemize}
 \newpage
@@ -236,8 +237,9 @@ While \tcode{std::unique_ptr} can be (mis-)used to keep track of general handle 
 
 \begin{codeblock}
 void demonstrate_unique_resource_with_stdio() {
+  auto fclose=[](auto file){::fclose(file);}; // not allowed to take address
   const std::string filename = "hello.txt";
-  { auto file=make_unique_resource(::fopen(filename.c_str(),"w"),&::fclose);
+  { auto file=make_unique_resource(::fopen(filename.c_str(),"w"),fclose);
     ::fputs("Hello World!\n", file.get());
     ASSERT(file.get()!= NULL);
   }
@@ -251,14 +253,15 @@ void demonstrate_unique_resource_with_stdio() {
   ::unlink(filename.c_str());
   {
     auto file = make_unique_resource_checked(::fopen("nonexistingfile.txt", "r"), 
-                (FILE*) NULL, &::fclose);
+                (FILE*) NULL, fclose);
     ASSERT_EQUAL((FILE*)NULL, file.get());
   }
 }
 void demontrate_unique_resource_with_POSIX_IO() {
   const std::string filename = "./hello1.txt";
+  auto close=[](auto fd){::close(fd);};
   { auto file=make_unique_resource(::open(filename.c_str(),
-                     O_CREAT|O_RDWR|O_TRUNC,0666), &::close);
+                     O_CREAT|O_RDWR|O_TRUNC,0666), close);
     ::write(file.get(), "Hello World!\n", 12u);
     ASSERT(file.get() != -1);
   }
@@ -272,7 +275,7 @@ void demontrate_unique_resource_with_POSIX_IO() {
   ::unlink(filename.c_str());
   {
     auto file = make_unique_resource_checked(::open("nonexistingfile.txt", 
-                       O_RDONLY), -1, &::close);
+                       O_RDONLY), -1, close);
     ASSERT_EQUAL(-1, file.get());
   }
 }\end{codeblock}
@@ -336,7 +339,7 @@ The following issues have been recommended by LWG already:
 
 \newpage
 \section{Open Issues (to be) Discussed by LEWG / LWG}
-The following issues have been resolved finally by LWG in Toronto. The shipping vehicle should be C++20, however, I would not object to put it into version 3 of the Library Fundamentals TS if there remains a chance to have it put into C++20.
+The following issues have been resolved finally by LWG in Toronto. The shipping vehicle should be C++20.
 \begin{itemize}
 \item \removed{which "callable" definition in the standard should be applied (call expression (as it is now) or via INVOKE (\tcode{is_callable_v<EF\&>}).
 IMHO call expression is fine, since everything is about side-effects 
@@ -494,7 +497,7 @@ the requirements of \tcode{Destructible} (Table~27
 %\ref{destructible}
 ). 
 %\tcode{is_callable<EF\&>::value} is \tcode{true}.
-Given an lvalue \tcode{g} of type \tcode{remove_reference_t<EF>}, the expression \tcode{g()} shall be well-formed and shall have well-defined behavior.
+Given an lvalue \tcode{g} of type \tcode{remove_reference_t<EF>}, the expression \tcode{g()} shall be well-formed.
 
 \pnum
 The constructor parameter \tcode{f} in the following constructors shall be a reference to a function or a reference to a function object([function.objects]). 
@@ -566,9 +569,12 @@ scope_success(EFP&& f) noexcept(is_nothrow_constructible_v<EF, EFP>
 \end{itemdecl}
 
 \begin{itemdescr}
-%\pnum
-%\requires Given an lvalue \tcode{f} of type \tcode{remove_reference_t<EFP>}, the expression \tcode{f()} shall be well-formed and shall have well-defined behavior.
-%Tim Song: f never called by scope_success
+\pnum
+\requires 
+%Given an lvalue \tcode{f} of type \tcode{remove_reference_t<EFP>}, the expression \tcode{f()} shall be well-formed and shall have well-defined behavior.
+%Tim Song: f never called by scope_success, later: need well-defined behavior
+The expression \tcode{f()} shall be well-formed, and have well-defined behavior.
+
 
 \pnum
 \effects If \tcode{EFP} is not an lvalue reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, initialize  \tcode{exit_function} with \tcode{std::forward<EFP>(f)} otherwise initialize \tcode{exit_function} with \tcode{f}. 
@@ -603,8 +609,9 @@ otherwise \tcode{EF} shall satisfy the requirements of \tcode{CopyConstructible}
 
 \pnum
 \effects %Copies the release state from \tcode{rhs}.
-If \tcode{is_nothrow_move_constructible_v<EF>} intializes \tcode{exit_function} with \tcode{std::move(rhs.exitfunction)},
-otherwise initialize \tcode{exit_function} with \tcode{rhs.exit_function}. Initializes \tcode{execute_on_destruction} from \tcode{rhs.execute_on_destruction} and \tcode{uncaught_on_creation} from \tcode{rhs.uncaught_on_creation}.
+If \tcode{is_nothrow_move_constructible_v<EF>} initializes \tcode{exit_function} with \\
+\tcode{std::forward<EF>(rhs.exit_function)},
+otherwise initializes \tcode{exit_function} with \tcode{rhs.exit_function}. Initializes \tcode{execute_on_destruction} from \tcode{rhs.execute_on_destruction} and \tcode{uncaught_on_creation} from \tcode{rhs.uncaught_on_creation}.
 If construction succeeds, call \tcode{rhs.release()}.
 \begin{note}
 Copying instead of moving provides the strong exception guarantee.
@@ -761,9 +768,9 @@ Destructible
 %\ref{function.objects}
 ), 
 for which, given
-a value \tcode{d} of type \tcode{D} and a value
+a lvalue \tcode{d} of type \tcode{D} and a lvalue
 \tcode{r} of type \tcode{R}, the expression
-\tcode{d(r)} shall be well-formed, shall have well-defined behavior, and shall not throw an exception.
+\tcode{d(r)} shall be well-formed. % Tim Song: to ctor: , shall have well-defined behavior, and shall not throw an exception.
 \tcode{D} shall either be CopyConstructible (Table 24
 %\ref{copyconstructible}
 ), or 
@@ -815,7 +822,8 @@ unique_resource(RR&& r, DD&& d) noexcept(@\seebelow@)
 \requires
 The expressions
 \tcode{d(r)} shall be well-formed, shall have well-defined behavior, and shall not throw an exception.
-If \tcode{is_reference_v<R>} is \tcode{true}, \tcode{d(resource.get())} otherwise \tcode{d(resource)} shall be well-formed, shall have well-defined behavior, and shall not throw an exception.
+If \tcode{is_reference_v<R>} is \tcode{true}, \tcode{d(resource.get())} and \tcode{deleter(resource.get())},
+ otherwise \tcode{d(resource)} and \tcode{deleter(resource)} shall be well-formed, shall have well-defined behavior, and shall not throw an exception.
 
 \pnum
 \effects 
@@ -842,7 +850,7 @@ This constructor shall not participate in overload resolution unless\\
 \tcode{(is_nothrow_constructible_v<R1, RR> || is_constructible_v<R1,RR\&>) \&\&}\\
 \tcode{(is_nothrow_constructible_v<D , DD> || is_constructible_v<D ,DD\&>)} is \tcode{true}.\\
 \begin{note}
-The first two conditions prohibit initialization from a rvalue-reference when \tcode{R1} is \tcode{reference_wrapper<R>} or \tcode{is_reference_v<D>} is true.
+The first two conditions prohibit initialization from a rvalue-reference when either \tcode{R1} or \tcode{D} is a specialization of  \tcode{reference_wrapper}.
 \end{note}
 \end{itemdescr}
 
@@ -1146,7 +1154,7 @@ The following example shows its use to avoid calling \tcode{fclose} when \tcode{
 \begin{codeblock}
 auto file = make_unique_resource_checked(
   ::fopen("potentially_nonexistent_file.txt", "r"), 
-  nullptr, &::fclose);
+  nullptr, [](auto fptr){::fclose(fptr);});
 \end{codeblock}
 \end{example}
 

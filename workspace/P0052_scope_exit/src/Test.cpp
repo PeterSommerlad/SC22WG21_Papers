@@ -270,8 +270,9 @@ void test_unique_resource_semantics_reset() {
 
 void demonstrate_unique_resource_with_stdio() {
 	const std::string filename = "hello.txt";
+	auto fclose=[](auto fptr){::fclose(fptr);};
 	{
-		auto file = unique_resource(::fopen(filename.c_str(), "w"), &::fclose);
+		auto file = unique_resource(::fopen(filename.c_str(), "w"), fclose);
 		::fputs("Hello World!\n", file.get());
 		ASSERT(file.get()!= NULL);
 	}
@@ -285,15 +286,17 @@ void demonstrate_unique_resource_with_stdio() {
 	}
 	::unlink(filename.c_str());
 	{
-		auto file = make_unique_resource_checked(::fopen("nonexistentfile.txt", "r"), nullptr, &::fclose);
+		auto file = make_unique_resource_checked(::fopen("nonexistentfile.txt", "r"), nullptr, fclose);
 		ASSERT_EQUAL((FILE*)NULL, file.get());
 	}
 
 }
 void demonstrate_unique_resource_with_stdio_Cpp17() {
 	const std::string filename = "hello.txt";
+	auto fclose=[](auto fptr){::fclose(fptr);};
+
 	{
-		unique_resource file(::fopen(filename.c_str(), "w"), &::fclose);
+		unique_resource file(::fopen(filename.c_str(), "w"), fclose);
 		::fputs("Hello World!\n", file.get());
 		ASSERT(file.get()!= NULL);
 	}
@@ -307,7 +310,7 @@ void demonstrate_unique_resource_with_stdio_Cpp17() {
 	}
 	::unlink(filename.c_str());
 	{
-		auto file = make_unique_resource_checked(::fopen("nonexistentfile.txt", "r"), nullptr, &::fclose);
+		auto file = make_unique_resource_checked(::fopen("nonexistentfile.txt", "r"), nullptr, fclose);
 		ASSERT_EQUAL((FILE*)NULL, file.get());
 	}
 
@@ -315,8 +318,9 @@ void demonstrate_unique_resource_with_stdio_Cpp17() {
 
 void demontrate_unique_resource_with_POSIX_IO() {
 	const std::string filename = "./hello1.txt";
+	auto close=[](auto fd){::close(fd);};
 	{
-		auto file = unique_resource(::open(filename.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666), &::close);
+		auto file = unique_resource(::open(filename.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666), close);
 
 		::write(file.get(), "Hello World!\n", 12u);
 		ASSERT(file.get() != -1);
@@ -331,7 +335,7 @@ void demontrate_unique_resource_with_POSIX_IO() {
 	}
 	::unlink(filename.c_str());
 	{
-		auto file = make_unique_resource_checked(::open("nonexistingfile.txt", O_RDONLY), -1, &::close);
+		auto file = make_unique_resource_checked(::open("nonexistingfile.txt", O_RDONLY), -1, close);
 		ASSERT_EQUAL(-1, file.get());
 	}
 
@@ -339,10 +343,11 @@ void demontrate_unique_resource_with_POSIX_IO() {
 
 void demontrate_unique_resource_with_POSIX_IO_lvalue() {
 	const std::string filename = "./hello1.txt";
+	auto close=[](auto fd){::close(fd);};
 	{
 		auto fd = ::open(filename.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0666);
 
-		auto file = make_unique_resource_checked(fd,-1, &::close);
+		auto file = make_unique_resource_checked(fd,-1, close);
 		ASSERT(fd!=-1);
 		::write(file.get(), "Hello World!\n", 12u);
 		ASSERT(file.get() != -1);
@@ -358,7 +363,7 @@ void demontrate_unique_resource_with_POSIX_IO_lvalue() {
 	::unlink(filename.c_str());
 	{
 		auto fd=::open("nonexistingfile.txt", O_RDONLY);
-		auto file = make_unique_resource_checked(fd, -1, &::close);
+		auto file = make_unique_resource_checked(fd, -1, close);
 		ASSERT_EQUAL(-1, file.get());
 	}
 
