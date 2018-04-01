@@ -1,3 +1,9 @@
+/* This is free to take by whomever wants it
+ * WITHOUT ANY WARRANTY FOR ANYTHING!
+ *
+ * (c) Peter Sommerlad April 1st 2018
+ */
+
 #include "april_fool.h"
 #include "cute.h"
 #include "ide_listener.h"
@@ -41,10 +47,10 @@ void AssignTest(){
 void AddAssignTest(){
 	int i{21};
 	int j{};
-	ASSERT_EQUAL(42,AddAssign(i,j,21));
+	ASSERT_EQUAL(42,PlusAssign(i,j,21));
 	ASSERT_EQUAL(21,j);
 	ASSERT_EQUAL(42,i);
-	static_assert(std::is_same_v<decltype(i+=j+=21),decltype(AddAssign(i,j,42))>);
+	static_assert(std::is_same_v<decltype(i+=j+=21),decltype(PlusAssign(i,j,42))>);
 
 }
 void ostreamouttest(){

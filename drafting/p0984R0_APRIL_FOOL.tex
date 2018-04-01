@@ -121,6 +121,8 @@ In addition the standard library functional forgot to provide corresponding func
 \section{Deprecate Function Binders}
 Function binders need to be deprecated, they are superseded by the more convenient lambdas.
 
+\section{Example Implementaion}
+A (partial) implementation together with (fragmentary) test cases is available at \url{https://github.com/PeterSommerlad/SC22WG21_Papers/tree/master/workspace/AprilFool2018}.
 \chapter{Todos}
 \begin{itemize}
 \item
@@ -131,6 +133,9 @@ Pointer comparison total order as described in 23.14.7 [comparisons] p. 2 need t
 
 \item 
 There are many places (e.g., where the now deprecated function object class templates less<T> and equal_to<T> are used in the standard text. With default constructible capture-less lambdas those are now more easily replaceable by the corresponding type aliases \tcode{lessTea} and \tcode{equalTea}. Due to time constraints I could not figure out all places where they should be used instead and I do not have a compiler implementing default constructible lambdas handy. This paper only provides the synopsis of 23.14 with respect to the searchers as an example for the use of \tcode{equalTea}.
+
+\item
+The standard does not define \tcode{\&\&=} and \tcode{||=} to be available as fold operators. I do not know why. So the specification is not complete with respect to all binary operators. I did not dare to propose those as well, because there might have been reasons to forbid that, which are not pure oversight.
 
 \item
 This paper, while published April 1st, has some potential for real progress of the ISO \Cpp{} standard. Therefore, there needs to be determined how to proceed with the technical interesting ideas that could simplify the language and library.
@@ -307,8 +312,8 @@ namespace std {
   constexpr inline auto And = @\seebelow@ ; // \&\& and
   constexpr inline auto Or = @\seebelow@ ; // || or
 
-  constexpr inline auto Bitand = @\seebelow@ ; // \& bit_and
-  constexpr inline auto Bitor = @\seebelow@ ; // | bit_or
+  constexpr inline auto Bitand = @\seebelow@ ; // \& bitand
+  constexpr inline auto Bitor = @\seebelow@ ; // | bitor
   constexpr inline auto Xor = @\seebelow@ ; // \^{} xor
   constexpr inline auto Lshift = @\seebelow@ ; // <{}<
   constexpr inline auto Rshift = @\seebelow@ ; // >{}>
@@ -320,8 +325,6 @@ namespace std {
   constexpr inline auto TimesAssign = @\seebelow@ ; // *=
   constexpr inline auto DivideAssign = @\seebelow@ ; // /=
   constexpr inline auto RemainderAssign = @\seebelow@ ; // \%=
-  constexpr inline auto AndAssign = @\seebelow@ ; // \&\&=
-  constexpr inline auto OrAssign = @\seebelow@ ; // ||=
   constexpr inline auto And_eq = @\seebelow@ ; // \&=
   constexpr inline auto Or_eq = @\seebelow@ ; // |=
   constexpr inline auto Xor_eq = @\seebelow@ ; // \^{}=
@@ -582,8 +585,8 @@ name & operator \\
 \tcode{TimesAssign} & \tcode{*=} \\
 \tcode{DivideAssign} & \tcode{/=} \\
 \tcode{RemainderAssign} & \tcode{\%=} \\
-\tcode{AndAssign} & \tcode{\&\&=} \\
-\tcode{OrAssign} & \tcode{||=} \\
+%\tcode{AndAssign} & \tcode{\&\&=} \\
+%\tcode{OrAssign} & \tcode{||=} \\
 \tcode{And_eq} & \tcode{\&=} \\
 \tcode{Or_eq} & \tcode{|=} \\
 \tcode{Xor_eq} & \tcode{\^{}=} \\

@@ -1,8 +1,12 @@
 /*
  * april_fool.h
  *
- *  Created on: 28 Mar 2018
+ *  Created on: 1 Apr 2018
  *      Author: sop
+ * This is free to take by whomever wants it
+ * WITHOUT ANY WARRANTY FOR ANYTHING!
+ *
+ * (c) Peter Sommerlad April 1st 2018
  */
 
 #ifndef SRC_APRIL_FOOL_H_
@@ -222,14 +226,63 @@ namespace std_ex{
   	return (... || std::forward<decltype(l)>(l));
   };
 
+  //  constexpr inline auto Bitand = @\seebelow@ ; // \& bitand
+  //  constexpr inline auto Bitor = @\seebelow@ ; // | bitor
+  //  constexpr inline auto Xor = @\seebelow@ ; // \^{} xor
+  //  constexpr inline auto Lshift = @\seebelow@ ; // <{}<
+  //  constexpr inline auto Rshift = @\seebelow@ ; // >{}>
 
-constexpr auto Lshift=[](auto&&... l) constexpr
-noexcept(noexcept((... << std::declval<decltype(l)>())))
--> decltype((... << std::forward<decltype(l)>(l)
-		))
-{
-	return (... << std::forward<decltype(l)>(l));
-};
+  constexpr auto Bitand=[](auto&&... l) constexpr
+  noexcept(noexcept((... bitand std::declval<decltype(l)>())))
+  -> decltype((... bitand std::forward<decltype(l)>(l)
+  		))
+  {
+  	return (... bitand std::forward<decltype(l)>(l));
+  };
+  constexpr auto Bitor=[](auto&&... l) constexpr
+  noexcept(noexcept((... bitor std::declval<decltype(l)>())))
+  -> decltype((... bitor std::forward<decltype(l)>(l)
+  		))
+  {
+  	return (... bitor std::forward<decltype(l)>(l));
+  };
+  constexpr auto Xor=[](auto&&... l) constexpr
+  noexcept(noexcept((... xor std::declval<decltype(l)>())))
+  -> decltype((... xor std::forward<decltype(l)>(l)
+  		))
+  {
+  	return (... << std::forward<decltype(l)>(l));
+  };
+  constexpr auto Lshift=[](auto&&... l) constexpr
+  noexcept(noexcept((... << std::declval<decltype(l)>())))
+  -> decltype((... << std::forward<decltype(l)>(l)
+  		))
+  {
+  	return (... << std::forward<decltype(l)>(l));
+  };
+  constexpr auto Rshift=[](auto&&... l) constexpr
+  noexcept(noexcept((... >> std::declval<decltype(l)>())))
+  -> decltype((... >> std::forward<decltype(l)>(l)
+  		))
+  {
+  	return (... >> std::forward<decltype(l)>(l));
+  };
+
+//  constexpr inline auto Assign = @\seebelow@ ; // =
+//  constexpr inline auto PlusAssign = @\seebelow@ ; // +=
+//  constexpr inline auto MinusAssign = @\seebelow@ ; // -=
+//  constexpr inline auto TimesAssign = @\seebelow@ ; // *=
+//  constexpr inline auto DivideAssign = @\seebelow@ ; // /=
+//  constexpr inline auto RemainderAssign = @\seebelow@ ; // \%=
+//  constexpr inline auto AndAssign = @\seebelow@ ; // \&\&=
+//  constexpr inline auto OrAssign = @\seebelow@ ; // ||=
+//  constexpr inline auto And_eq = @\seebelow@ ; // \&=
+//  constexpr inline auto Or_eq = @\seebelow@ ; // |=
+//  constexpr inline auto Xor_eq = @\seebelow@ ; // \^{}=
+//  constexpr inline auto LshiftAssign = @\seebelow@ ; // <{}<=
+//  constexpr inline auto RrhiftAssign = @\seebelow@ ; // >{}>=
+
+
 constexpr auto Assign=[](auto&&... l) constexpr
 noexcept(noexcept((std::declval<decltype(l)>() = ... )))
 //-> decltype((std::forward<decltype(l)>(l) = ... )) // ICE with gcc 7.3
@@ -237,12 +290,89 @@ noexcept(noexcept((std::declval<decltype(l)>() = ... )))
 {
 	return (std::forward<decltype(l)>(l) = ... );
 };
-constexpr auto AddAssign=[](auto&&... l) constexpr
+constexpr auto PlusAssign=[](auto&&... l) constexpr
 noexcept(noexcept((std::declval<decltype(l)>() += ... )))
 -> decltype((std::forward<decltype(l)>(l) += ... ))
 {
 	return (std::forward<decltype(l)>(l) += ... );
 };
+constexpr auto MinusAssign=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() -= ... )))
+-> decltype((std::forward<decltype(l)>(l) -= ... ))
+{
+	return (std::forward<decltype(l)>(l) -= ... );
+};
+
+constexpr auto TimesAssign=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() *= ... )))
+-> decltype((std::forward<decltype(l)>(l) *= ... ))
+{
+	return (std::forward<decltype(l)>(l) *= ... );
+};
+
+constexpr auto DividesAssign=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() /= ... )))
+-> decltype((std::forward<decltype(l)>(l) /= ... ))
+{
+	return (std::forward<decltype(l)>(l) /= ... );
+};
+
+constexpr auto RemainderAssign=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() %= ... )))
+-> decltype((std::forward<decltype(l)>(l) %= ... ))
+{
+	return (std::forward<decltype(l)>(l) %= ... );
+};
+
+//constexpr auto AndAssign=[](auto&&... l) constexpr
+//noexcept(noexcept((std::declval<decltype(l)>() &&= ... )))
+//-> decltype((std::forward<decltype(l)>(l) &&= ... ))
+//{
+//	return (std::forward<decltype(l)>(l) &&= ... );
+//};
+//
+//constexpr auto OrAssign=[](auto&&... l) constexpr
+//noexcept(noexcept((std::declval<decltype(l)>() ||= ... )))
+//-> decltype((std::forward<decltype(l)>(l) ||= ... ))
+//{
+//	return (std::forward<decltype(l)>(l) ||= ... );
+//};
+
+constexpr auto And_eq=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() and_eq ... )))
+-> decltype((std::forward<decltype(l)>(l) and_eq ... ))
+{
+	return (std::forward<decltype(l)>(l) and_eq ... );
+};
+
+constexpr auto Or_eq=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() or_eq ... )))
+-> decltype((std::forward<decltype(l)>(l) or_eq ... ))
+{
+	return (std::forward<decltype(l)>(l) or_eq ... );
+};
+
+constexpr auto Xor_eq=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() xor_eq ... )))
+-> decltype((std::forward<decltype(l)>(l) xor_eq ... ))
+{
+	return (std::forward<decltype(l)>(l) xor_eq ... );
+};
+
+constexpr auto LshiftAssign=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() <<= ... )))
+-> decltype((std::forward<decltype(l)>(l) <<= ... ))
+{
+	return (std::forward<decltype(l)>(l) <<= ... );
+};
+
+constexpr auto RshiftAssign=[](auto&&... l) constexpr
+noexcept(noexcept((std::declval<decltype(l)>() >>= ... )))
+-> decltype((std::forward<decltype(l)>(l) >>= ... ))
+{
+	return (std::forward<decltype(l)>(l) >>= ... );
+};
+
 
 
 // ternary operator
