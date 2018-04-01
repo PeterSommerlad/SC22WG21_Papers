@@ -67,7 +67,7 @@ Target: & C++20\\\hline
 \end{tabular}
 
 \begin{abstract}
-Ban non-overloaded functions and \tcode{<functional>} function object class templates from the standard = simpler syntax
+Ban non-overloaded functions and \tcode{<functional>} function object class templates from the standard = simpler syntax and "eat your own dog food" in the standard library.
 \end{abstract}
 
 \chapter{Motivation}
@@ -115,6 +115,26 @@ void multiply_vector_new(){
 
 In addition the standard library functional forgot to provide corresponding function object class templates for a whole bunch of operators. Also using C++17 fold expressions one could do even more by providing n-ary function objects for the corresponding binary operators. This will also add to the versatility of the corresponding function objects.
 
+\section{Default constructible capture-less Lambdas}
+\url{https://wg21.link/P0624} introduced default constructible lambda types that allow using such global lambda objects to be used as default arguments to a variety of places where today \tcode{std::less<>} or \tcode{std::equal_to<>} are used.
+
+\section{Deprecate Function Binders}
+Function binders need to be deprecated, they are superseded by the more convenient lambdas.
+
+\chapter{Todos}
+\begin{itemize}
+\item
+LEWG needs to bikeshed the names.
+
+\item
+Pointer comparison total order as described in 23.14.7 [comparisons] p. 2 need to be defined for \tcode{Smaller} etc.
+
+\item 
+There are many places (e.g., where the now deprecated function object class templates less<T> and equal_to<T> are used in the standard text. With default constructible capture-less lambdas those are now more easily replaceable by the corresponding type aliases \tcode{lessTea} and \tcode{equalTea}. Due to time constraints I could not figure out all places where they should be used instead and I do not have a compiler implementing default constructible lambdas handy. This paper only provides the synopsis of 23.14 with respect to the searchers as an example for the use of \tcode{equalTea}.
+
+\item
+This paper, while published April 1st, has some potential for real progress of the ISO \Cpp{} standard. Therefore, there needs to be determined how to proceed with the technical interesting ideas that could simplify the language and library.
+\end{itemize}
 
 \chapter{April's Impact on the standard}
 
@@ -228,10 +248,10 @@ functions or constructors an implementation shall provide corresponding definiti
 
 Note my plan is to deprecate all existing function object class templates and replace them by the generic version of a lambda which is not only the syntactical convenient thing, but also the only thing that should work{\textsuperscript{{\scriptsize TM}}. Names of the lambda variables are uppercased at the moment to avoid confusion, but that is LEWG's bike shedding's call. 
 
-As a side effect, disregarding the space for the deprecated features section 23.14 becomes significantly shorter. One could also attempt to deprecate \tcode{bind}, but I leave that with LEWG and do not propose it right now.
+As a side effect, disregarding the space for the deprecated features section 23.14 becomes significantly shorter. 
  
 \section{23.14.1 Header <functional> synopsis [functional.syn]}
-Adjust the synopsis of [functional.syn] as follows. Move all removed definitions and declarations to appendix D.
+Adjust the synopsis of [functional.syn] as follows. Move all removed definitions and declarations to Annex D.
 
 \begin{codeblock}
 namespace std {
@@ -274,9 +294,12 @@ namespace std {
   constexpr inline auto Remainder = @\seebelow@ ; // \&
   
   constexpr inline auto Equal = @\seebelow@ ; // ==
+  using equalTea = decltype(Equal); // to replace equal_to<>
   constexpr inline auto Not_eq = @\seebelow@ ; // !=
   constexpr inline auto Bigger = @\seebelow@ ; // >
+  using moreTea = decltype(Bigger); // to replace greater<>
   constexpr inline auto Smaller = @\seebelow@ ; // <
+  using lessTea = decltype(Smaller); // to replace less<>
   constexpr inline auto Maybe_bigger = @\seebelow@ ; // >=
   constexpr inline auto Sometimes_smaller = @\seebelow@ ; // <=
   constexpr inline auto Spaceship = @\seebelow@ ; // <=>
@@ -287,8 +310,8 @@ namespace std {
   constexpr inline auto Bitand = @\seebelow@ ; // \& bit_and
   constexpr inline auto Bitor = @\seebelow@ ; // | bit_or
   constexpr inline auto Xor = @\seebelow@ ; // \^{} xor
-  constexpr inline auto Lshift = @\seebelow@ ; // <<
-  constexpr inline auto Rshift = @\seebelow@ ; // >>
+  constexpr inline auto Lshift = @\seebelow@ ; // <{}<
+  constexpr inline auto Rshift = @\seebelow@ ; // >{}>
   
   // right associative binary operators
   constexpr inline auto Assign = @\seebelow@ ; // =
@@ -366,6 +389,10 @@ namespace std {
   // \ref{func.notfn}, function template \tcode{not_fn}
   template<class F> @\unspec@ not_fn(F&& f);
 
+\end{codeblock}
+\begin{removedblock}
+\begin{codeblock}
+
   // \ref{func.bind}, bind
   template<class T> struct is_bind_expression;
   template<class T> struct is_placeholder;
@@ -384,6 +411,9 @@ namespace std {
                .
     @\seebelownc@ _@\placeholdernc{M}@;
   }
+\end{codeblock}
+\end{removedblock}
+\begin{codeblock}
  
   // \ref{func.memfn}, member function adaptors
   template<class R, class T>
@@ -408,32 +438,38 @@ namespace std {
     bool operator!=(nullptr_t, const function<R(ArgTypes...)>&) noexcept;
 
   // \ref{func.search}, searchers
-  template<class ForwardIterator, class BinaryPredicate = equal_to<>>
+  template<class ForwardIterator, class BinaryPredicate = equal@\added{Tea}\removed{_to<>}@>
     class default_searcher;
 
   template<class RandomAccessIterator,
            class Hash = hash<typename iterator_traits<RandomAccessIterator>::value_type>,
-           class BinaryPredicate = equal_to<>>
+           class BinaryPredicate = equal@\added{Tea}\removed{_to<>}@>
     class boyer_moore_searcher;
 
   template<class RandomAccessIterator,
            class Hash = hash<typename iterator_traits<RandomAccessIterator>::value_type>,
-           class BinaryPredicate = equal_to<>>
+           class BinaryPredicate = equal@\added{Tea}\removed{_to<>}@>
     class boyer_moore_horspool_searcher;
 
   // \ref{unord.hash}, hash function primary template
   template<class T>
     struct hash;
+\end{codeblock}
+\begin{removedblock}
+\begin{codeblock}
 
   // \ref{func.bind}, function object binders
   template<class T>
     inline constexpr bool is_bind_expression_v = is_bind_expression<T>::value;
   template<class T>
     inline constexpr int is_placeholder_v = is_placeholder<T>::value;
+\end{codeblock}
+\end{removedblock}
+\begin{codeblock}
 }
 \end{codeblock}
 
-Move the sections 23.14.6 [arithmetic.operations], 23.14.7 [comparisons], 23.14.8 [logical.operations], and 23.14.9 [bitwise.operations]j to Appendix D and replace them by the following new section 23.14.6.
+Move the sections 23.14.6 [arithmetic.operations], 23.14.7 [comparisons], 23.14.8 [logical.operations], and 23.14.9 [bitwise.operations]j to Annex D and replace them by the following new section 23.14.6.
 
 \begin{addedblock}
 \section{23.14.6 Function Objects for Operators as Lambdas [functional.fool]}
@@ -572,4 +608,8 @@ noexcept(noexcept(std::declval<decltype(c)>() ? std::declval<decltype(l)>() : st
 \end{itemdecl}
 
 \end{addedblock}
+
+\section{23.14.11 Function object binders [func.bind]}
+Move the whole content of [func.bind] and its subsections to Annex D.
+
 \end{document}

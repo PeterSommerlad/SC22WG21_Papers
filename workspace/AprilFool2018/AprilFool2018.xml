@@ -1,0 +1,12 @@
+<testsuites>
+	<testsuite name="AllTests" tests="8">
+		<testcase classname="AllTests" name="thisIsATest"/>
+		<testcase classname="AllTests" name="multiply_vector"/>
+		<testcase classname="AllTests" name="multiply_vector_new"/>
+		<testcase classname="AllTests" name="WtfTest"/>
+		<testcase classname="AllTests" name="AssignTest"/>
+		<testcase classname="AllTests" name="AddAssignTest"/>
+		<testcase classname="AllTests" name="ostreamouttest"/>
+		<testcase classname="AllTests" name="setLessTest"/>
+	</testsuite>
+</testsuites>
