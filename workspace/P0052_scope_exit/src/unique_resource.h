@@ -24,6 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 #include "_scope_guard_common.h"
+#include "scope_exit.h"
 #include <type_traits>
 
 #include <utility>
