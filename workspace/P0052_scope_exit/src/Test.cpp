@@ -657,6 +657,40 @@ void test_scope_exit_lvalue_ref_passing_rvalue_fails_to_compile(){
 
 }
 
+struct nasty{};
+
+struct deleter_2nd_throwing_copy {
+	deleter_2nd_throwing_copy()=default;
+	deleter_2nd_throwing_copy(deleter_2nd_throwing_copy const &other){
+		if (copied %2) {
+			throw nasty{};
+		}
+		++copied;
+	}
+	void operator()(int const & t) const {
+		++deleted;
+	}
+	static inline int deleted{};
+	static inline int copied{};
+};
+
+void test_sometimes_throwing_deleter_copy_ctor(){
+	using uid=unique_resource<int,deleter_2nd_throwing_copy>;
+	uid strange{1,deleter_2nd_throwing_copy{}};
+	ASSERT_EQUAL(0,deleter_2nd_throwing_copy::deleted);
+
+	strange.release();
+	ASSERT_EQUAL(0,deleter_2nd_throwing_copy::deleted);
+
+	try {
+		uid x{ std::move(strange)};
+		FAILM("should have thrown");
+	} catch(nasty const &){
+	}
+	ASSERT_EQUAL(0,deleter_2nd_throwing_copy::deleted);
+	ASSERT_EQUAL(1,deleter_2nd_throwing_copy::copied);
+}
+
 
 
 
@@ -695,6 +729,7 @@ void runAllTests(int argc, const char *argv[]) {
 	s.push_back(CUTE(testScopeExitWithCPP17DeducingCtors));
 	s.push_back(CUTE(testScopeFailWithCPP17DeducingCtors));
 	s.push_back(CUTE(testScopeSuccessWithCPP17DeducingCtors));
+	s.push_back(CUTE(test_sometimes_throwing_deleter_copy_ctor));
 	cute::xml_file_opener xmlfile(argc,argv);
 	cute::xml_listener<cute::ide_listener<> >  lis(xmlfile.out);
 	cute::makeRunner(lis,argc,argv)(s, "AllTests");

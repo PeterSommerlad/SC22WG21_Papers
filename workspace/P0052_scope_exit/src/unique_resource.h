@@ -91,7 +91,7 @@ public:
 			noexcept(noexcept(detail::_box<R>(that.resource.move(), detail::_empty_scope_exit {})) &&
 					 noexcept(detail::_box<D>(that.deleter.move(), detail::_empty_scope_exit {})))
 		: resource(that.resource.move(), detail::_empty_scope_exit { })
-		, deleter(that.deleter.move(), scope_exit([&, this] { that.get_deleter()(get());that.release(); }))
+		, deleter(that.deleter.move(), scope_exit([&, this] { if (that.execute_on_destruction) that.get_deleter()(get());that.release(); }))
 		, execute_on_destruction(std::exchange(that.execute_on_destruction, false))
 		{ }
 
