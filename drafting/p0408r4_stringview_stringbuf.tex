@@ -104,7 +104,7 @@ On the other hand, there is no means to construct a \tcode{basic_string} and mov
 \subsection{Changes from r3}
 To make the job of reviewing and integrating my stringstream adjustments easier, I incorporate the changes proposed in p0407r2 (allocator-aware basic\_stringbuf), since both papers have been forwarded by LEWG to LWG.
 \begin{itemize}
-\item Added full set of reasonable overloads to the constructors with and without allocator (string\&\&, Allocator) was missing previously, because of the lack of combination.
+\item Added full set of reasonable overloads to the constructors with and without allocator (\tcode{basic_string\&\&} does not get an allocator constructor template argument to allow efficient construction from \tcode{charT*} literals).
 \end{itemize}
 
 
@@ -197,9 +197,8 @@ Change each of the non-moving, non-deleted constructors to add a const-ref \tcod
       @\added{const Allocator\& a = Allocator()}@);
 \end{codeblock}
 \begin{addedblock}\begin{codeblock}
-    template<class SAlloc = Allocator>
     explicit basic_stringbuf(
-      basic_string<charT, traits, SAlloc>&& s,
+      basic_string<charT, traits, Allocator>&& s,
       ios_base::openmode which = ios_base::in | ios_base::out,
       const Allocator& a = Allocator());
 
@@ -212,9 +211,8 @@ Change each of the non-moving, non-deleted constructors to add a const-ref \tcod
       const Allocator& a)
       : basic_stringbuf(s, ios_base::openmode(ios_base::in | ios_base::out), a) { }
 
-    template<class SAlloc = Allocator>
     explicit basic_stringbuf(
-      basic_string<charT, traits, SAlloc>&& s,
+      basic_string<charT, traits, Allocator>&& s,
       const Allocator& a)
       : basic_stringbuf(std::move(s), ios_base::openmode(ios_base::in | ios_base::out), a) { }
 
@@ -240,8 +238,7 @@ Add the \tcode{view()} member function obtaining a \tcode{string_view} to the un
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
-    template<class SAlloc = Allocator>
-    void str(basic_string<charT, traits, SAlloc>&& s);
+    void str(basic_string<charT, traits, Allocator>&& s);
     basic_string<charT, traits, Allocator> str() &&;
     basic_string_view<charT, traits> view() const;
 \end{codeblock}
@@ -334,9 +331,8 @@ Add the following constructor specifications:
 
 \begin{insrt}
 \begin{itemdecl}
-template<class SAlloc = Allocator>
 explicit basic_stringbuf(
-  basic_string<charT, traits, SAlloc>&& s,
+  basic_string<charT, traits, Allocator>&& s,
   ios_base::openmode which = ios_base::in | ios_base::out,
   const Allocator\& a = Allocator());
 \end{itemdecl}
@@ -599,9 +595,8 @@ Add a new constructor overload and change the one taking the string by copy to a
 \end{codeblock}
 \begin{addedblock}\begin{codeblock}
 
-    template <class SAlloc = Allocator>
     explicit basic_istringstream(
-      basic_string<charT, traits, SAlloc>&& str,
+      basic_string<charT, traits, Allocator>&& str,
       ios_base::openmode which = ios_base::in,
       const Allocator& a = Allocator());
 
@@ -614,9 +609,8 @@ Add a new constructor overload and change the one taking the string by copy to a
       const Allocator& a)
       : basic_istringstream(str, ios_base::in, a) {}
 
-    template <class SAlloc = Allocator>
     explicit basic_istringstream(
-      basic_string<charT, traits, SAlloc>&& str,
+      basic_string<charT, traits, Allocator>&& str,
       const Allocator& a)
       : basic_istringstream(std::move(str), ios_base::in, a) {}
 \end{codeblock}\end{addedblock}
@@ -693,9 +687,8 @@ Add the following constructor specification:
 
 \begin{addedblock}
 \begin{itemdecl}
-template <class SAlloc = Allocator>
 explicit basic_istringstream(
-  basic_string<charT, traits, SAlloc>&& str,
+  basic_string<charT, traits, Allocator>&& str,
   ios_base::openmode which = ios_base::in,
   const Allocator& a = Allocator());
 \end{itemdecl}
@@ -783,9 +776,8 @@ Add a new constructor overload and change the one taking the string by copy to a
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
-    template <class SAlloc = Allocator>
     explicit basic_ostringstream(
-      basic_string<charT, traits, SAlloc>&& str,
+      basic_string<charT, traits, Allocator>&& str,
       ios_base::openmode which = ios_base::out,
       const Allocator& a = Allocator());
 
@@ -798,9 +790,8 @@ Add a new constructor overload and change the one taking the string by copy to a
       const Allocator& a)
       : basic_ostringstream(std, ios_base::out, a) {}
 
-    template <class SAlloc = Allocator>
     explicit basic_ostringstream(
-      basic_string<charT, traits, SAlloc>&& str,
+      basic_string<charT, traits, Allocator>&& str,
       const Allocator& a)
       : basic_ostringstream(std::move(str), ios_base::out, a) {}
 \end{codeblock}
@@ -888,9 +879,8 @@ and initializing \tcode{sb} with
 Add the following constructor specification:
 \begin{insrt}
 \begin{itemdecl}
-template<class SAlloc = Allocator>
 explicit basic_ostringstream(
-  const basic_string<charT, traits, SAlloc>&& str,
+  const basic_string<charT, traits, Allocator>&& str,
   ios_base::openmode which = ios_base::out,
   const Allocator& a = Allocator());
 \end{itemdecl}
@@ -978,9 +968,8 @@ Add a new constructor overload and change the one taking the string by copy to a
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
-	template<class SAlloc = Allocator>
     explicit basic_stringstream(
-      basic_string<charT, traits, SAlloc>&& str,
+      basic_string<charT, traits, Allocator>&& str,
       ios_base::openmode which = ios_base::in | ios_base::out, 
       const Allocator& a = Allocator());
 
@@ -993,9 +982,8 @@ Add a new constructor overload and change the one taking the string by copy to a
       const Allocator& a)
       : basic_stringstream(std, ios_base::openmode(ios_base::in | ios_base::out), a) {}
 
-    template <class SAlloc = Allocator>
     explicit basic_stringstream(
-      basic_string<charT, traits, SAlloc>&& str,
+      basic_string<charT, traits, Allocator>&& str,
       const Allocator& a)
       : basic_stringstream(std::move(str), ios_base::openmode(ios_base::in | ios_base::out), a) {}
 \end{codeblock}
@@ -1084,9 +1072,8 @@ with
 Add the following constructor specification:
 \begin{insrt}
 \begin{itemdecl}
-template<class SAlloc = Allocator>
 explicit basic_stringstream(
-  const basic_string<charT, traits, SAlloc>&& str,
+  const basic_string<charT, traits, Allocator>&& str,
   ios_base::openmode which = ios_base::in | ios_base::out, 
   const Allocator& a = Allocator());
 \end{itemdecl}
