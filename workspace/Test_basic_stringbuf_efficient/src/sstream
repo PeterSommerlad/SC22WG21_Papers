@@ -78,6 +78,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
       typedef basic_streambuf<char_type, traits_type>  	__streambuf_type;
       typedef basic_string<char_type, _Traits, _Alloc> 	__string_type;
+      template<typename _SAlloc>
+      using __string_tmpl = basic_string<char_type, _Traits, _SAlloc>;
       typedef typename __string_type::size_type		__size_type;
 
     protected:
@@ -110,25 +112,45 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  This constructor initializes the parent class using its
        *  own default ctor.
       */
+      template <typename __SAlloc>
       explicit
-      basic_stringbuf(__string_type  const & __str,
+      basic_stringbuf(__string_tmpl<__SAlloc>  const & __str,
 		      ios_base::openmode __mode = ios_base::in | ios_base::out
     		  , allocator_type const &a=allocator_type())
       : __streambuf_type(), _M_mode(), _M_string(__str.data(), __str.size(),a)
       { _M_stringbuf_init(__mode); }
 
+      template <typename __SAlloc>
+      explicit
+      basic_stringbuf(__string_tmpl<__SAlloc>   const & __str,
+    		   allocator_type const &a)
+      :basic_stringbuf(__str,ios_base::openmode(ios_base::in | ios_base::out),a){}
+
 #if __cplusplus >= 201103L
       explicit
-      basic_stringbuf(__string_type&& __str,
+      basic_stringbuf(__string_type && __str,
 		      ios_base::openmode __mode = ios_base::in | ios_base::out
     		  , allocator_type const &a=allocator_type())
       : __streambuf_type(), _M_mode(), _M_string(std::move(__str),a)
       { _M_stringbuf_init(__mode); }
 
+      explicit
+      basic_stringbuf(__string_type && __str,
+    		   allocator_type const &a)
+      :basic_stringbuf(std::move(__str),ios_base::openmode(ios_base::in | ios_base::out),a){}
+      explicit
+      basic_stringbuf(allocator_type const &a)
+      :basic_stringbuf(ios_base::openmode(ios_base::in | ios_base::out),a){}
+
+
+
 		basic_stringbuf(basic_stringbuf const &) = delete;
 
       basic_stringbuf(basic_stringbuf&& __rhs)
       : basic_stringbuf(std::move(__rhs), __xfer_bufptrs(__rhs, this))
+      { __rhs._M_sync(const_cast<char_type*>(__rhs._M_string.data()), 0, 0); }
+      basic_stringbuf(basic_stringbuf&& __rhs,allocator_type const &a)
+      : basic_stringbuf(std::move(__rhs), __xfer_bufptrs(__rhs, this),a)
       { __rhs._M_sync(const_cast<char_type*>(__rhs._M_string.data()), 0, 0); }
 
       // 27.8.2.2 Assign and swap:
@@ -174,9 +196,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if __cplusplus > 201402L
       template<typename _SAlloc=_Alloc>
       basic_string<char_type, _Traits, _SAlloc>
-      str(_SAlloc const &sa=_SAlloc{}) const 
+      str(_SAlloc const &sa=_SAlloc{}) const&
       {
-    	  using __my_ret_type= basic_string<char_type, _Traits, _SAlloc>; 
+    	  using __my_ret_type= basic_string<char_type, _Traits, _SAlloc>;
     	  __my_ret_type __ret{sa};
 	if (this->pptr())
 	  {
@@ -192,7 +214,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       }
 
       __string_type
-      pilfer() 
+      str() &&
       {
 	if (this->pptr())
 	  {
@@ -204,7 +226,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 					_M_string._M_set_length(this->egptr() - this->pbase());	    //__string_type(this->pbase(), this->egptr());
 				}
 	  }
-	__string_type ret=std::move(_M_string);
+	__string_type ret{std::move(_M_string)};
+	_M_string.clear();
 	_M_stringbuf_init(_M_mode);
 	return ret;
       }
@@ -417,9 +440,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
       // The move constructor initializes an __xfer_bufptrs temporary then
       // delegates to this constructor to performs moves during its lifetime.
-      basic_stringbuf(basic_stringbuf&& __rhs, __xfer_bufptrs&&)
+      basic_stringbuf(basic_stringbuf&& __rhs, __xfer_bufptrs&&, allocator_type const &a=allocator_type())
 		: __streambuf_type(static_cast<__streambuf_type const &>(__rhs)),
-      _M_mode(__rhs._M_mode), _M_string(std::move(__rhs._M_string))
+      _M_mode(__rhs._M_mode), _M_string(std::move(__rhs._M_string),a)
       { }
 #endif
     };
@@ -456,6 +479,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
       // Non-standard types:
       typedef basic_string<_CharT, _Traits, _Alloc> 	__string_type;
+      template<typename _SAlloc>
+      using __string_tmpl = basic_string<char_type, _Traits, _SAlloc>;
+
       typedef basic_stringbuf<_CharT, _Traits, _Alloc> 	__stringbuf_type;
       typedef basic_istream<char_type, traits_type>	__istream_type;
 
@@ -495,8 +521,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  That's a lie.  We initialize the base class with NULL, because the
        *  string class does its own memory management.
       */
+      template<typename _SAlloc>
       explicit
-      basic_istringstream(__string_type  const & __str,
+      basic_istringstream(__string_tmpl<_SAlloc>  const & __str,
 			  ios_base::openmode __mode = ios_base::in
     		  , allocator_type const &a=allocator_type())
       : __istream_type(), _M_stringbuf(__str, __mode | ios_base::in,a)
@@ -519,6 +546,19 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       : __istream_type(), _M_stringbuf(std::move(__str), __mode | ios_base::in,a)
       { this->init(&_M_stringbuf); }
 
+      explicit
+      basic_istringstream(allocator_type const &a)
+  	  : basic_istringstream(ios_base::in,a){}
+
+     template<typename _SAlloc>
+      explicit
+      basic_istringstream(__string_tmpl<_SAlloc>  const & __str,
+    		   allocator_type const &a)
+      	  : basic_istringstream(__str,ios_base::in,a){}
+      explicit
+      basic_istringstream(__string_type&& __str,
+			  allocator_type const &a)
+  	  : basic_istringstream(std::move(__str),ios_base::in,a){}
 
       basic_istringstream(basic_istringstream const &) = delete;
 
@@ -566,11 +606,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if 1//__cplusplus > 201402L
       template<typename _SAlloc=_Alloc>
       basic_string<_CharT, _Traits, _SAlloc>
-      str(_SAlloc const &sa=_SAlloc{}) const 
+      str(_SAlloc const &sa=_SAlloc{}) const&
       { return _M_stringbuf.str(sa); }
       __string_type
-      pilfer()  
-      { return _M_stringbuf.pilfer(); }
+      str() &&
+      { return std::move(_M_stringbuf).str(); }
   	using __string_view_type=basic_string_view<_CharT,_Traits>;
       __string_view_type
       view() const
@@ -635,6 +675,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
       // Non-standard types:
       typedef basic_string<_CharT, _Traits, _Alloc> 	__string_type;
+      template<typename _SAlloc>
+      using __string_tmpl = basic_string<char_type, _Traits, _SAlloc>;
       typedef basic_stringbuf<_CharT, _Traits, _Alloc> 	__stringbuf_type;
       typedef basic_ostream<char_type, traits_type>	__ostream_type;
 
@@ -674,13 +716,18 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  That's a lie.  We initialize the base class with NULL, because the
        *  string class does its own memory management.
       */
+      template<typename _SAlloc>
       explicit
-      basic_ostringstream(__string_type  const & __str,
+      basic_ostringstream(__string_tmpl<_SAlloc> const & __str,
 			  ios_base::openmode __mode = ios_base::out
     		  , allocator_type const &a=allocator_type())
       : __ostream_type(), _M_stringbuf(__str, __mode | ios_base::out,a)
       { this->init(&_M_stringbuf); }
-
+      template<typename _SAlloc>
+      explicit
+      basic_ostringstream(__string_tmpl<_SAlloc> const & __str
+    		  , allocator_type const &a)
+      	  :basic_ostringstream(__str, ios_base::out, a){}
       /**
        *  @brief  The destructor does nothing.
        *
@@ -697,6 +744,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
     		  , allocator_type const &a=allocator_type())
       : __ostream_type(), _M_stringbuf(std::move(__str), __mode | ios_base::out,a)
       { this->init(&_M_stringbuf); }
+      explicit
+      basic_ostringstream(__string_type&& __str
+    		  , allocator_type const &a)
+  	  :basic_ostringstream(__str, ios_base::out, a){}
+      explicit
+      basic_ostringstream(allocator_type const &a)
+  	  :basic_ostringstream(ios_base::out, a){}
 
 
       basic_ostringstream(basic_ostringstream const &) = delete;
@@ -745,11 +799,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if __cplusplus > 201402L
       template<typename _SAlloc=_Alloc>
       basic_string<_CharT, _Traits, _SAlloc>
-      str(_SAlloc const &sa=_SAlloc{}) const 
+      str(_SAlloc const &sa=_SAlloc{}) const&
       { return _M_stringbuf.str(sa); }
       __string_type
-      pilfer()
-      { return _M_stringbuf.pilfer(); }
+      str() &&
+      { return std::move(_M_stringbuf).str(); }
   	using __string_view_type=basic_string_view<_CharT,_Traits>;
       __string_view_type
       view() const
@@ -815,6 +869,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 
       // Non-standard Types:
       typedef basic_string<_CharT, _Traits, _Alloc> 	__string_type;
+      template<typename _SAlloc>
+      using __string_tmpl = basic_string<char_type, _Traits, _SAlloc>;
       typedef basic_stringbuf<_CharT, _Traits, _Alloc> 	__stringbuf_type;
       typedef basic_iostream<char_type, traits_type>	__iostream_type;
 
@@ -851,13 +907,18 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *  That's a lie.  We initialize the base class with NULL, because the
        *  string class does its own memory management.
       */
+      template<typename _SAlloc>
       explicit
-      basic_stringstream(__string_type  const & __str,
+      basic_stringstream(__string_tmpl<_SAlloc>  const & __str,
 			 ios_base::openmode __m = ios_base::out | ios_base::in
    		  , allocator_type const &a=allocator_type())
       : __iostream_type(), _M_stringbuf(__str, __m,a)
       { this->init(&_M_stringbuf); }
-
+      template<typename _SAlloc>
+      explicit
+      basic_stringstream(__string_tmpl<_SAlloc>  const & __str,
+   		   allocator_type const &a)
+      	  :basic_stringstream(__str, ios_base::openmode(ios_base::out | ios_base::in), a){}
       /**
        *  @brief  The destructor does nothing.
        *
@@ -874,6 +935,13 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
    		  , allocator_type const &a=allocator_type())
       : __iostream_type(), _M_stringbuf(std::move(__str), __m,a)
       { this->init(&_M_stringbuf); }
+      explicit
+      basic_stringstream( __string_type&& __str
+   		  , allocator_type const &a)
+  	  :basic_stringstream(std::move(__str), ios_base::openmode(ios_base::out | ios_base::in), a){}
+      explicit
+      basic_stringstream(allocator_type const &a)
+  	  :basic_stringstream(ios_base::openmode(ios_base::out | ios_base::in), a){}
 
 		basic_stringstream(basic_stringstream const &) = delete;
 
@@ -921,11 +989,11 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 #if __cplusplus > 201402L
       template<typename _SAlloc=_Alloc>
       basic_string<_CharT, _Traits, _SAlloc>
-      str(_SAlloc const &sa=_SAlloc{}) const 
+      str(_SAlloc const &sa=_SAlloc{}) const&
       { return _M_stringbuf.str(sa); }
       __string_type
-      pilfer() 
-      { return _M_stringbuf.pilfer(); }
+      str() &&
+      { return std::move(_M_stringbuf).str(); }
   	using __string_view_type=basic_string_view<_CharT,_Traits>;
       __string_view_type
       view() const
