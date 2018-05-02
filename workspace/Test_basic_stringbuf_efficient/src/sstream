@@ -251,6 +251,9 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       operator __string_view_type() const {
     	  return this->view();
       }
+      allocator_type get_allocator() const {
+    	  	  return _M_string.get_allocator();
+      }
 #else
       __string_type
       str() const

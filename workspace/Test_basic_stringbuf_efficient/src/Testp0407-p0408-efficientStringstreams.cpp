@@ -1,9 +1,70 @@
 #include "sstream"
+#include "FixedAllocator.h"
 #include "cute.h"
 #include "ide_listener.h"
 #include "xml_listener.h"
 #include "cute_runner.h"
 #include <chrono>
+#include <type_traits>
+#include <string>
+
+#include <utility>
+
+using imystream=std::basic_istringstream<char,std::char_traits<char>,fixed_allocator<char>>;
+using omystream=std::basic_ostringstream<char,std::char_traits<char>,fixed_allocator<char>>;
+using mystring=std::basic_string<char,std::char_traits<char>,fixed_allocator<char>>;
+
+static_assert(std::is_same_v<typename imystream::__string_type,mystring>,"template forward wrong");
+
+void testInputWithFixedAllocator(){
+	fixed_allocator<char> a;
+	char const * const start=a.loc();
+	mystring ms{"hibutlongenoughtobeatsmallstringoptimization"};
+	ASSERT_EQUAL((unsigned long long)ms.data(),(unsigned long long)start);
+
+	imystream in{"Hellobutlongenoughtobeatsmallstringoptimization world",a};
+	std::string s{};
+	in >> s;
+	auto rest=std::move(in).str();
+	ASSERT_EQUAL("Hellobutlongenoughtobeatsmallstringoptimization",s);
+	ASSERT_EQUAL("Hellobutlongenoughtobeatsmallstringoptimization world",rest);
+	ASSERT_EQUAL(rest.get_allocator(),in.rdbuf()->get_allocator());
+	ASSERT_EQUAL(a,rest.get_allocator());
+	ASSERT(rest.data() >= a.loc() && rest.data() < a.loc()+decltype(a)::SIZE);
+	static_assert(std::is_same_v<decltype(rest),mystring>,"forwardng of type murks");
+	decltype(a)::reset();
+}
+
+void testInputWithFixedAllocatorButStdString(){
+	fixed_allocator<char> a;
+	char const * const start=a.loc();
+	mystring ms{"hibutlongenoughtobeatsmallstringoptimization world",a};
+	ASSERT_EQUAL((unsigned long long)ms.data(),(unsigned long long)start);
+
+	std::istringstream in{ms};
+	mystring s{};
+	in >> s;
+	auto rest=in.str(a);
+	ASSERT_EQUAL("hibutlongenoughtobeatsmallstringoptimization",s.c_str());
+	ASSERT_EQUAL("hibutlongenoughtobeatsmallstringoptimization world",rest.c_str());
+	ASSERT_EQUAL(a,rest.get_allocator());
+	ASSERT(rest.data() >= a.loc() && rest.data() < a.loc()+decltype(a)::SIZE);
+	static_assert(std::is_same_v<decltype(rest),mystring>,"forwardng of type murks");
+	decltype(a)::reset();
+}
+void testOutputWithFixedAllocator(){
+	fixed_allocator<char> a;
+	char const * const start=a.loc();
+	omystream out{a};
+	out << 42 << " hibutlongenoughtobeatsmallstringoptimization";
+	mystring read{std::move(out).str()};
+	ASSERT_EQUAL("42 hibutlongenoughtobeatsmallstringoptimization",read.c_str());
+	ASSERT_EQUAL(start,read.c_str());
+	ASSERT_EQUAL(0,out.str().size());
+	decltype(a)::reset();
+}
+
+
 
 void thisIsATest() {
 	std::string s{"input"};
@@ -162,6 +223,9 @@ void runAllTests(int argc, char const *argv[]){
 	s.push_back(CUTE(testFromLiteral));
 	s.push_back(CUTE(testIfReallyMovedFromLargeString));
 	s.push_back(CUTE(testIfstringbufCtorOverloadsWork));
+	s.push_back(CUTE(testInputWithFixedAllocator));
+	s.push_back(CUTE(testInputWithFixedAllocatorButStdString));
+	s.push_back(CUTE(testOutputWithFixedAllocator));
 	cute::xml_file_opener xmlfile(argc,argv);
 	cute::xml_listener<cute::ide_listener<> >  lis(xmlfile.out);
 	cute::makeRunner(lis,argc,argv)(s, "AllTests");
