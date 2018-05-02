@@ -1,7 +1,7 @@
 /*********************************************************************************
  * This file is part of CUTE.
  *
- * Copyright (c) 2007-2017 Peter Sommerlad, IFS
+ * Copyright (c) 2016-2017 Peter Sommerlad, IFS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,19 +23,24 @@
  *
  *********************************************************************************/
 
-#ifndef CUTE_LISTENER_H_
-#define CUTE_LISTENER_H_
-#include "cute_base.h"
-#include "cute_suite.h"
-namespace cute {
-	struct null_listener{ // defines Contract of runner parameter
-		void begin(suite const &, char const * /*info*/, size_t /*n_of_tests*/){}
-		void end(suite const &, char const * /*info*/){}
-		void start(test const &){}
-		void success(test const &,char const * /*msg*/){}
-		void failure(test const &,test_failure const &){}
-		void error(test const &,char const * /*what*/){}
-	};
-}
-#endif /* CUTE_LISTENER_H_ */
+#ifndef CUTE_DEPRECATED_H_
+#define CUTE_DEPRECATED_H_
 
+#if __cplusplus >= 201402L
+#define DEPRECATE(orig, repl) [[deprecated ("Use "#repl" instead.")]] inline void orig() {}
+#elif defined(__GNUG__)
+#define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+#if GCC_VERSION >= 40500 || defined(__clang__)
+#define DEPRECATE(orig, repl) __attribute__((deprecated("Use "#repl" instead."))) inline void orig() {}
+#else
+#define DEPRECATE(orig, repl) __attribute__((deprecated)) inline void orig() {}
+#endif
+#elif defined(_MSC_VER)
+#define DEPRECATE(orig, repl) __declspec(deprecated(#orig" is deprecated, use "#repl" instead.")) inline void orig() {}
+#endif
+
+#ifdef DEPRECATE
+#define DEPRECATED(name) name()
+#endif
+
+#endif /*CUTE_DEPRECATED_H_*/

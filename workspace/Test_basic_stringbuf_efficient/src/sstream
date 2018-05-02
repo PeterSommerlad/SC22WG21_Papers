@@ -26,6 +26,8 @@
  *  This is a Standard C++ Library header.
  */
 
+// ajdustments by Peter Sommerald for https://wg21.ling/p0407 and https://wg21.link/p0408
+
 //
 // ISO C++ 14882: 27.7  String-based streams
 //
