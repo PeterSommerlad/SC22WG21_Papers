@@ -3,7 +3,7 @@
 #include "xml_listener.h"
 #include "cute_runner.h"
 
-void thisIsATest() {
+void InsaneBool() {
 	ASSERTM("start writing tests", false);	
 }
 void newTestFunction(){
@@ -14,7 +14,7 @@ void newTestFunction(){
 bool runAllTests(int argc, char const *argv[]) {
 	cute::suite s { };
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(InsaneBool));
 	s.push_back(CUTE(newTestFunction));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<>> lis(xmlfile.out);

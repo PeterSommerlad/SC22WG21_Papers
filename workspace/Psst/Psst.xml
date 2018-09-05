@@ -1,7 +1,23 @@
 <testsuites>
-	<testsuite name="AllTests" tests="3">
-		<testcase classname="AllTests" name="thisIsATest"/>
+	<testsuite name="AllTests" tests="15">
+		<testcase classname="AllTests" name="InsaneBool"/>
 		<testcase classname="AllTests" name="testWithStringBase"/>
-		<testcase classname="AllTests" name="testEmpty"/>
+		<testcase classname="AllTests" name="testSizeworks"/>
+		<testcase classname="AllTests" name="testRelativeOps::testWidthDConstructionEq"/>
+		<testcase classname="AllTests" name="testRelativeOps::testWidthDMultiplyWith"/>
+		<testcase classname="AllTests" name="testRelativeOps::testWidthDAddable"/>
+		<testcase classname="AllTests" name="testRelativeOps::testWidthDSubtractable"/>
+		<testcase classname="AllTests" name="testRelativeOps::testWidthDivides"/>
+		<testcase classname="AllTests" name="testRelativeOps::testDiffCtorEq"/>
+		<testcase classname="AllTests" name="testUPlus"/>
+		<testcase classname="AllTests" name="testUMinus"/>
+		<testcase classname="AllTests" name="testUInc"/>
+		<testcase classname="AllTests" name="testUDec"/>
+		<testcase classname="AllTests" name="testBoolConverts"/>
+		<testcase classname="AllTests" name="testWaitCounter">
+			<failure message="../src/Test.cpp:187 testWaitCounter: 3 == c.val expected:	3	but was:	2	">
+testWaitCounter: 3 == c.val expected:	3	but was:	2	
+			</failure>
+		</testcase>
 	</testsuite>
 </testsuites>

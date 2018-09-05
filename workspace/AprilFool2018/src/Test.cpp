@@ -16,7 +16,7 @@
 
 using namespace std_ex;
 
-void thisIsATest() {
+void InsaneBool() {
 	constexpr auto x = Plus(35,7);
 	ASSERT_EQUAL(42,x);
 	ASSERT_EQUAL(-42,Negate(x));
@@ -75,7 +75,7 @@ void setLessTest(){
 bool runAllTests(int argc, char const *argv[]) {
 	cute::suite s { };
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(InsaneBool));
 	s.push_back(CUTE(multiply_vector));
 	s.push_back(CUTE(multiply_vector_new));
 	s.push_back(CUTE(WtfTest));
@@ -91,5 +91,7 @@ bool runAllTests(int argc, char const *argv[]) {
 }
 
 int main(int argc, char const *argv[]) {
+	auto endl=static_cast<std::ostream&(*)(std::ostream&)>(std::endl);
+	std_ex::Lshift(std::cout,"Hello",' ',"World!",endl,"The Answer is: ",6*7,endl);
     return runAllTests(argc, argv) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

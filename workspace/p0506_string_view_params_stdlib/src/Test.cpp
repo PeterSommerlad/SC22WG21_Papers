@@ -131,7 +131,7 @@ quotedsv( wstring_view __string,
 	}
 
 
-void thisIsATest() {
+void InsaneBool() {
 	std::ext::bitset<32> b{"01010101"sv};
 	std::ext::bitset<32> c("01010101"sv);
 	ASSERT_EQUAL(std::ext::bitset<32>{},(b^c));
@@ -140,7 +140,7 @@ void thisIsATest() {
 bool runAllTests(int argc, char const *argv[]) {
 	cute::suite s { };
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(InsaneBool));
 	s.push_back(CUTE(testQuotedSV));
 	s.push_back(CUTE(testQuotedSVcharPtr));
 	s.push_back(CUTE(testQuotedSVstring));

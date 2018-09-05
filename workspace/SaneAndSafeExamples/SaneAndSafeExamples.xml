@@ -1,0 +1,15 @@
+<testsuites>
+	<testsuite name="AllTests" tests="3">
+		<testcase classname="AllTests" name="InsaneBool">
+			<failure message="../src/Test.cpp:26 InsaneBool: &quot;&quot; == theanswer expected:		but was:	no	">
+InsaneBool: &quot;&quot; == theanswer expected:		but was:	no	
+			</failure>
+		</testcase>
+		<testcase classname="AllTests" name="InterestingSetDouble">
+			<failure message="../src/Test.cpp:36 InterestingSetDouble: v.size()*v.size() == s.size() expected:	16	but was:	1	">
+InterestingSetDouble: v.size()*v.size() == s.size() expected:	16	but was:	1	
+			</failure>
+		</testcase>
+		<testcase classname="AllTests" name="NicoVectorCTADEx"/>
+	</testsuite>
+</testsuites>
