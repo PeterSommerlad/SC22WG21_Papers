@@ -51,7 +51,7 @@
 \input{macros}
 \input{layout}
 \input{styles}
-\newcommand{\iref}[1]{[#1]}
+\renewcommand{\iref}[1]{[#1]}
 
 
 \pagestyle{myheadings}
@@ -493,7 +493,7 @@ in neither input nor output mode and a zero length \tcode{basic_string} is retur
 
 \pnum % taken from container.requirements.general p.17
 \constraints 
-This function does not participate in overload resolution, unless \tcode{SAlloc} satisfies both of the following conditions:
+This function does not participate in overload resolution, unless \tcode{SAlloc} satisfies both of the following conditions: 
 
 \begin{itemize}
 \item The \grammarterm{qualified-id} \tcode{SAlloc::value_type}
