@@ -88,7 +88,7 @@ void testOutputWithFixedAllocator(){
 
 
 
-void InsaneBool() {
+void thisIsATest() {
 	std::string s{"input"};
 	std::istringstream in{std::move(s)};
 	in >> s;
@@ -224,6 +224,21 @@ void test_str_from_rvalue_moved_out_with_seek(){
 	ASSERT_EQUAL(0,out.view().size());
 }
 
+void test_str_with_another_allocator(){
+	char const * const msg="hello, world\n";
+	std::ostringstream out{};
+	out << msg;
+	fixed_allocator<char> alloc{};
+	mystring s{std::move(*out.rdbuf()).str(alloc)};
+	ASSERT_EQUAL(msg,s.c_str());
+}
+void test_str_with_invalit_allocator(){
+	std::ostringstream out{};
+	out << "hello";
+	auto x = out.str(42); // should not compile
+}
+
+
 
 
 
@@ -231,7 +246,7 @@ void test_str_from_rvalue_moved_out_with_seek(){
 void runAllTests(int argc, char const *argv[]){
 	cute::suite s;
 	//TODO add your test here
-	s.push_back(CUTE(InsaneBool));
+	s.push_back(CUTE(thisIsATest));
 	s.push_back(CUTE(test_to_stringview_from_stringbuf));
 	s.push_back(CUTE(test_to_stringview_from_ostream));
 	s.push_back(CUTE(test_to_stringview_from_partially_read_written_stringstream));
@@ -248,6 +263,8 @@ void runAllTests(int argc, char const *argv[]){
 	s.push_back(CUTE(testInputWithFixedAllocator));
 	s.push_back(CUTE(testInputWithFixedAllocatorButStdString));
 	s.push_back(CUTE(testOutputWithFixedAllocator));
+	s.push_back(CUTE(test_str_with_another_allocator));
+	s.push_back(CUTE(test_str_with_invalit_allocator));
 	cute::xml_file_opener xmlfile(argc,argv);
 	cute::xml_listener<cute::ide_listener<> >  lis(xmlfile.out);
 	cute::makeRunner(lis,argc,argv)(s, "AllTests");

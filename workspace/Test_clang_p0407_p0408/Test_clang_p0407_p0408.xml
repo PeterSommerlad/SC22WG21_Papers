@@ -1,5 +1,5 @@
 <testsuites>
-	<testsuite name="AllTests" tests="17">
+	<testsuite name="AllTests" tests="18">
 		<testcase classname="AllTests" name="thisIsATest"/>
 		<testcase classname="AllTests" name="test_to_stringview_from_stringbuf"/>
 		<testcase classname="AllTests" name="test_to_stringview_from_ostream"/>
@@ -17,5 +17,10 @@
 		<testcase classname="AllTests" name="testInputWithFixedAllocator"/>
 		<testcase classname="AllTests" name="testInputWithFixedAllocatorButStdString"/>
 		<testcase classname="AllTests" name="testOutputWithFixedAllocator"/>
+		<testcase classname="AllTests" name="test_str_with_an_invalid_non_allocator_argument">
+			<failure message="../src/Test_clang_p0407-p0408-efficientStringstreams.cpp:233 test_str_with_an_invalid_non_allocator_argument: &quot;hello world\\n&quot; == s.c_str() expected:	hello world\n	but was:	hello, world\n	">
+test_str_with_an_invalid_non_allocator_argument: &quot;hello world\\n&quot; == s.c_str() expected:	hello world\n	but was:	hello, world\n	
+			</failure>
+		</testcase>
 	</testsuite>
 </testsuites>

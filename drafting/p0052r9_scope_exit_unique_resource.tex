@@ -56,8 +56,8 @@
 
 %%%%
 
-\newcommand{\papernumber}{p0052r8}
-\newcommand{\paperdate}{2018-04-24}
+\newcommand{\papernumber}{p0052r9}
+\newcommand{\paperdate}{2018-10-01}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -76,6 +76,14 @@ Audience: & LWG\\\hline
 \end{tabular}
 
 \chapter{History}
+\section{Changes from P0052R8}
+Incorporates changes suggested in wording review from LWG meeting in Batavia, August 2018.
+\begin{itemize}
+\item update specification section names as of changes made to the working paper after Rapperswil (Requires->(Mandates (compile-time), Expects(contract)), Remarks->Constraints
+\item may be: "macros" for \textit{\tcode{DESTROY}} and \textit{\tcode{RESOURCE}} in \tcode{unique_resource} specification
+\end{itemize}
+
+
 \section{Changes from P0052R7}
 Found a bug in my implementation of \tcode{unique_resource}'s move constructor that was unfortunately also present in the spec R7. If we move from an already \tcode{release()}d \tcode{unique_resource} and the \tcode{deleter}'s copy constructor throws the \tcode{deleter} is called on the moved resource, even so it was already released. Updated the note to also say it guarantees not only no leaking but also no double-release of the resource.
 

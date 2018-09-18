@@ -51,14 +51,14 @@
 \input{macros}
 \input{layout}
 \input{styles}
-%\newcommand{\iref}[1]{[#1]}
+\newcommand{\iref}[1]{[#1]}
 
 
 \pagestyle{myheadings}
 
 
-\newcommand{\papernumber}{p0408r5}
-\newcommand{\paperdate}{2018-09-10}
+\newcommand{\papernumber}{p0408r4}
+\newcommand{\paperdate}{2018-05-01}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -100,9 +100,6 @@ C++17 and library TS have \tcode{basic_string_view} allowing an efficient read-o
 On the other hand, there is no means to construct a \tcode{basic_string} and move from it into a \tcode{basic_stringbuf} via a constructor or a move-enabled overload of \tcode{str(basic_string \&\&)}.
 
 \section{History}
-
-\subsection{Changes from r4}
-
 
 \subsection{Changes from r3}
 To make the job of reviewing and integrating my stringstream adjustments easier, I incorporate the changes proposed in p0407r2 (allocator-aware basic\_stringbuf), since both papers have been forwarded by LEWG to LWG.
@@ -493,6 +490,19 @@ the
 the call are now considered uninitialized (except for those characters re-initialized
 by the new \tcode{basic_string}). Otherwise the \tcode{basic_stringbuf} has been created
 in neither input nor output mode and a zero length \tcode{basic_string} is returned. 
+
+\pnum % taken from container.requirements.general p.17
+\constraints 
+This function does not participate in overload resolution, unless \tcode{SAlloc} satisfies both of the following conditions:
+
+\begin{itemize}
+\item The \grammarterm{qualified-id} \tcode{SAlloc::value_type}
+is valid and denotes a type\iref{temp.deduct}.
+
+\item The expression \tcode{declval<SAlloc\&>().allocate(size_t\{\})}
+is well-formed when treated as an unevaluated operand.
+\end{itemize}
+
 \end{itemdescr}
 
 Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{view() const} member function.:
