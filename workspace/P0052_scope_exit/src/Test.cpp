@@ -48,7 +48,7 @@ using std::experimental::scope_exit;
 using std::experimental::scope_fail;
 using std::experimental::scope_success;
 
-void thisIsATest() {
+void InsaneBool() {
 	std::ostringstream out { };
 	{
 		auto guard = scope_exit([&] {out << "done\n";});
@@ -697,7 +697,7 @@ void test_sometimes_throwing_deleter_copy_ctor(){
 void runAllTests(int argc, const char *argv[]) {
 	cute::suite s;
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(InsaneBool));
 	s.push_back(CUTE(testscopeExitWithNonAssignableResourceAndReset));
 	s.push_back(CUTE(testCompilabilityGuardForPointerTypes));
 	s.push_back(CUTE(testTalkToTheWorld));

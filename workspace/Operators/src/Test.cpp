@@ -40,7 +40,7 @@ struct nonaddable: Ops<nonaddable>{
 
 };
 
-void thisIsATest() {
+void InsaneBool() {
 	addable one{1};
 	addable two = one+one;
 	ASSERT_EQUAL(2,two.operator int());
@@ -56,7 +56,7 @@ void nonaddableTest_compile_error(){
 bool runAllTests(int argc, char const *argv[]) {
 	cute::suite s { };
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(InsaneBool));
 	s.push_back(CUTE(nonaddableTest_compile_error));
 	cute::xml_file_opener xmlfile(argc, argv);
 	cute::xml_listener<cute::ide_listener<>> lis(xmlfile.out);

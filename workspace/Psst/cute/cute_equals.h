@@ -52,7 +52,7 @@ namespace cute {
 		template <typename ExpectedValue, typename ActualValue, bool select_non_floating_point_type>
 		bool do_equals_floating(ExpectedValue const &expected
 					,ActualValue const &actual,const impl_place_for_traits::integral_constant<bool, select_non_floating_point_type>&){
-			return expected==actual; // normal case for most types uses operator==!
+			return bool(expected==actual); // normal case for most types uses operator==!
 		}
 		template <typename ExpectedValue, typename ActualValue>
 		bool do_equals_floating(ExpectedValue const &expected
