@@ -88,7 +88,7 @@ void testOutputWithFixedAllocator(){
 
 
 
-void thisIsATest() {
+void simpleminimum() {
 	std::string s{"input"};
 	std::istringstream in{std::move(s)};
 	in >> s;
@@ -231,7 +231,7 @@ void test_str_from_rvalue_moved_out_with_seek(){
 void runAllTests(int argc, char const *argv[]){
 	cute::suite s;
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(simpleminimum));
 	s.push_back(CUTE(test_to_stringview_from_stringbuf));
 	s.push_back(CUTE(test_to_stringview_from_ostream));
 	s.push_back(CUTE(test_to_stringview_from_partially_read_written_stringstream));

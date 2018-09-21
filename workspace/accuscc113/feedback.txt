@@ -1,0 +1,27 @@
+This program consists of several bad practices and undefined behavior.
+
+The working on some platforms is because those platforms push arguments on the stack in consecutive addresses from the
+first to the last. This was pure luck.
+
+C++ lacks a feature of more dynamic languages that treat variadic arguments as sequence container, such as
+Java or Python. 
+
+But let's start from the top:
+
+A. putting functions in the same translation unit as main() makes them inaccessible to unit tests
+
+line 5: variadic templates as defined in the template parameter list allow arbitrary types. 
+line 6: thus returning T, where any of the Ts is not convertible to the type of the first argument it won't compile
+line 8: std::sort is not the correct algorithm to use to find the minimum of a list of values, because it does too much.
+        std::min would be the better algorithm to use it provides linear complexity guarantee instead of the n*log(n) 
+        average complexity of sort.
+line 9: as said above arbitrary passing pointers to arguments and let sort interpret them as a range is undefined behavior
+        even if the arguments are in a sequence on the stack and of the same type, using the addresses is not a valid range
+        For example, comparing pointers that do not refer to elemens in the same object or array is undefined behavior, and
+        any range-algorithm is comparing the iterators (pointers) internally to detect completeness.
+main (16/18/21): using std::endl to get a newline in output is often inefficient. use '\n' to output a newline. 
+        std::endl is also flushing the output buffer and thus requires an operating system roundtrip
+        
+Now after all these problems, how would a function that gives the minimum of a list of arguments of the same value look like?
+
+

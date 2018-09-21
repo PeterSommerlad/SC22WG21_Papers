@@ -88,7 +88,7 @@ void testOutputWithFixedAllocator(){
 
 
 
-void thisIsATest() {
+void simpleminimum() {
 	std::string s{"input"};
 	std::istringstream in{std::move(s)};
 	in >> s;
@@ -235,7 +235,7 @@ void test_str_with_another_allocator(){
 void test_str_with_invalit_allocator(){
 	std::ostringstream out{};
 	out << "hello";
-	auto x = out.str(42); // should not compile
+	//auto x = out.str(42); // should not compile
 }
 
 
@@ -246,7 +246,7 @@ void test_str_with_invalit_allocator(){
 void runAllTests(int argc, char const *argv[]){
 	cute::suite s;
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(simpleminimum));
 	s.push_back(CUTE(test_to_stringview_from_stringbuf));
 	s.push_back(CUTE(test_to_stringview_from_ostream));
 	s.push_back(CUTE(test_to_stringview_from_partially_read_written_stringstream));
