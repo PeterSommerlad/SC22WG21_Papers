@@ -57,8 +57,8 @@
 \pagestyle{myheadings}
 
 
-\newcommand{\papernumber}{p0408r4}
-\newcommand{\paperdate}{2018-05-01}
+\newcommand{\papernumber}{p0408r5}
+\newcommand{\paperdate}{2018-10-01}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -100,6 +100,17 @@ C++17 and library TS have \tcode{basic_string_view} allowing an efficient read-o
 On the other hand, there is no means to construct a \tcode{basic_string} and move from it into a \tcode{basic_stringbuf} via a constructor or a move-enabled overload of \tcode{str(basic_string \&\&)}.
 
 \section{History}
+
+\subsection{Changes from r4}
+Incorporate suggestions from LWG review in Batavia, August 2018. This was the first time the combined proposal was reviewed.
+\begin{itemize}
+\item Adjust specification sections to new naming schema introduced at the Rapperswil Meeting 2018 for C++20. (Requires->(Mandates (compile-time), Expects(contract)), Remarks->Constraints)
+
+\item overload constructors with default arguments to only have the single argument version explicit.
+\item introduce an exposition-only member function in \tcode{basic_stringbuf} to set the streambuf pointers (in the original version, that was part of the \tcode{str(string)} member function and now is needed in more than one place.
+\item reduce clutter, since bit operations are possible in enum \tcode{ios_base::openmode} parameters.
+\end{itemize}
+
 
 \subsection{Changes from r3}
 To make the job of reviewing and integrating my stringstream adjustments easier, I incorporate the changes proposed in p0407r2 (allocator-aware basic\_stringbuf), since both papers have been forwarded by LEWG to LWG.
@@ -148,8 +159,14 @@ This is an extension to the API of \tcode{basic_stringbuf}, \tcode{basic_strings
 
 \removed{This paper addresses both Library Fundamentals TS 3 and C++Next (2020?).} 
 When added to the standard draft with p0448 (spanstream), section [depr.str.strstreams] should be removed.
+
+
 \chapter{Design Decisions}
 After experimentation I decided that substituting the \tcode{(basic_string<charT,traits,Allocator const \&)} constructors in favor of passing a \tcode{basic_string_view} would lead to ambiguities with the new move-from-string constructors.
+
+\section{Hint to implementers}
+In both libc++ and libstdc++ I needed to make basic_stringbuf a friend of basic_string to allow efficient growth of the buffer beyond the current string length (breaking an invariant) until it is retrieved using one of the str() member functions. Other implementations might use a different strategy of caring for the buffer space that should be efficiently be adopted by the returned string object, thus requiring either special constructors or access to internals as well.
+
 \section{Open Issues to be discussed by LWG}
 Note: this list includes the discussion of p0407 features.
 \begin{itemize}
