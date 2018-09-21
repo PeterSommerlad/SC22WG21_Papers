@@ -1,0 +1,179 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
+\usepackage[final]
+           {listings}     % code listings
+%\usepackage{longtable}    % auto-breaking tables
+%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+%\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+\usepackage[final]{microtype}
+%\usepackage{multicol}
+\usepackage{xspace}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+
+%%%% reuse all three from std.tex:
+\input{macros}
+\input{layout}
+\input{styles}
+
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{dXXXX}
+\newcommand{\paperdate}{2018-07-10}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - Safe and Sane C++ Classes}
+\author{Peter Sommerlad}
+\date{\paperdate}                % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{center}
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number:&  \papernumber \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++ / Programming Language Vulnerabilities C++\\\hline 
+Audience: & SG12 / ISO SC22 WG23\\\hline
+\end{tabular}
+\end{center}
+\chapter{Introduction}
+A guiding principle should be "easy to use, hard to misuse". An additional principle should be clear separation of concern and clear separation of purpose. Mixing categories, like values and objects, in a single type can be doomed, or at least hard-to-get-right expert territory.
+\begin{description}
+\item [Value Types] - Regular types, built-in
+\item [Empty Classes] - Tags, (CRTP-)super-Mix-ins and sub-classing-Adapters
+\item [Managing Classes] - RAII, Manager objects, Containers
+\item [OO-Polymorphic Classes] - better non-copyable!
+\item [Referring Types] - References, (smart) pointers, string_view, span
+\item [combinations] - expert territory, e.g., manager as value type, usage should be clear
+\item [less sane variations] - e.g., copyable OO hierarchy types (deep or shallow), referring types as members, subclassing adapters 
+\end{description}
+\begin{table}[htp]
+\caption{Howard Hinnant's special member functions table}
+\begin{center}
+\begin{tabular}{|c||c|c|c|c|c|c||c|}
+ &\multicolumn{6}{c}{What the compiler provides for class X}& \\
+ user\newline{}declares   & {\tcode{X()}} & {\tcode{\~X()}} & {\tcode{X(X const\&)}} & {\tcode{=(X const\&)}} & {\tcode{X(X \&\&)}} & {\tcode{=(X \&\&)}} &   OK? \\
+\hline
+ nothing & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & OK \\
+\hline
+\tcode{X(T)} & not decl& \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & OK \\
+\hline
+\tcode{X()} & \textit{declared} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & (OK) \\
+\hline
+\tcode{\~X()} & \tcode{=default} & \textit{declared} & \color{red}\tcode{=default} & \color{red}\tcode{=default} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{X(X const\&)} & not decl& \tcode{=default} & \textit{declared} & \color{red}\tcode{=default} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{=(X const\&)} & \tcode{=default} & \tcode{=default} & \color{red}\tcode{=default} & \textit{declared} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{X(X\&\&)} & not decl& \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & \textit{declared} & not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{=(X\&\&)} & \tcode{=default} & \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & not decl& \textit{declared} & {(BAD)} \\
+\hline
+\end{tabular}
+\end{center}
+\label{default}
+\end{table}%
+
+\begin{table}[htp]
+\caption{Safe and Sane combinations of Special Member Functions (TODO)}
+\begin{center}
+\begin{tabular}{|c||c|c|c|c|c|c||c|}
+ &\multicolumn{6}{c}{declared or provided}& \\
+type category & {\tcode{X()}} & {\tcode{\~X()}} & {\tcode{X(X const\&)}} & {\tcode{=(X const\&)}} & {\tcode{X(X \&\&)}} & {\tcode{=(X \&\&)}}  \\
+\hline
+value/aggregate & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & OK \\
+\hline
+value & not decl& \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & OK \\
+\hline
+\tcode{X()} & \textit{declared} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & (OK) \\
+\hline
+OO & \tcode{=default} & \textit{declared} & \color{red}\tcode{=default} & \color{red}\tcode{=default} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{X(X const\&)} & not decl& \tcode{=default} & \textit{declared} & \color{red}\tcode{=default} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{=(X const\&)} & \tcode{=default} & \tcode{=default} & \color{red}\tcode{=default} & \textit{declared} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{X(X\&\&)} & not decl& \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & \textit{declared} & not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{=(X\&\&)} & \tcode{=default} & \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & not decl& \textit{declared} & {(BAD)} \\
+\hline
+\end{tabular}
+\end{center}
+\label{default}
+\end{table}%
+
+TODO: Howard's table
+
+rule of zero and related
+
+context of audience.
+
+forces to be covered.
+
+Properties to be discussed. 
+
+Potential dangers.
+\section{Items to be discussed}
+Things I am unsure
+\begin{itemize}
+\item Are there further useful and safe exceptions?
+\end{itemize}
+
+
+\chapter{Categories of safe user-defined classes}
+\section{Plain Value Types}
+\section{Monomorphic Object Types (better name) - Encapsulation Types}
+\section{Polymorphic Object Types - Class Hierarchies}
+\section{Resource Managing Types}
+
+%%%%%%
+
+\chapter{Bibliography}
+Core Guidelines
+
+MISRA
+
+Rule of Zero
+
+Howard's table
+\end{document}
+
