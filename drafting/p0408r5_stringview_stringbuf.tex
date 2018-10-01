@@ -104,19 +104,19 @@ On the other hand, there is no means to construct a \tcode{basic_string} and mov
 \subsection{Changes from r4}
 Incorporate suggestions from LWG review in Batavia, August 2018. This was the first time the combined proposal was reviewed.
 \begin{itemize}
-\item Adjust specification sections to new naming schema introduced at the Rapperswil Meeting 2018 for C++20. (Requires->(Mandates (compile-time), Expects(contract)), Remarks->Constraints)
+\item Adjust specification sections to new naming schema introduced at the Rapperswil Meeting 2018 for C++20. (Requires->(Mandates (compile-time), Expects(contract)), Remarks->Constraints, Postconditions->Ensures). 
 
-\item overload constructors with default arguments to only have the single argument version explicit according to p1163.
-\item introduce an exposition-only member function \tcode{init_buf_ptrs()} in \tcode{basic_stringbuf} to set the streambuf pointers (in the original version, that was part of the \tcode{str(string)} member function and now is needed in more than one place. Add a note there about internally violating invariants of \tcode{buf}.
+\item change the overloads of constructors with default arguments to only have the single argument version explicit according to p1163.
+\item introduce an exposition-only member function \tcode{init_buf_ptrs()} in \tcode{basic_stringbuf} to set the streambuf pointers. In the standard version, that was part of the \tcode{str(string)} member function and now is needed in more than one place. Add a note there about internally violating invariants of \tcode{buf}. Explain the exposition only members in the front matter of the class.
 \item reduce clutter, since bit operations are possible in enum \tcode{ios_base::openmode} parameters.
-\item Provide a note that allocator properties are propagated along the properties of the basic_string member buf.
-\item It should be discussed if the following definition of swap for basic_stringbuf should be adopted. Note, the base class swap does not give a noexcept guarantee. I provided that:
+\item Provide a note that allocator properties are propagated along the properties of the basic_string member \tcode{buf} in the front matter of the class. I hope this is sufficient to address the issue from Batavia about what happens with the allocators. Also all other allocator relevant comments should be addressed through that delegation to \tcode{basic_string}'s properties.
+\item I provided the following definition of \tcode{swap} for \tcode{basic_stringbuf} adopted from \tcode{basic_string}. Note, the base class swap does not give a noexcept guarantee. I provided that:
 \begin{codeblock}
 void swap(basic_stringbuf& s)
   noexcept(allocator_traits<Allocator>::propagate_on_container_swap::value ||
            allocator_traits<Allocator>::is_always_equal::value);
 \end{codeblock}
-\item \tcode{basic_stringbuf} move constructor now guarantees that \tcode{rhs} is empty, as if \tcode{std::move(rhs).str()} was called. This seems the easiest way to guarantee its get and put area are re-initialized accordingly. While technically not required, it makes handling moved-from streambufs (which are rare) consistent with calling the rvalue-ref-qualified \tcode{str()} member function. Please note, we do not give such a guarantee to the moved-from state of the stream objects, since they get their buffer pointer stolen (I hope) and thus are completely unrelated to a streambuf afterwards.
+\item \tcode{basic_stringbuf} move constructor now guarantees that \tcode{rhs} is empty, as if \tcode{std::move(rhs).str()} was called. This seems the easiest way to guarantee its get and put area are re-initialized accordingly. While technically not required, it makes handling moved-from streambufs (which are rare) consistent with calling the rvalue-ref-qualified \tcode{str()} member function. Please note, we do not give such a guarantee to the moved-from state of the stream objects, since they get their buffer pointer stolen and thus are completely unrelated to a streambuf after been moved-from. Only moving out the underlying string keeps the stream in working condition.
 \end{itemize}
 
 
@@ -173,13 +173,15 @@ When added to the standard draft with p0448 (spanstream), section [depr.str.strs
 After experimentation I decided that substituting the \tcode{(basic_string<charT,traits,Allocator const \&)} constructors in favor of passing a \tcode{basic_string_view} would lead to ambiguities with the new move-from-string constructors.
 
 \section{Hint to implementers}
-In both libc++ and libstdc++ I needed to make basic_stringbuf a friend of basic_string to allow efficient growth of the buffer beyond the current string length (breaking an invariant) until it is retrieved using one of the str() member functions. Other implementations might use a different strategy of caring for the buffer space that should be efficiently be adopted by the returned string object, thus requiring either special constructors or access to internals as well.
+In both libc++ and libstdc++ I needed to make basic_stringbuf a friend of basic_string to allow efficient growth of the buffer beyond the current string length (breaking an invariant) until it is retrieved using one of the str() member functions. Other implementations might use a different strategy of caring for the buffer space that should be efficiently be adopted by the returned string object, thus requiring either special basic_string constructors or access to its internals as well.
 
 \section{Open Issues to be discussed by LWG}
 Note: this list includes the discussion of p0407 features.
 \begin{itemize}
 \item \em{Does it make sense to add \tcode{noexcept} specifications for \tcode{move()} and \tcode{swap()} members, since the base classes and other streams do not. At least it does not make sense so for stream objects, since the base classes do not specify that.}
+\begin{removedblock}
 \item \em{The \tcode{basic_string} constructors that move from the string get a default template argument for \tcode{SAlloc} in the hope that allows initialization from a character string literal. Need confirmation that this trick works and selects the better constructor for temporary conversion without ambiguity, because for the copying (const-ref) overload the allocator of the string needs to be deduced. This should lead to the effect of optimizing existing usages.}
+\end{removedblock}
 \end{itemize}
 
 \section{Open Issues discussed by LEWG in Albuquerque}
@@ -484,7 +486,8 @@ basic_stringbuf& operator=(basic_stringbuf&& rhs);
 
 \begin{itemdescr}
 \pnum
-\effects \added{Move assigns \tcode{buf} from \tcode{rhs.str())}}. After the move assignment \tcode{*this} has the observable state it would
+\effects \added{Move assigns \tcode{buf} from \tcode{std::move(rhs).str()}.}
+After that move assignment \tcode{*this} has the observable state it would
 have had if it had been move constructed from \tcode{rhs} (see~\iref{stringbuf.cons}).
 
 \pnum
@@ -493,10 +496,11 @@ have had if it had been move constructed from \tcode{rhs} (see~\iref{stringbuf.c
 
 \indexlibrarymember{swap}{basic_stringbuf}%
 \begin{itemdecl}
-void swap(basic_stringbuf& rhs);
+void swap(basic_stringbuf& rhs)@\removed{;}@
 @\added{noexcept(allocator_traits<Allocator>::propagate_on_container_swap::value ||}\\
        \added{allocator_traits<Allocator>::is_always_equal::value)}@;
 \end{itemdecl}
+%% taken from basic_string::swap
 
 \begin{itemdescr}
 \pnum
@@ -508,7 +512,7 @@ and \tcode{rhs}. \added{Specifically, \tcode{buf.swap(rhs.buf)}.}
 \begin{itemdecl}
 template <class charT, class traits, class Allocator>
   void swap(basic_stringbuf<charT, traits, Allocator>& x,
-            basic_stringbuf<charT, traits, Allocator>& y);
+            basic_stringbuf<charT, traits, Allocator>& y)@\removed{;}@
 @\added{noexcept(noexcept(x.swap(y)))}@;
 \end{itemdecl}
 
@@ -516,8 +520,6 @@ template <class charT, class traits, class Allocator>
 \pnum
 \effects As if by \tcode{x.swap(y)}.
 \end{itemdescr}
-
-
 
 
 \subsection{30.8.2.3 Member functions [stringbuf.members]}
@@ -587,7 +589,7 @@ is well-formed when treated as an unevaluated operand.
 \end{addedblock}
 \end{itemdescr}
 
-Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{view() const} member function. Introduce the exposition only private member functions \tcode{init_buf_ptrs()} to provide the correct intialization of streambuf pointer members and adjust the \tcode{str(s)} member functions with parameters accordingly.:
+Add the following specifications and adjust the wording of \tcode{str() const} according to the wording given for \tcode{view() const} member function. Introduce the exposition only private member functions \tcode{init_buf_ptrs()} to provide the correct intialization of streambuf pointer members and adjust the \tcode{str(s)} member functions with parameters accordingly. \emph{the long effects section here and above might be shortened through the use of \tcode{buf}, but I did not want to do that without LWG's blessing}:
 
 \begin{insrt}
 \begin{itemdecl}
@@ -613,6 +615,11 @@ all characters initialized prior to the call are now considered uninitialized
 (except for those characters re-initialized by the new \tcode{basic_string}). 
 Otherwise the \tcode{basic_stringbuf} has been created in neither input nor output mode 
 and an empty \tcode{basic_string} is returned. 
+
+\pnum
+\begin{note}
+The explained effect can be achieved by setting \tcode{buf}'s \tcode{size()} to the resulting length (\tcode{egptr()-eback()} or \tcode{high_mark-pbase()}) and returning \tcode{std::move(buf)}. However, \tcode{basic_string} does not provide setting the length without changing the characters in the buffer in the range \tcode{[buf.data()+buf.size(), buf.data()+buf.capacity())} as a public member function.
+\end{note}
 
 \pnum
 \ensures The underlying character sequence \tcode{buf} is empty and \tcode{pbase()}, \tcode{pptr()}, \tcode{epptr()}, \tcode{eback()}, \tcode{gptr()}, \tcode{egptr()} are initialized as of calling \tcode{init_buf_ptrs()} with an empty \tcode{buf}.
