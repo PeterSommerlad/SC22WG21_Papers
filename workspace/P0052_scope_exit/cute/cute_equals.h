@@ -1,20 +1,25 @@
 /*********************************************************************************
  * This file is part of CUTE.
  *
- * CUTE is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Copyright (c) 2007-2018 Peter Sommerlad, Emanuel Graf, IFS
  *
- * CUTE is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with CUTE.  If not, see <http://www.gnu.org/licenses/>.
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
  *
- * Copyright 2007-2011 Peter Sommerlad, Emanuel Graf
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  *
  *********************************************************************************/
 
@@ -23,12 +28,19 @@
 #include "cute_base.h"
 #include "cute_diff_values.h"
 #include "cute_determine_traits.h"
+#include "cute_deprecated.h"
+#include "cute_range.h"
 #include <cmath>
 #include <limits>
 #include <algorithm>
+#ifdef USE_STD11
+#include <tuple>
+#endif
 
 
 namespace cute {
+
+
 	namespace cute_do_equals {
 		// provide some template meta programming tricks to select "correct" comparison for floating point and integer types
 		template <typename ExpectedValue, typename ActualValue, typename DeltaValue>
@@ -52,8 +64,8 @@ namespace cute {
 		template <typename ExpectedValue, typename ActualValue, bool select_non_integral_type>
 		bool do_equals(ExpectedValue const &expected
 					,ActualValue const &actual
-					,const impl_place_for_traits::integral_constant<bool, select_non_integral_type>&exp_is_integral
-					,const impl_place_for_traits::integral_constant<bool, select_non_integral_type>&act_is_integral){
+					,const impl_place_for_traits::integral_constant<bool, select_non_integral_type>&/*exp_is_integral*/
+					,const impl_place_for_traits::integral_constant<bool, select_non_integral_type>&/*act_is_integral*/){
 			return do_equals_floating(expected,actual,impl_place_for_traits::is_floating_point<ExpectedValue>());
 		}
 		template <typename ExpectedValue, typename ActualValue, bool select_non_integral_type>
@@ -65,16 +77,23 @@ namespace cute {
 		template <typename ExpectedValue, typename ActualValue, bool select_non_integral_type>
 		bool do_equals(ExpectedValue const &expected
 					,ActualValue const &actual
-					,const impl_place_for_traits::integral_constant<bool, select_non_integral_type>&exp_is_integral
+					,const impl_place_for_traits::integral_constant<bool, select_non_integral_type>&/*exp_is_integral*/
 					,const impl_place_for_traits::true_type&){
 			return do_equals_floating(expected,actual,impl_place_for_traits::is_floating_point<ExpectedValue>());
 		}
 		template <typename ExpectedValue, typename ActualValue, bool select_non_integral_type>
 		bool do_equals(ExpectedValue const &expected
 					,ActualValue const &actual
-					,const impl_place_for_traits::true_type&,const impl_place_for_traits::integral_constant<bool, select_non_integral_type>&act_is_integral){
+					,const impl_place_for_traits::true_type&,const impl_place_for_traits::integral_constant<bool, select_non_integral_type>&/*act_is_integral*/){
 			return do_equals_floating(expected,actual,impl_place_for_traits::is_floating_point<ActualValue>());
 		}
+#ifdef USE_STD11
+		template <bool select_non_floating_point_type, typename ...ExpectedTypes, typename ...ActualTypes>
+		bool do_equals(std::tuple<ExpectedTypes...> const &expected
+					,std::tuple<ActualTypes...> const &actual,const std::integral_constant<bool, select_non_floating_point_type>&){
+					return expected==actual;
+		}
+#endif
 		// can I get rid of the following complexity by doing a do_equals_integral
 		// parameterized by is_signed<ExpectedValue>==is_signed<ActualValue> or nofBits<A> < nofBits<B>
 
@@ -214,4 +233,9 @@ namespace cute {
 #define ASSERT_EQUAL_DELTAM(msg,expected,actual,delta) cute::assert_equal_delta((expected),(actual),(delta),\
 		CUTE_FUNCNAME_PREFIX+cute::cute_to_string::backslashQuoteTabNewline(msg),__FILE__,__LINE__)
 #define ASSERT_EQUAL_DELTA(expected,actual,delta) ASSERT_EQUAL_DELTAM(#expected " == " #actual " with error " #delta  ,(expected),(actual),(delta))
+
+DEPRECATE(ASSERT_EQUAL_RANGES_M, ASSERT_EQUAL_RANGESM)
+#define ASSERT_EQUAL_RANGES_M(msg,expbeg,expend,actbeg,actend) DEPRECATED(ASSERT_EQUAL_RANGES_M), ASSERT_EQUALM(msg,cute::make_range(expbeg,expend),cute::make_range(actbeg,actend))
+#define ASSERT_EQUAL_RANGESM(msg,expbeg,expend,actbeg,actend) ASSERT_EQUALM(msg,cute::make_range(expbeg,expend),cute::make_range(actbeg,actend))
+#define ASSERT_EQUAL_RANGES(expbeg,expend,actbeg,actend) ASSERT_EQUAL_RANGESM("range{" #expbeg "," #expend "} == range{" #actbeg "," #actend "}",expbeg,expend,actbeg,actend)
 #endif /*CUTE_EQUALS_H_*/

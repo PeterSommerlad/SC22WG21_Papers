@@ -1,6 +1,6 @@
 <testsuites>
-	<testsuite name="AllTests" tests="33">
-		<testcase classname="AllTests" name="thisIsATest"/>
+	<testsuite name="AllTests" tests="36">
+		<testcase classname="AllTests" name="InsaneBool"/>
 		<testcase classname="AllTests" name="testscopeExitWithNonAssignableResourceAndReset"/>
 		<testcase classname="AllTests" name="testCompilabilityGuardForPointerTypes"/>
 		<testcase classname="AllTests" name="testTalkToTheWorld"/>
@@ -33,5 +33,8 @@
 		<testcase classname="AllTests" name="testScopeFailWithCPP17DeducingCtors"/>
 		<testcase classname="AllTests" name="testScopeSuccessWithCPP17DeducingCtors"/>
 		<testcase classname="AllTests" name="test_sometimes_throwing_deleter_copy_ctor"/>
+		<testcase classname="AllTests" name="DemoFstream"/>
+		<testcase classname="AllTests" name="DemonstrateTransactionFilecopy"/>
+		<testcase classname="AllTests" name="DemonstrateSurprisingReturnedFromBehavior"/>
 	</testsuite>
 </testsuites>

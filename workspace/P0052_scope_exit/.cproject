@@ -43,7 +43,13 @@
                             							
                             <tool command="g++" id="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.debug.943127978" name="MacOS X C++ Linker" superClass="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.debug">
                                 								
-                                <option id="macosx.cpp.link.option.paths.70990070" name="Library search path (-L)" superClass="macosx.cpp.link.option.paths" useByScannerDiscovery="false"/>
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="true" id="macosx.cpp.link.option.paths.70990070" name="Library search path (-L)" superClass="macosx.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths"/>
+                                								
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="macosx.cpp.link.option.libs.801521216" name="Libraries (-l)" superClass="macosx.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
+                                    									
+                                    <listOptionValue builtIn="false" value="stdc++fs"/>
+                                    								
+                                </option>
                                 								
                                 <inputType id="cdt.managedbuild.tool.macosx.cpp.linker.input.1661813840" superClass="cdt.managedbuild.tool.macosx.cpp.linker.input">
                                     									
@@ -57,7 +63,7 @@
                             							
                             <tool id="cdt.managedbuild.tool.gnu.assembler.macosx.exe.debug.1764856255" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.macosx.exe.debug">
                                 								
-                                <option id="gnu.both.asm.option.include.paths.1481346606" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.both.asm.option.include.paths.1481346606" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
                                     									
                                     <listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/cute}&quot;"/>
                                     								
@@ -75,7 +81,7 @@
                                 								
                                 <option id="gnu.cpp.compiler.macosx.exe.debug.option.debugging.level.1402508865" name="Debug Level" superClass="gnu.cpp.compiler.macosx.exe.debug.option.debugging.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
                                 								
-                                <option id="gnu.cpp.compiler.option.include.paths.891292065" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.compiler.option.include.paths.891292065" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
                                     									
                                     <listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/cute}&quot;"/>
                                     								
@@ -83,7 +89,7 @@
                                 								
                                 <option id="gnu.cpp.compiler.option.dialect.std.609447329" name="Language standard" superClass="gnu.cpp.compiler.option.dialect.std" useByScannerDiscovery="true" value="gnu.cpp.compiler.dialect.default" valueType="enumerated"/>
                                 								
-                                <option id="gnu.cpp.compiler.option.dialect.flags.947282912" name="Other dialect flags" superClass="gnu.cpp.compiler.option.dialect.flags" useByScannerDiscovery="true" value="--std=c++17" valueType="string"/>
+                                <option id="gnu.cpp.compiler.option.dialect.flags.947282912" name="Other dialect flags" superClass="gnu.cpp.compiler.option.dialect.flags" useByScannerDiscovery="true" value="--std=c++2a" valueType="string"/>
                                 								
                                 <inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1388898024" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
                                 							
@@ -95,7 +101,7 @@
                                 								
                                 <option id="gnu.c.compiler.macosx.exe.debug.option.debugging.level.980475868" name="Debug Level" superClass="gnu.c.compiler.macosx.exe.debug.option.debugging.level" useByScannerDiscovery="false" value="gnu.c.debugging.level.max" valueType="enumerated"/>
                                 								
-                                <option id="gnu.c.compiler.option.include.paths.858380738" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.c.compiler.option.include.paths.858380738" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
                                     									
                                     <listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/cute}&quot;"/>
                                     								
@@ -169,7 +175,7 @@
                             							
                             <tool id="cdt.managedbuild.tool.gnu.assembler.macosx.exe.release.1009803843" name="GCC Assembler" superClass="cdt.managedbuild.tool.gnu.assembler.macosx.exe.release">
                                 								
-                                <option id="gnu.both.asm.option.include.paths.1837694879" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.both.asm.option.include.paths.1837694879" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
                                     									
                                     <listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/cute}&quot;"/>
                                     								
@@ -187,7 +193,7 @@
                                 								
                                 <option id="gnu.cpp.compiler.macosx.exe.release.option.debugging.level.763472759" name="Debug Level" superClass="gnu.cpp.compiler.macosx.exe.release.option.debugging.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
                                 								
-                                <option id="gnu.cpp.compiler.option.include.paths.2065292855" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.cpp.compiler.option.include.paths.2065292855" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
                                     									
                                     <listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/cute}&quot;"/>
                                     								
@@ -203,7 +209,7 @@
                                 								
                                 <option id="gnu.c.compiler.macosx.exe.release.option.debugging.level.1358364941" name="Debug Level" superClass="gnu.c.compiler.macosx.exe.release.option.debugging.level" useByScannerDiscovery="false" value="gnu.c.debugging.level.none" valueType="enumerated"/>
                                 								
-                                <option id="gnu.c.compiler.option.include.paths.650401854" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
+                                <option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="gnu.c.compiler.option.include.paths.650401854" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
                                     									
                                     <listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/cute}&quot;"/>
                                     								

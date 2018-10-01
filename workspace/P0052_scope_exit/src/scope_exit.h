@@ -81,7 +81,7 @@ struct on_success_policy
 };
 }
 template<class EF, class Policy = detail::on_exit_policy>
-struct basic_scope_exit;
+class basic_scope_exit; // silence brain dead clang warning -Wmismatched-tags
 
 //PS: It would be nice if just the following would work in C++17
 //PS: however, we need a real class for template argument deduction
@@ -159,7 +159,7 @@ class basic_scope_exit :  Policy
     using _noexcept_ctor_from = std::bool_constant<noexcept(detail::_box<EF>(std::declval<EFP>(), detail::_empty_scope_exit{}))>;
 public:
     template<typename EFP, typename = std::enable_if_t<_ctor_from<EFP>::value>>
-    explicit basic_scope_exit(EFP &&ef) noexcept(_noexcept_ctor_from<EFP>::value)
+    [[nodiscard]] explicit basic_scope_exit(EFP &&ef) noexcept(_noexcept_ctor_from<EFP>::value)
       : exit_function(std::forward<EFP>( ef), _make_failsafe(_noexcept_ctor_from<EFP>{}, &ef))
     {}
     basic_scope_exit(basic_scope_exit &&that) noexcept(noexcept(detail::_box<EF>(that.exit_function.move(), that)))

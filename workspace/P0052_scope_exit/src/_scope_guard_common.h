@@ -43,6 +43,13 @@ _move_assign_if_noexcept(T &x) noexcept
 {
     return std::move(x);
 }
+template< class T >
+constexpr typename std::conditional<
+    !std::is_nothrow_move_constructible_v<T> && std::is_copy_constructible_v<T>,
+    const T&,
+    T&&
+>::type move_if_noexcept(T& x) noexcept;
+
 }
 template<typename T>
 class _box
@@ -56,9 +63,9 @@ class _box
     {}
 
 public:
-    template<typename TT,
+    template<typename TT, typename GG,
         typename = std::enable_if_t<std::is_constructible_v<T, TT>>>
-    explicit _box(TT &&t, auto &&guard) noexcept(noexcept(_box((T &&) t)))
+    explicit _box(TT &&t, GG &&guard) noexcept(noexcept(_box((T &&) t)))
       : _box(std::forward<TT>(t))
     {
         guard.release();
@@ -91,9 +98,9 @@ class _box<T &>
 {
     std::reference_wrapper<T> value;
 public:
-    template<typename TT,
+    template<typename TT, typename GG,
         typename = std::enable_if_t<std::is_convertible_v<TT, T &>>>
-    _box(TT &&t, auto &&guard) noexcept(noexcept(static_cast<T &>((TT &&) t)))
+    _box(TT &&t, GG &&guard) noexcept(noexcept(static_cast<T &>((TT &&) t)))
       : value(static_cast<T &>(t))
     {
         guard.release();

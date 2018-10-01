@@ -1,27 +1,34 @@
 /*********************************************************************************
  * This file is part of CUTE.
  *
- * CUTE is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Copyright (c) 2007-2018 Peter Sommerlad, IFS
  *
- * CUTE is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with CUTE.  If not, see <http://www.gnu.org/licenses/>.
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
  *
- * Copyright 2007-2015 Peter Sommerlad
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  *
  *********************************************************************************/
 
 #ifndef CUTE_TO_STRING_H_
 #define CUTE_TO_STRING_H_
+
 #include <string>
 #include <algorithm>
+
 namespace cute {
 namespace cute_to_string {
 		static inline std::string backslashQuoteTabNewline(std::string const &input){
@@ -66,6 +73,11 @@ namespace cute_to_string {
 #include <set>
 #endif
 #include "cute_demangle.h"
+#include "cute_determine_version.h"
+#ifdef USE_STD11
+#include "cute_integer_sequence.h"
+#include <tuple>
+#endif
 namespace cute {
 namespace cute_to_string {
 		template <typename T>
@@ -123,7 +135,7 @@ namespace cute_to_string {
 		//try print_pair with specialization of template function instead:
 		// the generic version prints about missing operator<< that is the last resort
 		template <typename T>
-		std::ostream &print_pair(std::ostream &os,T const &t){
+		std::ostream &print_pair(std::ostream &os,T const &){
 			return os << "no operator<<(ostream&, " <<cute::demangle(typeid(T).name())<<')';
 		}
 		//the std::pair overload is useful for std::map etc. however,
@@ -145,6 +157,41 @@ namespace cute_to_string {
 			return os << '}';
 		}
 
+#ifdef USE_STD11
+		template<std::size_t Value>
+		using size = std::integral_constant<std::size_t, Value>;
+		struct empty { template<typename ...Types>empty(Types const &...){} };
+		template<typename ...Types, std::size_t _, std::size_t Head, std::size_t ...Indices>
+		std::ostream &print_tuple(std::ostream &os, std::tuple<Types...> const &t, size<_> const, index_sequence<Head, Indices...>){
+			empty{os << '\n'
+			      ,cute_to_string::to_stream(os, std::get<Head>(t))
+			      ,(os << ",\n", cute_to_string::to_stream(os, std::get<Indices>(t)))...};
+			return os;
+		}
+		template<typename ...Types, std::size_t _>
+		std::ostream &print_tuple(std::ostream &os, std::tuple<Types...> const &t, size<_> const s) {
+			return print_tuple(os, t, s, index_sequence_for<Types...>{});
+		}
+		template<typename ..._>
+		std::ostream &print_tuple(std::ostream &os, std::tuple<_...> const &t, size<1> const){
+			return os << '\n', cute_to_string::to_stream(os, std::get<0>(t));
+		}
+		template<typename ..._>
+		std::ostream &print_tuple(std::ostream &os, std::tuple<_...> const &, size<0>){
+			return os;
+		}
+		// overload for std::tuple<...>
+		template<typename ...Types>
+		std::ostream &print_pair(std::ostream &os, std::tuple<Types...> const &t){
+			os << cute::demangle(typeid(decltype(t)).name()) << '{';
+			auto olflags = os.flags();
+			os << std::boolalpha;
+			print_tuple(os, t, size<sizeof...(Types)>{});
+			os.flags(olflags);
+			os << '}';
+			return os;
+		}
+#endif
 		template <typename T, bool select>
 		struct select_container {
 			std::ostream &os;
@@ -267,7 +314,7 @@ namespace cute_to_string {
 			return to_string_embedded_int_signed(t,impl_place_for_traits::is_signed<T>());
 		}
 		template <typename T>
-		std::string to_string_embedded_int(T const &t, impl_place_for_traits::false_type ){
+		std::string to_string_embedded_int(T const &, impl_place_for_traits::false_type ){
 			return "no to_string";
 		}
 		// convenience for pointers.... useful?

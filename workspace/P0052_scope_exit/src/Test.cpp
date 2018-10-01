@@ -39,6 +39,7 @@ SOFTWARE.
 #include <functional>
 
 #include <ostream>
+#include <filesystem>
 
 //#define CHECK_COMPILE_ERRORS
 
@@ -47,6 +48,46 @@ using std::experimental::make_unique_resource_checked;
 using std::experimental::scope_exit;
 using std::experimental::scope_fail;
 using std::experimental::scope_success;
+
+void DemoFstream(){
+	{
+		std::ofstream ofs{"demo_hello.txt"};
+		ofs << "Hello world\n";
+	}
+	{
+		std::ifstream ifs{"demo_hello.txt"};
+		std::string s;
+		ASSERT(getline(ifs,s));
+		ASSERT_EQUAL("Hello world",s);
+	}
+}
+
+using std::filesystem::path;
+void copy_file_transact(path const & from, path const & to) {
+   path t = to.native() + ".deleteme";
+   auto guard= scope_fail{ [t]{remove(t);} };
+   copy_file(from, t);
+   rename(t, to);
+}
+void DemonstrateTransactionFilecopy(){
+
+}
+
+
+
+std::string access_returned_from_string(size_t& len){
+	std::string s{"a string"};
+	scope_exit guard{[&]{ len = s.size();}};
+	return (s); // pessimize copy elision to demonstrate effect
+}
+void DemonstrateSurprisingReturnedFromBehavior(){
+	size_t len{0xffffffff};
+	auto s = access_returned_from_string(len);
+	// exected:	ASSERT_EQUAL(s.size(),len);
+	// what really happens
+	ASSERT_EQUAL(0,len);
+}
+
 
 void InsaneBool() {
 	std::ostringstream out { };
@@ -176,7 +217,7 @@ void testsFromEricNiebler_scope_exit_with_throwing_function_object(){
 	try
 	    {
 	        throwing_copy c{"called anyway",out};
-	        auto &&x = scope_exit(c);
+	        auto &&x = scope_exit(c); // -Wunused-variable on clang
 	        out << "whoops" << std::endl;
 	    }
 	    catch(...)
@@ -191,7 +232,7 @@ void testsFromEricNiebler_scope_success_with_throwing_function_object(){
 	try
 	    {
         throwing_copy c{"Oh noes!!!",out};
-        auto &&x = scope_success(c);
+        auto &&x = scope_success(c);// -Wunused-variable on clang
 	        out << "whoops" << std::endl;
 	    }
 	    catch(...)
@@ -206,7 +247,7 @@ void testsFromEricNiebler_scope_fail_with_throwing_function_object(){
 	try
 	    {
         throwing_copy c{"called because of exception!!!",out};
-        auto &&x = scope_fail(c);
+        auto &&x = scope_fail(c);// -Wunused-variable on clang
 	        out << "whoops" << std::endl;
 	    }
 	    catch(...)
@@ -730,6 +771,9 @@ void runAllTests(int argc, const char *argv[]) {
 	s.push_back(CUTE(testScopeFailWithCPP17DeducingCtors));
 	s.push_back(CUTE(testScopeSuccessWithCPP17DeducingCtors));
 	s.push_back(CUTE(test_sometimes_throwing_deleter_copy_ctor));
+	s.push_back(CUTE(DemoFstream));
+	s.push_back(CUTE(DemonstrateTransactionFilecopy));
+	s.push_back(CUTE(DemonstrateSurprisingReturnedFromBehavior));
 	cute::xml_file_opener xmlfile(argc,argv);
 	cute::xml_listener<cute::ide_listener<> >  lis(xmlfile.out);
 	cute::makeRunner(lis,argc,argv)(s, "AllTests");
