@@ -766,12 +766,12 @@ public:
     explicit basic_istringstream(allocator_type const & __a)
     : basic_istringstream(ios_base::in,__a){}
     inline _LIBCPP_INLINE_VISIBILITY
-    explicit basic_istringstream(string_type && __s,
+    basic_istringstream(string_type && __s,
     		                         allocator_type const & __a)
     : basic_istringstream(std::move(__s),ios_base::in,__a){}
     template<typename _SAlloc>
     inline _LIBCPP_INLINE_VISIBILITY
-    explicit basic_istringstream(const string_temp<_SAlloc>& __s,
+    basic_istringstream(const string_temp<_SAlloc>& __s,
 								allocator_type const & __a)
     :basic_istringstream(__s,ios_base::in,__a){}
 #ifndef _LIBCPP_CXX03_LANG
