@@ -87,7 +87,7 @@ Incorporates changes suggested in wording review from LWG meeting in Batavia, Au
 \item make \tcode{unique_resource} constructor non-explicit (it is not unary).
 \item rename \tcode{execute_on_destruction} member \tcode{of unique_resource} to \tcode{execute_on_reset}.
 \end{itemize}
-
+Many thanks to Tim Song for his final walk over the text.
 
 \section{Changes from P0052R7}
 Found a bug in my implementation of \tcode{unique_resource}'s move constructor that was unfortunately also present in the spec R7. If we move from an already \tcode{release()}d \tcode{unique_resource} and the \tcode{deleter}'s copy constructor throws the \tcode{deleter} is called on the moved resource, even so it was already released. Updated the note to also say it guarantees not only no leaking but also no double-release of the resource.
@@ -805,10 +805,10 @@ for which, given
 a lvalue \tcode{d} of type \tcode{D} and a lvalue
 \tcode{r} of type \tcode{R}, the expression
 \tcode{d(r)} shall be well-formed. % Tim Song: to ctor: , shall have well-defined behavior, and shall not throw an exception.
-\tcode{D} shall either meet the \oldconcept{CopyConstructible} requirement (Table 24
+\tcode{D} shall either meet the \oldconcept{CopyConstructible} requirements (Table 24
 %\ref{copyconstructible}
 ), or 
-\tcode{D} shall meet the \oldconcept{MoveConstructible} requirement (Table 23
+\tcode{D} shall meet the \oldconcept{MoveConstructible} requirements (Table 23
 %\ref{moveconstructible}
 ) and
 \tcode{is_nothrow_move_constructible_v<D>} shall be \tcode{true}.
@@ -818,10 +818,10 @@ For the purpose of this sub-clause,
 a \emph{resource type} \tcode{T} is an object type that meets the
 \oldconcept{CopyConstructible} (Table 24
 %\ref{copyconstructible}
-) requirement,  or 
+) requirements,  or 
 is an object type that meets the \oldconcept{MoveConstructible} (Table 23
 %\ref{moveconstructible}
-) requirement and
+) requirements and
 \tcode{is_nothrow_move_constructible_v<T>} is \tcode{true},
 or is an lvalue reference to a resource type.
 \tcode{R} shall be a resource type.
@@ -941,7 +941,7 @@ If initialization of \tcode{deleter} throws an exception and
  \tcode{is_nothrow_move_constructible_v<R1>} is \tcode{true} 
 and \tcode{rhs.execute_on_reset} is \tcode{true}: %% bugfix in R8
 \begin{codeblock}
-    rhs.deleter(resource); rhs.release();
+    rhs.deleter(@\textit{RESOURCE}@); rhs.release();
 \end{codeblock}
 
 \pnum
@@ -968,8 +968,8 @@ unique_resource& operator=(unique_resource&& rhs) noexcept(@\seebelow@);
 \begin{itemdescr}
 \pnum
 \requires %\mandates not useful for oldconcept
-If \tcode{is_nothrow_move_assignable_v<R1>} is \tcode{true}, \tcode{R1} shall meet the \oldconcept{MoveAssignable} requirement (Table 25), otherwise \tcode{R1} shall meet the \oldconcept{CopyAssignable} (Table 26) requirement.
-If \tcode{is_nothrow_move_assignable_v<D>} is \tcode{true}, \tcode{D} shall meet the \oldconcept{MoveAssignable} requirement (Table 25), otherwise \tcode{D} shall meet the \oldconcept{CopyAssignable} requirement (Table 26).
+If \tcode{is_nothrow_move_assignable_v<R1>} is \tcode{true}, \tcode{R1} shall meet the \oldconcept{MoveAssignable} requirements (Table 25), otherwise \tcode{R1} shall meet the \oldconcept{CopyAssignable} (Table 26) requirements.
+If \tcode{is_nothrow_move_assignable_v<D>} is \tcode{true}, \tcode{D} shall meet the \oldconcept{MoveAssignable} requirements (Table 25), otherwise \tcode{D} shall meet the \oldconcept{CopyAssignable} requirements (Table 26).
 %\requires %\mandates not useful for oldconcept
 %If \tcode{is_nothrow_move_assignable_v<R1>} is \tcode{true}, \tcode{R1} shall be \oldconcept{MoveAssignable} (Table 25), otherwise \tcode{R1} shall be \oldconcept{CopyAssignable} (Table 26).
 %If \tcode{is_nothrow_move_assignable_v<D>} is \tcode{true}, \tcode{D} shall be \oldconcept{MoveAssignable} (Table 25), otherwise \tcode{D} shall be \oldconcept{CopyAssignable} (Table 26).
@@ -1061,7 +1061,7 @@ Equivalent to:
 \begin{codeblock}
 if (execute_on_reset) {
     execute_on_reset = false;
-    deleter(@\textit{RESOURCE}@)
+    deleter(@\textit{RESOURCE}@);
 }
 \end{codeblock}
 \end{itemdescr}
