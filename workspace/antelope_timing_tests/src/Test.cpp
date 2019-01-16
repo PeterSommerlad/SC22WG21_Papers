@@ -76,7 +76,7 @@ void timeRemCtrlBlocksStringFunctions(){
 
 
 
-void thisIsATest() {
+void simpleminimum() {
 	auto t = time_func([]{return std::string{};},10000);
 	ASSERT_LESS(t.count(),100);
 }
@@ -84,7 +84,7 @@ void thisIsATest() {
 bool runAllTests(int argc, char const *argv[]) {
 	cute::suite s { };
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(simpleminimum));
 	s.push_back(CUTE(testSameResult));
 	s.push_back(CUTE(timeSomeStringFunctions));
 	s.push_back(CUTE(timeSomeFasterStringFunctions));

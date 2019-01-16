@@ -44,6 +44,8 @@
 %\usepackage{memhfixc}     % fix interactions between hyperref and memoir
 %\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
 %
+\usepackage{threeparttable}
+
 \renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
 
 
@@ -57,8 +59,8 @@
 \pagestyle{myheadings}
 
 
-\newcommand{\papernumber}{p0408r5}
-\newcommand{\paperdate}{2018-10-01}
+\newcommand{\papernumber}{p0408r6}
+\newcommand{\paperdate}{2019-01-21}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -75,13 +77,16 @@ Including wording from p0407 Allocator-aware basic\_stringbuf}
 \date{\paperdate}                        % Activate to display a given date or no date
 \setsecnumdepth{subsection}
 
+% test if std.tex macros can be replaced as well, but ref seems to be too special?
+\renewcommand{\ref}[1]{[#1]}
+
 \begin{document}
 \maketitle
 \begin{tabular}[t]{|l|l|}\hline 
 Document Number: & \papernumber  \\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++\\\hline 
-Audience: & LWG\\\hline
+Audience: & LEWG / LWG\\\hline
 Target: & C++20\\\hline
 \end{tabular}
 
@@ -100,6 +105,47 @@ C++17 and library TS have \tcode{basic_string_view} allowing an efficient read-o
 On the other hand, there is no means to construct a \tcode{basic_string} and move from it into a \tcode{basic_stringbuf} via a constructor or a move-enabled overload of \tcode{str(basic_string \&\&)}.
 
 \section{History}
+
+\subsection{Changes from r5}
+There was a review in my absence (again) in San Diego, November 2018. I'll try my best to incorporate the feedback here.
+\begin{itemize}
+\item rebase on n4791.
+\item undo premature application of p1163 (explicit -> non-explicit multi-parameter ctors by additional overloads) (ARGHHH, but I now think I follow Titus argumentation that it might be a bad idea).
+\item see table \ref{tab:ctors}. LEWG might need to reconsider the combination of p0407/p0408 to agree on sane ctor overloads. LWG and Ville gave feedback on different ctor overloads. New Design: separate SFINAEd overloads for "foreign" string arguments.
+\item clean up \tcode{str()} member function overloads. This was in the overlap of p0407 and p0408 and not seen by LEWG in that way (sorry!). Split getter to two, one taking an allocator for the new string. Setter \tcode{str(string const\&)} member function remains a template on the string's Allocator. 
+\item adjust the \emph{italic} explanations accordingly to the changes.
+\item LWG question: Do the constructors taling a \tcode{SAlloc} template parameter restrict it  to \oldconcept{Allocator} requirements? It is implicit via \tcode{basic_string}.
+
+\end{itemize}
+
+\begin{table}
+\begin{threeparttable}
+\caption{Overview of stringbuf constructors introduced}
+\label{tab:ctors}
+\begin{tabular}{|c|c|c|c|c|}\hline
+ string & which & Allocator & ctor & comment \\\hline
+        &   &   & default & exists \\\hline
+        & yes &   & explicit & exists \\\hline
+   copy & opt &   & explicit & exists \\\hline
+        & \added{yes} & \added{yes} &  & 407 for stateful allocs \\\hline
+   \added{move} & \added{opt} &  & \added{explicit} & 408, combined again \\\hline
+\added{other-copy}\tnote{1} &   & \added{yes} &   & 407 other kind of strings\tnote{2} \\\hline
+\added{other-copy}\tnote{1} & \added{yes} & \added{yes} &   & 407 other kind of strings\tnote{2} \\\hline
+\added{other-copy}\tnote{1} & \added{opt} &     & \added{explicit}  & 407 above with default alloc\tnote{3} \\\hline
+   &   & \added{yes} &   & 407 for stateful allocators \\\hline
+  \removed{move} & \removed{yes}  & \removed{yes} &   & 408r5 - useless, copies anyway\\\hline
+\end{tabular}
+\begin{tablenotes}
+%\begin{enumerate}
+\item{1} other-copy means has a different Allocator template argument
+\item{2} allow if same or different allocator for string, because allocator is given, see copy-ctor string with allocator parameter.
+\item{3} LEWG new design question: requires string Allocator different from stringbuf Allocator (new), otherwise existing ctor is changed ABI (and may be CTAD) breakage.
+\item{*} in addition a move ctor is defined taking an additional Allocator argument like with basic_string
+\item{**} Allocator should always be the last Parameter (is that really always the case?).
+%\end{enumerate}
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
 
 \subsection{Changes from r4}
 Incorporate suggestions from LWG review in Batavia, August 2018. This was the first time the combined proposal was reviewed.
@@ -180,7 +226,7 @@ Note: this list includes the discussion of p0407 features.
 \begin{itemize}
 \item \em{Does it make sense to add \tcode{noexcept} specifications for \tcode{move()} and \tcode{swap()} members, since the base classes and other streams do not. At least it does not make sense so for stream objects, since the base classes do not specify that.}
 \begin{removedblock}
-\item \em{The \tcode{basic_string} constructors that move from the string get a default template argument for \tcode{SAlloc} in the hope that allows initialization from a character string literal. Need confirmation that this trick works and selects the better constructor for temporary conversion without ambiguity, because for the copying (const-ref) overload the allocator of the string needs to be deduced. This should lead to the effect of optimizing existing usages.}
+\item \em{\sout{The \tcode{basic_string} constructors that move from the string get a default template argument for \tcode{SAlloc} in the hope that allows initialization from a character string literal. Need confirmation that this trick works and selects the better constructor for temporary conversion without ambiguity, because for the copying (const-ref) overload the allocator of the string needs to be deduced. This should lead to the effect of optimizing existing usages.}}
 \end{removedblock}
 \end{itemize}
 
@@ -197,71 +243,71 @@ Note: this list includes the discussion of p0407 features.
 \item Provide guidance on validity lifetime of of the obtained \tcode{string_view} object.
 \end{itemize}
 
+\section{Open Issues to be discussed by LEWG/LWG (in Kona?)}
+\begin{itemize}
+\item Constructor overloads taking a string with a different allocator, esp. SFINAE.
+\item is \tcode{!is_same_v<SAlloc,Allocator>} the correct SFINAE predicate.
+\item \tcode{str()} member functions taking an allocator argument to return a different string type.
+\item \tcode{noexcept} for \tcode{view()} member function (suggested by LWG).
+\item does an Allocator template parameter that is mapped to \tcode{basic_string}'s Allocator template parameter need to conform to \oldconcept{Allocator} requirements.
+\end{itemize}
+
+
 \chapter{Technical Specifications}
-The following is relative to n4604.
+The following is relative to n4791.
 
 Remove section on \tcode{char*} streams [depr.str.strstreams] and all its subsections from appendix D.
 
 \section{30.8.2 Adjust synopsis of basic\_stringbuf [stringbuf]}
 Add a new constructor overload.
 
-\textit{Note that p0407 provides allocator support for \tcode{basic_stringbuf}, since now both papers have been forwarded to LWG, the changes proposed in p0407 are integrated here for ease of review and integration. The explanations of those changes are added in italics here.}
+\textit{Note that p0407 provides allocator support for \tcode{basic_stringbuf}, since now both papers have been forwarded to LWG, the changes proposed in p0407 are integrated here for ease of review and integration. The explanations of those changes are added in italics here. from r6 on some changes that need to be revisited by LEWG are made, since the overlap of the two papers' functionality.}
 
 \begin{em}
-Change each of the non-moving, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. Add an overload for the move constructor adding an \tcode{Allocator} parameter. Add an exposition-only member variable \tcode{buf} to allow referring to it for specifying allocator behaviour. May be: Add noexcept specification, depending on allocator behavior, like with \tcode{basic_string}?\
+Change each of the non-moving, non-deleted constructors to add a const-ref \tcode{Allocator} parameter as last parameter with a default constructed \tcode{Allocator} as default argument. Add an overload for the move constructor adding an \tcode{Allocator} parameter like with \tcode{basic_string}. Add an exposition-only member variable \tcode{buf} to allow referring to it for specifying allocator behaviour. May be: Add noexcept specification, depending on allocator behavior, like with \tcode{basic_string}?\
 \\
 This section also adopts the changes of p1163 by only marking the single argument constructors explicit and provide non-explicit overloads for zero, two or more argument versions. That paper p1163 was tentatively accepted in Batavia, August 2018.
 \end{em}
 
 \begin{codeblock}
-    // \iref{stringbuf.cons}, constructors:
-    @\added{basic_stringbuf():basic_stringbuf(ios_base::in | ios_base::out)\{\}}@  
-    @\added{basic_stringbuf(ios_base::openmode which, const Allocator\& a);}@
+    // \iref{stringbuf.cons}, constructors
+    basic_stringbuf() : basic_stringbuf(ios_base::in | ios_base::out) {}
+    explicit basic_stringbuf(ios_base::openmode which);
     explicit basic_stringbuf(
-      ios_base::openmode which@\removed{ = ios_base::in | ios_base::out}@)
-      @\added{: basic_stringbuf(ios_base::in | ios_base::out, Allocator())\{\}}\removed{;}@
+      const basic_string<charT, traits, Allocator>& str,
+      ios_base::openmode which = ios_base::in | ios_base::out);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
+    explicit basic_stringbuf(const Allocator& a)
+      : basic_stringbuf(ios_base::in | ios_base::out, a) { }
+      
+    basic_stringbuf(ios_base::openmode which, const Allocator& a);
+    explicit basic_stringbuf(
+      basic_string<charT, traits, Allocator>&& s,
+      ios_base::openmode which = ios_base::in | ios_base::out);
+    template<class SAlloc>
+    basic_stringbuf(
+      const basic_string<charT, traits, SAlloc>& s, 
+      const Allocator& a)
+      : basic_stringbuf(s, ios_base::in | ios_base::out, a) { }
     template<class SAlloc>
     basic_stringbuf(
       const basic_string<charT, traits, SAlloc>& str,
       ios_base::openmode which,
-      const Allocator& a = Allocator());
-\end{codeblock}
-\end{addedblock}
-\begin{codeblock}
-    @\added{template<class SAlloc>}@
-    explicit basic_stringbuf(
-      const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& str@\removed{,}@
-      @\removed{ios_base::openmode which = ios_base::in | ios_base::out})\removed{;}@
-      @\added{: basic_stringbuf(str, ios_base::in | ios_base::out)\{\}}@
-\end{codeblock}
-\begin{addedblock}\begin{codeblock}
-    basic_stringbuf(
-      basic_string<charT, traits, Allocator>&& s,
-      ios_base::openmode which,
-      const Allocator& a = Allocator());
-      
-    explicit basic_stringbuf(
-      basic_string<charT, traits, Allocator>&& s)
-      : basic_stringbuf(std::move(s), ios_base::in | ios_base::out){}
-
-    explicit basic_stringbuf(const Allocator& a)
-      : basic_stringbuf(ios_base::in | ios_base::out, a) { }
-      
+      const Allocator& a);
     template<class SAlloc>
     basic_stringbuf(
-      const basic_string<charT, traits, SAlloc>& s,
-      const Allocator& a)
-      : basic_stringbuf(s, ios_base::in | ios_base::out, a) { }
+      const basic_string<charT, traits, SAlloc>& str,
+      const Allocator& a) : basic_stringbuf(str, ios_base::in | ios_base::out, a) {}
+    template<class SAlloc>
+    explicit basic_stringbuf(
+      const basic_string<charT, traits, SAlloc>& str,
+      ios_base::openmode which = ios_base::in | ios_base::out);
 
-    basic_stringbuf(
-      basic_string<charT, traits, Allocator>&& s,
-      const Allocator& a)
-      : basic_stringbuf(std::move(s), ios_base::in | ios_base::out, a) { }
-
-\end{codeblock}\end{addedblock}%% no allocator for move, because it must be the same to steal from!
+\end{codeblock}
+\end{addedblock}
+%% restrict the last ctor above to SAlloc != Allocator
 \begin{codeblock}
     basic_stringbuf(const basic_stringbuf& rhs) = delete;
     basic_stringbuf(basic_stringbuf&& rhs);
@@ -269,24 +315,37 @@ This section also adopts the changes of p1163 by only marking the single argumen
 
 \end{codeblock}
 
-Change the getting \tcode{str()} overload to take an Allocator for the returned string and add a reference qualification. Add an rvalue-ref overload of \tcode{str()}.
-Change the \tcode{str()} overload copying into the string buffer to take an allocator template parameter that could differ from the buffer's own \tcode{Allocator}. 
-Add a \tcode{str()} overload that moves from its string rvalue-reference argument into the internal buffer.
-Add the \tcode{view()} member function obtaining a \tcode{string_view} to the underlying internal buffer.
-Provide an exposition-only member function \tcode{init_buf_ptrs()} to ensure streambuf pointers are initialized correctly by all \tcode{buf} setting operations.
+\begin{em}
+{The following list summarizes the edits:}
+\begin{itemize}
+\item Add an rvalue-ref overload of \tcode{str()} that obtains the underlying string via moving from buf.
+\item Add a \tcode{str(Allcator)} overload template member function to take an Allocator for the returned string and add a reference qualification the existing \tcode{str()} overload.\emph{NEW: was intermingled with existing str() member, now separate.} 
+\item Add the \tcode{view()} member function obtaining a \tcode{string_view} to the underlying internal buffer.\emph{NEW: make that noexcept.}
+\item make the setter \tcode{str()} overload a template member copying into the string buffer to take an allocator template parameter that could differ from the buffer's own \tcode{Allocator} 
+\item Add a \tcode{str(string\&\&)} overload that moves from its string rvalue-reference argument into the internal buffer.
+\item Provide an exposition-only member function \tcode{init_buf_ptrs()} to ensure streambuf pointers are initialized correctly by all \tcode{buf} setting operations.
+\end{itemize}
+\end{em}
 
 \begin{codeblock}
     // \iref{stringbuf.members}, get and set:
+    basic_string<charT, traits, Allocator> str() const  @\added{\&}@;
+\end{codeblock}
+\begin{addedblock}
+\begin{codeblock}
+    template<class SAlloc>
+    basic_string<charT,traits,SAlloc> str(const SAlloc& sa) const ;
+    basic_string<charT, traits, Allocator> str() &&;
+    basic_string_view<charT, traits> view() const noexcept;
+\end{codeblock}
+\end{addedblock}
+\begin{codeblock}
     @\added{template<class SAlloc = Allocator>}@
-    basic_string<charT,traits,@\added{S}@Alloc@\removed{ator}@> str(@\added{const SAlloc\& sa = SAlloc()}@) const @\added{\&}@;
-    @\added{template<class SAlloc = Allocator>}@
-    void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
+    void str(const basic_string<charT, traits, @\removed{Allocator}\added{SAlloc}@>& s);
 \end{codeblock}
 \begin{addedblock}
 \begin{codeblock}
     void str(basic_string<charT, traits, Allocator>&& s);
-    basic_string<charT, traits, Allocator> str() &&;
-    basic_string_view<charT, traits> view() const;
 \end{codeblock}
 \end{addedblock}
 
@@ -327,7 +386,7 @@ The sequence can be initialized from, or made available as, an object of class
 
 
 \pnum
-For the sake of exposition, the maintained data and internal pointer initialization is presented here as:
+For the sake of exposition, the maintained data \added{and internal pointer initialization} is presented here as:
 \begin{itemize}
 \item
 \tcode{ios_base::openmode mode},
@@ -351,24 +410,23 @@ accordingly.
 \end{addedblock}
 \end{itemize}
 
-\begin{addedblock}
-\pnum
-\begin{note}
-The allocator used by \tcode{basic_stringbuf} is only relevant for \tcode{buf} or the member functions initializing, assigning or returning \tcode{buf}. All allocator (propagation) properties are thus given by \tcode{basic_stringbuf}'s allocator properties.
-\end{note}
-\end{addedblock}
+%% San Diego feedback suggested eliminate the design note:
+%\begin{addedblock}
+%\pnum
+%\begin{note}
+%The allocator used by \tcode{basic_stringbuf} is only relevant for \tcode{buf} or the member functions initializing, assigning or returning \tcode{buf}. All allocator (propagation) properties are thus given by \tcode{basic_stringbuf}'s allocator properties.
+%\end{note}
+%\end{addedblock}
 
 
 
 \subsection{30.8.2.1 basic\_stringbuf constructors [stringbuf.cons]}
 \begin{em}
-Adjust the constructor specifications taking the additional Allocator parameter and an overload for the move-constructor taking an Allocator:
+Adjust the constructor specifications taking the additional Allocator parameter and an overload for the move-constructor taking an Allocator. Make the constructors' wording that actually construct a buf consistent.
 \end{em}
 
 \begin{itemdecl}
-explicit basic_stringbuf(
-  ios_base::openmode which = ios_base::in | ios_base::out@\added{,}@
-  @\added{const Allocator \&a = Allocator()}@);
+explicit basic_stringbuf(ios_base::openmode which);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -377,22 +435,25 @@ explicit basic_stringbuf(
 Constructs an object of class
 \tcode{basic_stringbuf},
 initializing the base class with
-\tcode{basic_streambuf()}\iref{streambuf.cons}, \removed{and} initializing
+\tcode{basic_streambuf()}\iref{streambuf.cons}, and initializing
 \tcode{mode}
-with \tcode{which}\added{, and \tcode{buf} with \tcode{a}. Calls \tcode{init_buf_ptrs()}}.
+with \tcode{which}.
+It is
+\impldef{whether sequence pointers are initialized to null pointers}
+whether the sequence pointers
+(\tcode{eback()}, \tcode{gptr()}, \tcode{egptr()},
+\tcode{pbase()}, \tcode{pptr()}, \tcode{epptr()})
+are initialized to null pointers.
 
 \pnum
 \ensures
 \tcode{str() == ""}.
 \end{itemdescr}
 
-Modify the following constructor specification:
 \begin{itemdecl}
-@\added{template<class SAlloc>}@
 explicit basic_stringbuf(
-  const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s,
-  ios_base::openmode which = ios_base::in | ios_base::out@\added{,}@
-  @\added{const Allocator\& a = Allocator()}@);
+  const basic_string<charT, traits, Allocator>& s,
+  ios_base::openmode which = ios_base::in | ios_base::out);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -403,30 +464,87 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_streambuf()}\iref{streambuf.cons}, \removed{and} initializing
 \tcode{mode}
-with \tcode{which}\added{, and initializing \tcode{buf} with \tcode{\{s,a\}}. Calls \tcode{init_buf_ptrs()}}.
+with \tcode{which} \added{, and \tcode{buf} with \tcode{s}. Calls  \tcode{init_buf_ptrs()}}.
 \removed{Then calls \tcode{str(s)}.}
 \end{itemdescr}
 
-Add the following constructor specifications:
 
-\begin{insrt}
+
+\begin{addedblock}
+\begin{itemdecl}
+basic_stringbuf(
+  ios_base::openmode which,
+  const Allocator &a);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Constructs an object of class
+\tcode{basic_stringbuf},
+initializing the base class with
+\tcode{basic_streambuf()}\iref{streambuf.cons}, initializing
+\tcode{mode}
+with \tcode{which}, and \tcode{buf} with \tcode{a}. Calls \tcode{init_buf_ptrs()}.
+
+\pnum
+\ensures
+\tcode{str() == ""}.
+\end{itemdescr}
+
 \begin{itemdecl}
 explicit basic_stringbuf(
   basic_string<charT, traits, Allocator>&& s,
-  ios_base::openmode which = ios_base::in | ios_base::out,
-  const Allocator\& a = Allocator());
+  ios_base::openmode which = ios_base::in | ios_base::out);
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} (30.6.3.1), and initializing \tcode{mode} with \tcode{which}. 
-%old:
-\removed{Then calls \tcode{str(std::move(s))}.}
-%% p0407: 
-\added{, and initializing \tcode{buf} with \tcode{\{std::move(s), a\}}. Calls \tcode{init\_buf\_ptrs()}}.
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{std::move(s)}. Calls \tcode{init\_buf\_ptrs()}.
 \end{itemdescr}
-\end{insrt}
 
-Note to reviewers: \textit{For p0407, different allocators for \tcode{s} and the \tcode{basic_stringbuf} will result in a copy instead of a move.}
+\begin{itemdecl}
+template<class SAlloc>
+basic_stringbuf(
+  basic_string<charT, traits, SAlloc>& s,
+  ios_base::openmode which,
+  const Allocator &a);
+\end{itemdecl}
+\begin{itemdescr}
+
+%\pnum
+%\mandates 
+%\tcode{SAlloc} shall satisfy the \oldconcept{Allocator} requirements
+%(\tref{utilities.allocator.requirements}).
+%% TODO
+
+\pnum
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{\{s,a\}}. Calls \tcode{init\_buf\_ptrs()}.
+
+\end{itemdescr}
+
+\begin{itemdecl}
+template<class SAlloc>
+explicit basic_stringbuf(
+  basic_string<charT, traits, SAlloc>& s,
+  ios_base::openmode which = ios_base::in | ios_base::out);
+\end{itemdecl}
+\begin{itemdescr}
+
+\pnum
+\mandates \tcode{!is_same_v<SAlloc,Allocator>}.
+%\tcode{SAlloc} shall satisfy the \oldconcept{Allocator} requirements
+%(\tref{utilities.allocator.requirements}).
+%% TODO
+
+\pnum
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{\{s,a\}}. Calls \tcode{init\_buf\_ptrs()}.
+
+\end{itemdescr}
+
+
+\end{addedblock}
+
+
 
 \textit{Add the additional move constructor taking an allocator and adjust the description accordingly:}
 
@@ -439,8 +557,7 @@ basic_stringbuf(basic_stringbuf&& rhs);
 \pnum
 \effects Move constructs from the rvalue \tcode{rhs}. 
 \added{In the first form \tcode{buf} is initialized from \tcode{\{std::move(rhs.buf)\}}. In the second form \tcode{buf} is initialized from \tcode{\{std::move(rhs.buf), a\}}.}
-It
-is
+It is
 \impldef{whether sequence pointers are copied by \tcode{basic_stringbuf} move
 constructor} whether the sequence pointers in \tcode{*this}
 (\tcode{eback()}, \tcode{gptr()}, \tcode{egptr()},
@@ -472,6 +589,7 @@ refer to the state of \tcode{rhs} just after this construction.
 \end{addedblock}
 \end{itemize}
 \end{itemdescr}
+
 
 %\rSec3[stringbuf.assign]{Assign and swap}
 \section{30.8.2.2 Assign and swap [stringbuf.assign]}
@@ -696,7 +814,7 @@ Move-assigns \tcode{buf} from \tcode{s}. Calls \tcode{init_buf_ptrs()}.
 \end{insrt}
 
 \begin{itemdecl}
-@\added{template<class SAlloc = Allocator>}@
+@\added{template<class SAlloc>}@
 void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s);
 \end{itemdecl}
 
@@ -704,6 +822,8 @@ void str(const basic_string<charT, traits, @\added{S}@Alloc@\removed{ator}@>& s)
 \pnum
 \effects
 \tcode{buf = s}. Calls \tcode{init_buf_ptrs()}.
+% note: this takes into account that a basic_string can be assigned from a basic_string_view and 
+% s can always be converted to one.
 \removed{
 Copies the content of \tcode{s} into the \tcode{basic_stringbuf} underlying character
 sequence and initializes the input and output sequences according to \tcode{mode}}.

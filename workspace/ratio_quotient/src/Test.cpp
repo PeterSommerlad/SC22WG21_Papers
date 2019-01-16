@@ -126,7 +126,7 @@ static_assert(017==y,"");
 } // namespace
 
 
-void thisIsATest() {
+void simpleminimum() {
 	using namespace std_peter::literals;
 	using std_peter::ratio;
 	constexpr ratio r{2_to_c,4_to_c};
@@ -184,7 +184,7 @@ static_assert(std::is_same_v<std_peter::ratio_t<1,2>,std_peter::ratio_t<2,4>>,""
 bool runAllTests(int argc, char const *argv[]) {
 	cute::suite s { };
 	//TODO add your test here
-	s.push_back(CUTE(thisIsATest));
+	s.push_back(CUTE(simpleminimum));
 	s.push_back(CUTE(test_ratio_scale));
 	s.push_back(CUTE(test_integral_constant_negate));
 	cute::xml_file_opener xmlfile(argc, argv);
