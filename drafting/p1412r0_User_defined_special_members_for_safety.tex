@@ -1,0 +1,114 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
+\usepackage[final]
+           {listings}     % code listings
+%\usepackage{longtable}    % auto-breaking tables
+%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+%\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+\usepackage[final]{microtype}
+%\usepackage{multicol}
+\usepackage{xspace}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+
+%%%% reuse all three from std.tex:
+\input{macros}
+\input{layout}
+\input{styles}
+
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{dXXXX}
+\newcommand{\paperdate}{20178-03-xx}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - On user-declared and user-defined special member functions in safety-critical code}
+\author{Peter Sommerlad}
+\date{\paperdate}                % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{center}
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number:&  \papernumber \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++ / Programming Language Vulnerabilities C++\\\hline 
+Audience: & SG12 / ISO SC22 WG23\\\hline
+\end{tabular}
+\end{center}
+\chapter{Introduction}
+
+TODO: Howard's table
+
+rule of zero and related
+
+context of audience.
+
+forces to be covered.
+
+Properties to be discussed. 
+
+Potential dangers.
+\section{Items to be discussed}
+Things I am unsure
+\begin{itemize}
+\item Are there further useful and safe exceptions?
+\end{itemize}
+
+
+\chapter{Categories of safe user-defined classes}
+\section{Plain Value Types}
+\section{Monomorphic Object Types (better name) - Encapsulation Types}
+\section{Polymorphic Object Types - Class Hierarchies}
+\section{Resource Managing Types}
+
+%%%%%%
+
+\chapter{Bibliography}
+Core Guidelines
+
+MISRA
+
+Rule of Zero
+
+Howard's table
+\end{document}
+
