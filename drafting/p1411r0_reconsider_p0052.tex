@@ -1,0 +1,108 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
+\usepackage[final]
+           {listings}     % code listings
+\usepackage{longtable}    % auto-breaking tables
+\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+%\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+\usepackage[final]{microtype}
+%\usepackage{multicol}
+\usepackage{xspace}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+
+%%%% reuse all four from std.tex:
+\input{layout}
+\input{styles}
+\input{macros}
+\input{tables}
+
+\renewcommand{\iref}[1]{[#1]}
+
+
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{p1411r0}
+\newcommand{\paperdate}{2019-01-21}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - Please reconsider <scope> for C++20}
+\author{Peter Sommerlad}
+\date{\paperdate}                % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{center}
+\begin{tabular}[t]{|l|l|}\hline 
+Document Number:&  \papernumber \hfill \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++\\\hline 
+Audience: & LEWG\\\hline
+Target: & C++20 \\\hline
+\end{tabular}
+\end{center}
+\chapter{Introduction}
+Timing is hard. When LEWG blessed p0052 (scope guards and unique_resource) to advance (see \url{https://issues.isocpp.org/show_bug.cgi?id=6}), neither C++20 nor a library fundamentals TS was open and the paper was not ready for C++17. The current working draft was for C++17 and the library fundamentals TS 2 was (about to be) published. Thinking ahead LEWG voted p0052 for a future library fundamentals TS 3. I believe that went under LEWG's assumption that such a vehicle would open early enough so that the highly desired and long brewing feature could be included into C++20. However, library fundamentals TS 3 was only opened for business summer 2018 and thus too late to include new features as a staging area for C++20. While getting improved through LWG feedback under the assumption it could and should be included into C++20, it turned out, that such a formal blessing by LEWG is missing. In addition some minor design question arose (default constructability of unique_resource) that must be addressed by LEWG. Many people have expressed the desire to get p0052 into C++20, or at least its unique_resource part.
+
+To not overwhelm LEWG with the wording and rationale of p0052 I would like to ask for answering 2-3 simple questions as soon as possible, so that I can be relieved of p0052 (which is reaching an age it has to go to elementary school). I understand that LEWG does not bless for inclusion in the working draft, but we need a formal forward decision by LEWG to not get bailed with that paper when it comes to plenary.
+\chapter{Decisions to be made}
+
+\section{Decision 1: Allow default constructability of unique_resource}
+I have user requests that desire \tcode{unique_resource} to provide a default constructor if its resource and deleter types are default constructible. The reason is to ease using member variables and containers of such unique_resource objects. The default constructor would create the unique_resource in a released state to be later reassigned or reset. This would not introduced additional overhead, since the underlying infrastructure must already deal with such a released state.
+
+LEWG question: Should unique_resource provide a default constructor creating a resource in a released state if both template argument types allow so?
+
+\section{Decision 2: Bless all of p0052 forward to LWG to consider for inclusion in C++20}
+
+LEWG question: Should p0052 be forwarded for C++20? (it was in spirit, but not in fact).
+
+\section{Decision 3 (only if 2 is NO): Bless unique_resource part of p0052 to LWG to consider for inclusion in C++20}
+
+This question is only relevant if Decision 2 is NO. There is stronger user desire for unique_resource than for scope guards.
+
+LEWG question: Should only the unique_resource part of p0052 be forwarded to LWG for C++20?
+
+
+\section{Outlook}
+If neither decision 2 or 3 are positive I am eagerly looking for a future champion and co-author that takes this paper further. I have other priorities to work on and am burnt out by the many iterations this paper took.
+
+\end{document}
+
