@@ -54,8 +54,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{dXXXX}
-\newcommand{\paperdate}{20178-03-xx}
+\newcommand{\papernumber}{p1412}
+\newcommand{\paperdate}{2019-01-21}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -71,22 +71,103 @@
 Document Number:&  \papernumber \\\hline
 Date: & \paperdate \\\hline
 Project: & Programming Language C++ / Programming Language Vulnerabilities C++\\\hline 
-Audience: & SG12 / ISO SC22 WG23\\\hline
+Audience: & SG12 / ISO SC22 WG23, SG20, Misra C++\\\hline
 \end{tabular}
 \end{center}
 \chapter{Introduction}
 
-TODO: Howard's table
+Why.
 
-rule of zero and related
+Type system.
+
+Promote value types/regular types.
+
+UB
+
+
+level of developer expertise
 
 context of audience.
 
-forces to be covered.
+\chapter{history}
+
+rule of zero and related
+
+
 
 Properties to be discussed. 
 
 Potential dangers.
+
+\chapter{Forces for Safety in Source Code}
+As a pattern (book) author I would like to introduce so-called "forces" that are used in a pattern's problem description to denote design constraints that influence the pattern's solution. Often such forces are not absolute and a pattern make conscious trade-offs. That is also a reason, why often conflicting patterns for a problem exist that resolve to different solutions.
+
+Here I collect forces that in my observation have influenced existing programming guidelines.
+\begin{itemize}
+\item Simplicity
+\item Familiarity
+\item Code Evolution (aka Maintenance)
+\end{itemize}
+
+\chapter{Howard Hinnant's special member function overview}
+\begin{table}[htp]
+\caption{Howard Hinnant's special member functions table}
+\begin{center}
+\begin{tabular}{|c||c|c|c|c|c|c||c|}
+ &\multicolumn{6}{c}{What the compiler provides for class X}& \\
+ user\newline{}declares   & {\tcode{X()}} & {\tcode{\~X()}} & {\tcode{X(X const\&)}} & {\tcode{=(X const\&)}} & {\tcode{X(X \&\&)}} & {\tcode{=(X \&\&)}} &   OK? \\
+\hline
+ nothing & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & OK \\
+\hline
+\tcode{X(T)} & not decl& \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & OK \\
+\hline
+\tcode{X()} & \textit{declared} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & (OK) \\
+\hline
+\tcode{\~X()} & \tcode{=default} & \textit{declared} & \color{red}\tcode{=default} & \color{red}\tcode{=default} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{X(X const\&)} & not decl& \tcode{=default} & \textit{declared} & \color{red}\tcode{=default} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{=(X const\&)} & \tcode{=default} & \tcode{=default} & \color{red}\tcode{=default} & \textit{declared} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{X(X\&\&)} & not decl& \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & \textit{declared} & not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{=(X\&\&)} & \tcode{=default} & \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & not decl& \textit{declared} & {(BAD)} \\
+\hline
+\end{tabular}
+\end{center}
+\label{default}
+\end{table}%
+
+\begin{table}[htp]
+\caption{Safe and Sane combinations of Special Member Functions (TODO)}
+\begin{center}
+\begin{tabular}{|c||c|c|c|c|c|c||c|}
+ &\multicolumn{6}{c}{declared or provided}& \\
+type category & {\tcode{X()}} & {\tcode{\~X()}} & {\tcode{X(X const\&)}} & {\tcode{=(X const\&)}} & {\tcode{X(X \&\&)}} & {\tcode{=(X \&\&)}}  \\
+\hline
+value/aggregate & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & OK \\
+\hline
+value & not decl& \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & OK \\
+\hline
+\tcode{X()} & \textit{declared} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & \tcode{=default} & (OK) \\
+\hline
+OO & \tcode{=default} & \textit{declared} & \color{red}\tcode{=default} & \color{red}\tcode{=default} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{X(X const\&)} & not decl& \tcode{=default} & \textit{declared} & \color{red}\tcode{=default} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{=(X const\&)} & \tcode{=default} & \tcode{=default} & \color{red}\tcode{=default} & \textit{declared} & not decl& not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{X(X\&\&)} & not decl& \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & \textit{declared} & not decl& \color{red}\textbf{BAD} \\
+\hline
+\tcode{=(X\&\&)} & \tcode{=default} & \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & not decl& \textit{declared} & {(BAD)} \\
+\hline
+\end{tabular}
+\end{center}
+\label{default}
+\end{table}%
+
+
+
 \section{Items to be discussed}
 Things I am unsure
 \begin{itemize}
