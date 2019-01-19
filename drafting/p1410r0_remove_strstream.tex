@@ -79,13 +79,13 @@ Audience: & LEWG/LWG\\\hline
 Target: & C++20 or C++23\\\hline
 \end{tabular}
 \end{center}
-\section{Introduction}
+\chapter{Introduction}
 Streams have been the oldest part of the C++ standard library and especially strstreams that can use pre-allocated buffers have been deprecated for a long time now, waiting for a replacement. p0407, p0408 and p0448 provide together a modern complete replacement for strstream. This paper provides wording for actually removing it from appendix D and referring to its removal in appendix C. If p0408 (that includes p0407) and p0448 are accepted for C++20 then this paper can either be applied for C++20 or as some propose applied for C++23. I personally believe time is ripe for C++20, but I let LEWG or the full committee decide.
 
-\section{Impact on the standard}
+\chapter{Impact on the standard}
 This section is relative to n4791 which is current at the time of the writing.
 
-\subsection{provide wording for difference in Appendix C}
+\section{provide wording for difference in Appendix C}
 Depending on approval standard add the following paragraph to section [diff.cpp17.depr] (or [diff.cpp20.depr] when that exists). The editorial guidance now is relative to n4791.
 
 Add a new paragraph in [diff.cpp17.depr] before p.7 as follows:
@@ -95,9 +95,10 @@ Add a new paragraph in [diff.cpp17.depr] before p.7 as follows:
 \rationale
 The introduction of span streams [span.streams] and the provisioning of efficient access to the underlying buffer of string streams [string.streams] provide better alternatives for the use cases of \tcode{char *} streams. The latter have been deprecated in all revisions of this international standard.
 \effect
-A valid \CppXVII{} program that relies on the deprecated \tcode{char *} stream classes may fail to compile. Such a program must be adapted to employ classes and functions from [span.streams] or [string.streams] to achieve its functionality with equivalent performance.
+A valid \CppXVII{} program that relies on the deprecated \tcode{char *} stream classes may fail to compile.
+In cases where the underlying \tcode{strstreambuf} is allows writing and its \tcode{strstate} bitmask has \tcode{allocated} or \tcode{dynamic} set, classes from [string.streams] should be used instead. In other cases either classes from [span.streams] or [string.streams] can be used to achieve its functionality with equivalent performance.
 
-\subsection{Remove deprecated \tcode{char *} streams from Appendix D}
+\section{Remove deprecated \tcode{char *} streams from Appendix D}
 Remove all of Appendix D.8  [depr.str.strstreams]
 
 

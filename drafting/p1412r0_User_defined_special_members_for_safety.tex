@@ -44,6 +44,7 @@
 %\usepackage{memhfixc}     % fix interactions between hyperref and memoir
 %\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
 %
+\usepackage{threeparttable} % allow for table footnotes..
 \renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
 
 
@@ -76,9 +77,13 @@ Audience: & SG12 / ISO SC22 WG23, SG20, Misra C++\\\hline
 \end{center}
 \chapter{Introduction}
 
-Why.
+C++ is a complex language providing a lot of flexibility in its use. However, not all programs are valid or behave as a developer thinks. Because of its deterministic resource management C++ is used in many systems that have high quality and safety-related requirements. While high software quality does not make a system safe or fault-tolerant, it can be an enabling factor to achieve them. Therefore, in safety-critical environments adhering to programming guidelines restricting the language use to avoid safety risks, especially undefined behavior, are one of the required practices.
 
-Type system.
+Over the decades of C++ evolution, best practices and what is considered good style changed a lot. Typical systems built with the language often outlive the style they were written in. With the introduction of a three years release cycle and the frequent innovation and updates it becomes hard to keep up. Some style guides try to achieve that by taking a looking class and even proposing to use features of the language or library that are not yet standardized or even implemented (\cite{CoreGuidelines}). Other relevant guidelines that are industry standards stem from a past and provide a style that is considered no longer recommendable.
+
+One area, where classic and more modern C++ versions differ are the recommended practices of declaring and defining special member functions in a user-defined class type. The introduction of move operations with C++11 and the guaranteed copy-elision of C++17 are game changers to the rules viable for C++03, and the world has not become simpler. This paper explains the situation by repeating Howard Hinnant's classical special member functions table and suggest a set of special member function declaration/definition combinations the author recommends. The underlying philosophy, such as categorizing class types into values, managing types, and referring types, is explained below together with other attributes the author believes are important for modern high-quality C++ code.
+
+%Type system.
 
 Promote value types/regular types.
 
@@ -113,6 +118,7 @@ Here I collect forces that in my observation have influenced existing programmin
 \begin{table}[htp]
 \caption{Howard Hinnant's special member functions table}
 \begin{center}
+\begin{threeparttable}
 \begin{tabular}{|c||c|c|c|c|c|c||c|}
  &\multicolumn{6}{c}{What the compiler provides for class X}& \\
  user\newline{}declares   & {\tcode{X()}} & {\tcode{\~X()}} & {\tcode{X(X const\&)}} & {\tcode{=(X const\&)}} & {\tcode{X(X \&\&)}} & {\tcode{=(X \&\&)}} &   OK? \\
@@ -134,6 +140,7 @@ Here I collect forces that in my observation have influenced existing programmin
 \tcode{=(X\&\&)} & \tcode{=default} & \tcode{=default} & \tcode{=delete} &  \tcode{=delete} & not decl& \textit{declared} & {(BAD)} \\
 \hline
 \end{tabular}
+\end{threeparttable}
 \end{center}
 \label{default}
 \end{table}%
