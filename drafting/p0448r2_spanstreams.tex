@@ -441,7 +441,7 @@ void swap(basic_spanbuf& rhs) noexcept;
 
 \begin{itemdescr}
 \pnum
-\effects 
+\effects Equivalent to: 
 \tcode{basic_streambuf<charT, traits>::swap(rhs);} \tcode{std::swap(mode,rhs.mode);} \tcode{std::swap(buf, rhs.buf)}.
 %Exchanges the state of \tcode{*this}
 %and \tcode{rhs}.
@@ -776,7 +776,7 @@ basic_ispanstream& operator=(basic_ispanstream&& rhs);
 
 \begin{itemdescr}
 \pnum
-\effects 
+\effects Equivalent to:
 \tcode{basic_istream<charT, traits>::swap(rhs);} \tcode{sb = std::move(rhs.sb)}.
 %Move assigns the base and members of \tcode{*this} from the base and corresponding
 %members of \tcode{rhs}.
@@ -792,8 +792,8 @@ void swap(basic_ispanstream& rhs);
 
 \begin{itemdescr}
 \pnum
-\effects 
-\tcode{basic_istream<charT, traits>::swap(rhs);}\tcode{sb.swap(rhs.sb)}.
+\effects Equivalent to:
+\tcode{basic_istream<charT, traits>::swap(rhs);} \tcode{sb.swap(rhs.sb)}.
 % text from basic_istringstream:
 %Exchanges the state of \tcode{*this} and
 %\tcode{rhs} by calling
@@ -811,7 +811,8 @@ template <class charT, class traits>
 
 \begin{itemdescr}
 \pnum
-\effects \tcode{x.swap(y)}.
+\effects As if by 
+\tcode{x.swap(y)}.
 \end{itemdescr}
 
 %\rSec3[ispanstream.members]{Member functions}
@@ -932,7 +933,7 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_ostream(\&sb)}
 and initializing \tcode{sb} with
-\tcode{basic_spanbuf<charT, traits>{span, which | ios_base::out})}~(\iref{spanbuf.cons}).
+\tcode{basic_spanbuf<charT, traits>(span, which | ios_base::out)}~(\iref{spanbuf.cons}).
 \end{itemdescr}
 
 %\indexlibrary{\idxcode{basic_ospanstream}!constructor}%
@@ -962,7 +963,7 @@ basic_ospanstream& operator=(basic_ospanstream&& rhs) noexcept;
 
 \begin{itemdescr}
 \pnum
-\effects 
+\effects Equivalent to: 
 \tcode{basic_ostream<charT, traits>::swap(rhs);} \tcode{sb = std::move(rhs.sb)}.
 
 \pnum
@@ -976,8 +977,8 @@ void swap(basic_ospanstream& rhs) noexcept;
 
 \begin{itemdescr}
 \pnum
-\effects 
-\tcode{basic_ostream<charT, traits>::swap(rhs);}\tcode{sb.swap(rhs.sb)}.
+\effects Equivalent to:
+\tcode{basic_ostream<charT, traits>::swap(rhs);} \tcode{sb.swap(rhs.sb)}.
 \end{itemdescr}
 
 
@@ -1111,7 +1112,7 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_iostream(\&sb)}
 and initializing \tcode{sb} with
-\tcode{basic_spanbuf<charT, traits>{span, which})}~(\iref{spanbuf.cons}).
+\tcode{basic_spanbuf<charT, traits>(span, which)}~(\iref{spanbuf.cons}).
 \end{itemdescr}
 
 %\indexlibrary{\idxcode{basic_spanstream}!constructor}%
@@ -1142,7 +1143,7 @@ basic_spanstream& operator=(basic_spanstream&& rhs) noexcept;
 
 \begin{itemdescr}
 \pnum
-\effects 
+\effects Equivalent to:
 \tcode{basic_iostream<charT, traits>::swap(rhs);} \tcode{sb = std::move(rhs.sb)}.
 %Move assigns the base and members of \tcode{*this} from the base and corresponding
 %members of \tcode{rhs}.
@@ -1158,8 +1159,8 @@ void swap(basic_spanstream& rhs) noexcept;
 
 \begin{itemdescr}
 \pnum
-\effects 
-\tcode{basic_iostream<charT, traits>::swap(rhs);}\tcode{sb.swap(rhs.sb)}.
+\effects Equivalent to:
+\tcode{basic_iostream<charT, traits>::swap(rhs);} \tcode{sb.swap(rhs.sb)}.
 \end{itemdescr}
 
 
