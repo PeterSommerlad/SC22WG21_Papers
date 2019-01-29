@@ -1,0 +1,1 @@
+kernelname<<<grid_dimensions, block_dimensions, bytes_of_shared_mem, stream>>>(args);

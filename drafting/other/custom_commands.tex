@@ -1,0 +1,157 @@
+
+% ADD GLOBAL CUSTOM COMMANDS HERE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                                                   %
+%   Example:                                                                                        %
+%   \newcommand{\keyword}[1]{\textbf{#1}}                                                           %
+%                                                                                                   %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%\newminted[thesismintedpython]{python}{tabsize=2, fontsize=\footnotesize, breaklines}
+%\newmintinline[inlbash]{bash}{tabsize=2, fontsize=\footnotesize, breaklines}
+
+\NewDocumentCommand{\instruction}{m}%
+    {%
+    {\texttt{\color{instruction}{\textbf{[#1]}}}}%
+    }%
+    
+\NewDocumentCommand{\fileref}{m}%
+    {%
+    {\texttt{\color{fileref}{\textbf{#1}}}}%
+    }%
+
+% \NewDocumentCommand{\TODO}{m}
+%     {
+%     {\color{red}{\Huge TODO \large #1}}%
+%     }
+
+\DeclareCiteCommand{\Reproduced}%
+    {Reproduced from }{\printtext[bibhyperref]{\usebibmacro{cite}}}{\multicitedelim}{\usebibmacro{postnote}}%
+
+\DeclareCiteCommand{\reproduced}%
+    {reproduced from }{\printtext[bibhyperref]{\usebibmacro{cite}}}{\multicitedelim}{\usebibmacro{postnote}}%
+    
+\DeclareCiteCommand{\Adapted}%
+    {Adapted from }{\printtext[bibhyperref]{\usebibmacro{cite}}}{\multicitedelim}{\usebibmacro{postnote}}%
+
+\DeclareCiteCommand{\adapted}%
+    {adapted from }{\printtext[bibhyperref]{\usebibmacro{cite}}}{\multicitedelim}{\usebibmacro{postnote}}%
+    
+\DeclareCiteCommand{\citeba}%
+    {\printtext[bibhyperref]{[\usebibmacro{prenote}}}{\printtext[bibhyperref]{ \usebibmacro{cite}}}{\multicitedelim}{\printtext[bibhyperref]{\usebibmacro{postnote} ]}}%
+
+\NewDocumentCommand{\colhl}{m m}
+    {%
+    {\texttt{\color{#1}#2}}% 
+    }%
+
+\NewDocumentCommand{\colbhl}{m m}
+    {%
+    {\texttt{\color{#1}\textbf{#2}}}% 
+    }%
+    
+    \NewDocumentCommand{\intt}{ m }
+    {%
+    \texttt{#1}%
+    }%
+    
+\NewDocumentCommand{\ohcolorbox}{ m m O{1em}}
+    {%
+    \colorbox{#1}{\strut{#2}}%
+    }%
+
+\NewDocumentCommand{\oscolorbox}{ m m O{1em}}
+    {%
+    \colorbox{#1}{\makebox[#3]{\strut{#2}}}%
+    }%
+
+
+\NewDocumentCommand{\inputcuda}{ m m O{} O{} }%
+    {%
+    \begin{cudabox}[#3]%
+    \inputminted[escapeinside=||,#4]{cuda}{parts/#1/cuda/#2}%
+    \end{cudabox}%
+    }%
+    
+\NewDocumentCommand{\inputsycl}{ m m O{} O{} }%
+    {%
+    \begin{syclbox}[#3]%
+    \inputminted[escapeinside=||,#4]{cpp}{parts/#1/sycl/#2}%
+    \end{syclbox}%
+    }%
+    
+\NewDocumentCommand{\inputcts}{ m m O{} O{} }%
+    {%
+    \begin{ctsbox}[#3]%
+    \inputminted[escapeinside=||,#4]{cuda}{parts/#1/c2s/#2}%
+    \end{ctsbox}%
+    }%
+
+\NewDocumentCommand{\syclinlfbox}{ m O{100}}%
+    {%
+    {%
+    \setlength{\fboxrule}{2pt}%
+    \fcolorbox{syclorange!#2}{white}{#1}%
+    }%
+    }%
+    
+\NewDocumentCommand{\cudainlfbox}{ m O{100}}%
+    {%
+    {%
+    \setlength{\fboxrule}{2pt}%
+    \fcolorbox{cudagreen!#2}{white}{#1}%
+    }%
+    }%
+    
+\NewDocumentCommand{\syclinlbox}{ m O{100}}%
+    {%
+    \colorbox{syclorange!#2}{#1}%
+    }%
+    
+\NewDocumentCommand{\cudainlbox}{ m O{100}}%
+    {%
+    \colorbox{cudagreen!#2}{#1}%
+    }%
+    
+\NewDocumentCommand{\syclohinlbox}{ m O{100}}%
+    {%
+    \colorbox{syclorange!#2}{\strut{#1}}%
+    }%
+    
+\NewDocumentCommand{\cudaohinlbox}{ m O{100}}%
+    {%
+    \colorbox{cudagreen!#2}{\strut{#1}}%
+    }%
+    
+\NewDocumentCommand{\FUTUREbox}{ m }%
+    {%
+    \begin{alertbox}[Future work:]%
+    #1%
+    \end{alertbox}%
+    }%
+
+\NewDocumentCommand{\offsetbox}{ m }%
+    {%
+    \begin{tcolorbox}[colback=white,
+    colbacktitle=white,
+    coltitle=black,
+    fonttitle=\bfseries,
+    bottomrule=0pt,
+    boxrule=0pt,
+    colframe=white]%
+    #1%
+    \end{tcolorbox}%
+    }%
+    
+\DeclareCiteCommand{\citetitle}
+  {\boolfalse{citetracker}%
+   \boolfalse{pagetracker}%
+   \usebibmacro{prenote}}
+  {\ifciteindex
+     {\indexfield{indextitle}}
+     {}%
+   \printtext[bibhyperref]{\printfield[citetitle]{labeltitle}}}
+  {\multicitedelim}
+  {\usebibmacro{postnote}}
+    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
