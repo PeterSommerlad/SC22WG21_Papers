@@ -64,7 +64,8 @@ captionpos=b,caption=\lstname
 ,breaklines=true}
 
 \lstdefinelanguage{C++11}{language=C++, morekeywords={alignas,alignof,char16_t,char32_t,constexpr, decltype, noexcept, nullptr, tatic_assert, thread_local, typeid}}
-\lstdefinelanguage{Cuda}{language=C++11, morekeywords={__global__,__device__,__host__,__constant__,__shared__}}
+\lstdefinelanguage{Cuda}{language=C++11, morekeywords={__global__,__device__,__host__,__constant__,__shared__},
+moredelim=[s][keywordstyle]{<<<}{>>>}}
 \lstdefinestyle{C++11}{language=C++11,basicstyle=\normalsize\ttfamily}
 \lstdefinestyle{Cuda}{language=Cuda,basicstyle=\normalsize\ttfamily}
 
@@ -185,11 +186,11 @@ Here we give a brief overview of key elements of CUDA syntax that will be transf
 \subsection{Marking CUDA Kernels}
 Kernel functions in CUDA are marked with the following specifiers:
 \begin{description}
-\item[\tcode{__host__}] function is executable on the host CPU (redundant, unless combined with \tcode{__device__}
-\item[\tcode{__global__}] kernel function that is executable on the GPU device and can be called from the host CPU with the special call syntax
-\item[\tcode{__device__}] kernel function executable and callable only on the device, unless combined with \tcode{__host__}
+\item[\tcode{__host__}] function is executable on the host CPU (redundant, unless combined with \tcode{__device__})
+\item[\tcode{__global__}] kernel function that is executable on the GPU device and can be called with the special call syntax
+\item[\tcode{__device__}] function executable and callable only on the device, unless combined with \tcode{__host__}
 \end{description}
-These identifiers are implemented as macros, which makes detecting them in the parsed AST already a challenge. Similar specifiers are used for memory space designation (\tcode{__device__} \tcode{__constant__} \tcode{__shared__}). 
+These identifiers are implemented as macros, which makes detecting them in the parsed AST already a challenge. Similar specifiers are used for memory space designation (\tcode{__device__}, \\\tcode{__constant__}, \tcode{__shared__}). 
 
 
 \subsection{Invoking Kernels}
@@ -269,6 +270,7 @@ As an example, for the usage of one of the input matrices (A) the lines declarin
 \inputsycl{sycl-main-a.cpp}{SYCL buffer declaration replaces all lines in Listing~\ref{cuda-main-a.cpp}}
 
 \subsection{SYCL memory accessors from CUDA pointer accesses}
+\label{SYCL:accessors}
 The example code in Listing~\ref{cuda-main.cpp} contains nested loops initializing the input matrices. For simplicity, this loop does two dimensional index transformation manually in the allocated area using the pointers. 
 Since SYCL accesses all buffer memory through SYCL accessors for such an access corresponding accessor objects have to be created. 
 It is important that these accessor objects are defined in a as local as possible scope, because their lifetime is used to synchronize between host and kernel access to the underlying buffer. 
@@ -285,38 +287,54 @@ The underlying scope-introduction algorithm employs slicing and scope matching t
 
 \subsection{Transforming a CUDA kernel call to a SYCL compute-queue submission} 
 
-In contrast to the relatively simple CUDA kernel call syntax, activating a kernel in SYCL is a bit more elaborated, because it requires introducing a compute queue the kernel is submitted with. The special arguments to a CUDA kernel call specifying the underlying grid and block dimensions that are computed 
+In contrast to the relatively simple CUDA kernel call syntax, activating a kernel in SYCL is a bit more elaborated, because it requires introducing a compute queue the kernel is submitted with. The special arguments to a CUDA kernel call specifying the underlying grid and block dimensions that are computed need to be mapped to SYCL's \tcode{nd_range} values. The CUDA types for dimensions allows a bit more flexibility, such as changing the values after initialization that complicates the mapping. This results in a slightly complicated determination of the SYCL range value, that needs to slice the code backwards from the CUDA kernel call to see the computed \tcode{dim3} dimensions, if not given as literals. The details of this algorithm are omitted for brevity here (\cite{stauberCUDASYCL2018}).
 
+Each CUDA kernel call, such as the one in Listing~\ref{cuda-call.cpp} is replaced by a newly introduced compound statement that provides a local scope for the required SYCL objects creating a compute queue and submitting the kernel to it. 
+The \tcode{submit()} call takes a lambda expression that consists of creating the necessary accessor objects, like shown in section~\ref{SYCL:accessors}. Next the lambda calls parallel_for on the handler objects passing the dimensions and accessors to the actual kernel, which is again wrapped in a lambda resulting in the code given in Listing~\ref{sycl-submit.cpp}. The forward-declared class type used as a template argument to parallel_for is used by SYCL as a unique identifier. So this name (abbreviated here as \tcode{class matrixMul_f0}) must be synthesized in a way that guarantees uniqueness. 
+\inputcode{cuda-matrix-call.cpp}{Kernel call to be transformed}
+\inputsycl{sycl-submit.cpp}{Submitting transformed kernel}
+
+This concludes up the transformations required to map CUDA C++ code to SYCL: transforming kernels, mapping memory management and access, calling kernels. In some areas the resulting code gets simpler, especially with respect to resource management. In some others, such as calling the kernel, the CUDA "magic" is replaced by the more transparent but elaborated SYCL compute queue submission. The complete converted program can be seen in Listing~\ref{sycl-matrix-main.cpp} in the Appendix. The required SYCL header include directives are also inserted automatically.
 
 \section{Tooling architecture}
+To complete the paper, a brief overview of the underlying tooling architecture is given. The initial prototype attempted to use the \nsight{} Eclipse CDT plug-in and attempted to build the transformation on top of it as given in Figure~\ref{fig:protoarch}. While a working example transformation could be created, that "solution" showed that the internal parsing infrastructure and its relatively inaccessibility were not up to what is needed for sound code analysis and transformation. 
 \begin{figure}[h]
-  \label{fig:protoarch}
   \centering
   \includegraphics[width=\linewidth]{SimpleArchitectureNsight}
   \caption{Architectural overview initial prototype.}
   %\Description{.}
-\end{figure}
-\begin{figure}[h]
   \label{fig:protoarch}
-  \centering
-  \includegraphics[width=\linewidth]{SimpleArchitectureCRITTER}
-  \caption{Architectural overview after own CUDA parser implementation.}
-  %\Description{.}
 \end{figure}
 
+The second attempt created a CUDA parsing infrastructure (CRITTER) and embedded this into the existing Eclipse CDT C++ AST and transformation infrastructure\cite{stauberCRITTER2019}. The ILTIS layer \cite{stauberIltis2018} abstracts many CDT internals required to ease porting AST transformation plug-ins to newer CDT releases. With that basis the ReSYCLator CUDA to SYCL transformation is on a much sounder platform for future extensions as shown in Figure~\ref{fig:resultarch}.
+
 \begin{figure}[h]
-  \label{fig:toolarch}
+  \centering
+  \includegraphics[width=\linewidth]{SimpleArchitectureCRITTER}
+  \caption{Architectural overview relying on own CUDA parser.}
+  %\Description{.}
+  \label{fig:resultarch}
+\end{figure}
+
+The following Figure~\ref{fig:toolarch} shows the internal dependencies/extension point implementations of the individual Eclipse components created during this project. Note the output specified as "SYCL AST" is not actually a component. The Eclipse framework and Eclipse CDT provide the right hand facilities. The CUDA C++ parser is build by extending Eclipse CDT's C++ parser and AST with additional syntax. To fit everything in the workspace environment of Eclipse CDT, CUDA language support infrastructure needed to be created in addition to the CUDA C++ parser. This allows to seamlessly work with CUDA sources as well as with SYCL C++ sources within the same Eclipse workspace seamlessly.
+
+
+\begin{figure}[h]
   \centering
   \includegraphics[width=\linewidth]{ResultSchemaSimple}
   \caption{Plug-in dependencies of CUDA C++ parser SYCL transformation. Triangles mark plug-in extensions.}
   %\Description{.}
+  \label{fig:toolarch}
 \end{figure}
 
 \section{Outlook and Future Work}
-passing accessors instead of global_ptr to kernels
+Creating such tooling during a Master's degree fixed time frame requires omitting some desirable features. For example, creating SYCL kernels that directly rely on accessors instead of \tcode{global_ptr} is one of the omissions to be able to complete the transformation. The mapping of multiple dimensions within the kernel instead of the generated "pointer arithmetic" is another. But we believe the created infrastructure with its automated tests provides a good starting point for further productizing. The interactive nature under the control of the developer in an IDE allows to be only partially complete and still eases the porting, in contrast to an almost impossible fully automatic solution. 
 
-multiple dimensions handling instead of one dimensional explicit mapping.
+A future product might provide SYCL-specific code analysis and refactoring options to suggest code improvements, e.g., for detecting sub-optimal SYCL mechanism usages, or for improving the generated SYCL code of a transformation. As of today, some existing C++ refactorings, such as "Extract using declaration" for qualified names, already can improve readability of the generated SYCL code that uses fully-qualified names for SYCL components.
 
+More CUDA features, such as transforming CUDA streams to SYCL queues and more sophisticated management of selectors and devices. Also other memory regions, such as constant memory or CUDA's "write-to-symbol" mechanism, need to be handled by the transformation. 
+
+As a side effect the CUDA parsing and AST infrastructure and its integration into the refactoring AST rewriting engine of Eclipse CDT will allow better IDE support for CUDA developers as well. 
 
 
 %
@@ -337,6 +355,9 @@ To our Codeplay friends who inspired work on CUDA to SYCL transformation and the
 %\section{Appendices}
 
 \section{Longer Code Examples}
+\lstset{basicstyle=\footnotesize\ttfamily}
 \inputcode{cuda-main.cpp}{\tcode{main()} calling CUDA matrix multiplication kernel}
+
+\inputsycl{sycl-matrix-main.cpp}{Complete converted SYCL matrix multiplication}
 
 \end{document}
