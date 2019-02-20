@@ -57,8 +57,8 @@
 %%%%
 \renewcommand{\iref}[1]{[#1]}
 
-\newcommand{\papernumber}{p0052r9}
-\newcommand{\paperdate}{2018-10-03}
+\newcommand{\papernumber}{d0052r10}
+\newcommand{\paperdate}{2019-02-19}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -77,6 +77,11 @@ Audience: & LWG\\\hline
 \end{tabular}
 
 \chapter{History}
+\section{Changes from P0052R9}
+\begin{itemize}
+\item Added default constructor as proposed by p1411, to ease integration, once LEWG blesses it. This will be shown in \added{green}.
+\end{itemize}
+
 \section{Changes from P0052R8}
 Incorporates changes suggested in wording review from LWG meeting in Batavia, August 2018.
 \begin{itemize}
@@ -753,6 +758,13 @@ Equivalent to
 template <class R,class D>
 class unique_resource {
 public:
+\end{codeblock}
+\begin{addedblock}
+\end{addedblock}
+\begin{codeblock}
+  @\added{unique_resource(); // \seebelow }@ 
+\end{codeblock}
+\begin{codeblock}
   template <class RR, class DD>
   unique_resource(RR&& r, DD&& d) noexcept(@\seebelow@);
   unique_resource(unique_resource&& rhs) noexcept(@\seebelow@);
@@ -852,6 +864,22 @@ For the scope of this clause let \tcode{\textit{RESOURCE}} be defined as follows
 %\rSec3[scope.unique_resource.ctor]{\tcode{unique_resource} constructors}}
 \subsection {\tcode{unique_resource} constructors [scope.unique_resource.ctor]}
 
+\begin{addedblock}
+\begin{itemdecl}
+unique_resource()
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\constraints
+\tcode{is_default_constructible_v<R>} \tcode{\&\&}
+\tcode{is_default_constructible_v<D>} is \tcode{true}.
+
+\pnum
+\effects
+Constructs a \tcode{unique_resource} where \tcode{resource} and \tcode{deleter} are value-initialized and \tcode{execute_on_reset} is initialized with \tcode{false}.
+\end{itemdescr}
+\end{addedblock}
 
 \begin{itemdecl}
 template <class RR, class DD>
