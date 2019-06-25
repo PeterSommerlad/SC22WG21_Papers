@@ -1,0 +1,140 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
+\usepackage[final]
+           {listings}     % code listings
+%\usepackage{longtable}    % auto-breaking tables
+%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+\usepackage[final]{microtype}
+%\usepackage{multicol}
+\usepackage{xspace}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\usepackage{threeparttable} % allow for table footnotes..
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+\usepackage{todonotes}
+
+%%%% reuse all three from std.tex:
+\input{macros}
+\input{layout}
+\input{styles}
+
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{P1771r0}
+\newcommand{\paperdate}{2019-06-17}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - [[nodiscard]] for constructors}
+\author{Peter Sommerlad}
+\date{\paperdate}                % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+\begin{document}
+\maketitle
+\begin{center}
+\begin{tabular}[t]{|l|p{8cm}|}\hline 
+Document Number:&  \papernumber \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++ \newline Programming Language Vulnerabilities C++\\\hline 
+Audience: & EWGI/EWG/CWG\\\hline
+\end{tabular}
+\end{center}
+
+
+\chapter{Introduction}
+
+The  paper p0189 that introduced the \tcode{[[nodiscard]]} attribute did not consider constructors. However, gcc for example implements the checking for constructors, even so it warns about putting \tcode{[[nodiscard]]} on a constructor definition. Here I propose to allow  \tcode{[[nodiscard]]} also on constructors (which it implicitly is allowed by the current wording) and suggest checking it for cast expressions so that we can put it on things like \tcode{scoped_lock} etc.
+
+The need is more obvious in C++ 17 and later, where CTAD allows for fewer factory functions and thus the easy to make mistake by just typing the type and constructor arguments instead of defining a local variable.
+
+Since this change is editorial only, it might be considered to be applied for the current working paper.
+
+\chapter{Impact on the standard}
+
+The change is IMHO editorial only, since the semantics of warnings is only in a note. Change section [dcl.attr.nodiscard] as follows. Note that a constructor declaration is a function declaration.
+
+\rSec2[dcl.attr.nodiscard]{Nodiscard attribute}%
+%\indextext{attribute!nodiscard}
+
+\pnum
+The \grammarterm{attribute-token} \tcode{nodiscard}
+may be applied to the \grammarterm{declarator-id}
+in a function declaration or to the declaration of a class or enumeration.
+It shall appear at most once in each \grammarterm{attribute-list} and
+no \grammarterm{attribute-argument-clause} shall be present.
+
+\pnum
+\begin{note}
+A nodiscard call is a function call expression 
+\added{or an explicit type conversion}
+that
+calls a function 
+\added{or constructs an object through a constructor}
+previously declared \tcode{nodiscard}, or
+whose return type
+\added{or type} % to be discussed
+is a possibly cv-qualified class or enumeration type
+marked \tcode{nodiscard}. Appearance of a nodiscard call as
+a potentially-evaluated discarded-value expression (7.2)%\iref{expr.prop}
+is discouraged unless explicitly cast to \tcode{void}.
+Implementations should issue a warning in such cases.
+This is typically because discarding the return value
+of a nodiscard call has surprising consequences.
+\end{note}
+
+\pnum
+\begin{example}
+\begin{codeblock}
+struct [[nodiscard]] error_info { @\commentellip@ };
+error_info enable_missile_safety_mode();
+void launch_missiles();
+void test_missiles() {
+  enable_missile_safety_mode(); // warning encouraged
+  launch_missiles();
+}
+error_info &foo();
+void f() { foo(); }             // warning not encouraged: not a nodiscard call, because neither
+                                // the (reference) return type nor the function is declared nodiscard
+\end{codeblock}
+\end{example}
+
+
+\end{document}
+

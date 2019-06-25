@@ -57,7 +57,7 @@
 %%%%
 \renewcommand{\iref}[1]{[#1]}
 
-\newcommand{\papernumber}{d0052r10}
+\newcommand{\papernumber}{p0052r10}
 \newcommand{\paperdate}{2019-02-19}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
@@ -79,8 +79,36 @@ Audience: & LWG\\\hline
 \chapter{History}
 \section{Changes from P0052R9}
 \begin{itemize}
-\item Added default constructor as proposed by p1411, to ease integration, once LEWG blesses it. This will be shown in \added{green}.
-\end{itemize}
+\item adjust clause numbers to n4800: 20->15, 23->19, and the table numbers for the Cpp17concepts as well. Note to editor: the latex contains the corresponding stable names in comments for most occurrences if not in the main text.
+\item strike "Requires:" in non-item-description paragraphs putting requirements on class template arguments after the synopsis (for \tcode{scope_guard} and \tcode{unique_resource})
+\item rephrase the use of "shall" in new style Mandates, Expects, and Constraints sections of a specification, by "is" or equivalent. (see also P1369).
+\item add semicolon in front of otherwise in \emph{\tcode{scope_guard}} constructors Effects clause.
+\item remove template argument from injected class name in Constraints clause of \emph{\tcode{scope_guard}} constructors.
+\item rephrase Constraint clauses that use code into using words, like "is true".
+\item add \tcode{unique_resource} default constructor and adjust specification as told by LWG.
+\item adjust punctuation as instructed by LWG.
+\item clarify saying "resource or deleter" in some places
+\item remove superfluous paragraph number in longer Effects clauses.
+\item rewrite Effects clause of \tcode{make_unique_resource_checked} as commonly phrased by LWG:
+
+ "Effects: Returns an object constructed with
+members initialized from std::forward<R>(resource), std::forward<D>(d),
+and !bool(resource == valid).  Any failure during the construction of
+the return value will not call d(resource) if bool(resource == invalid)
+is true."
+
+\begin{comment}
+*Marshall*: Assuming we get a paper with these changes are we happy
+moving it forward?  Do we need to look at the words again?  I instead
+suggest that two volunteers verify that Peter made the changes, then move
+it forward.  *Peter*: We are authorized to move it into the Library TS.
+P1411 asks to move this paper into the IS.  *Marshall*: It goes into
+the Library TS, and if there are no objections, it could go into C++20.
+There are no LWG objections.  Peter must now check with LEWG on the
+Library TS vs. C++20 decision.  *Daniel Sunderland* and *Jeff Garland*
+volunteered.
+\end{comment}
+\item Added default constructor for \tcode{unique_resource} as proposed by p1411, to ease integration, once LEWG blesses it.\end{itemize}
 
 \section{Changes from P0052R8}
 Incorporates changes suggested in wording review from LWG meeting in Batavia, August 2018.
@@ -251,6 +279,7 @@ The Standard Template Library provides RAII (resource acquisition is initializat
 \item Special thanks to Daniel Kr\"ugler for his deliberate review of the draft version of this paper (D3949).
 \item Thanks to participants in LWG in various meetings, especially STL, Lisa Lippincott, Casey Carter, many others, and Marshall Clow for help with phrasing the wording.
 \item Very special thanks to Tim Song for his elaborate feedback on the wording after Jacksonville and his willingness to go over it several times. Hopefully R7 of this paper will be close enough to make it into the standard.
+\item Thanks to LWG in Kona reviewing it and blessing it to forward. Especial thanks to Paul E. McKenney for taking splendid notes about the edits required and to Dan Sunderland and Jeff Garland for checking that I edited correctly.
 \end{itemize}
 \newpage
 \chapter{Motivation}
@@ -390,34 +419,34 @@ paragraph.
 
 However the following adjustment is missing, since the standard library promises that all library classes won't throw on destruction:
 
-\section{Adjust 20.5.5.12 Restrictions on exception handling [res.on.exception.handling]}
+\section{Adjust 15.5.5.12 Restrictions on exception handling [res.on.exception.handling]}
 
 Change paragraph 3 as follows:
 
 \pnum
 \added{Unless otherwise specified, 
-d}\removed{D}estructor operations defined in the \Cpp standard library
+d}\removed{D}estructor operations defined in the \Cpp{} standard library
 shall not throw exceptions.
-Every destructor\added{ without an exception specification} in the \Cpp standard library shall behave as if it had a
+Every destructor\added{ without an exception specification} in the \Cpp{} standard library shall behave as if it had a
 non-throwing exception specification.
 
 
 
 
 \section{Header}
-In section 20.5.1.1 Library contents [contents] add an entry to table 16 (cpp.library.headers) for the new header \tcode{<scope>}.
+In section 15.5.1.2 Headers [headers] add an entry to table 19 (cpp.library.headers) for the new header \tcode{<scope>}.
 
-In section 20.5.1.3 Freestanding implementations [compliance] add an extra row to table 19 (cpp.headers.freestanding) and 
-in section [utilities.general] add the same extra row to table 34 (util.lib.summary)
+In section 15.5.1.3 Freestanding implementations [compliance] add an extra row to table 22 (cpp.headers.freestanding) and 
+in section [utilities.general] add the same extra row to table 39 (util.lib.summary)
 %%TODO clearer specification 
 \begin{table}[htb]
-\caption{table 19 and table 34}
+\caption{table 22 (cpp.headers.freestanding) and table 39 (util.lib.summary)}
 \begin{center}
 \begin{tabular}{|lcl|}
 \hline
 &Subclause & Header\\
 \hline
-23.nn &Scope Guard Support & \tcode{<scope>}\\
+19.nn &Scope Guard Support & \tcode{<scope>}\\
 \hline
 \end{tabular}
 \end{center}
@@ -425,7 +454,7 @@ in section [utilities.general] add the same extra row to table 34 (util.lib.summ
 \end{table}%
 
 \section{Additional sections}
-Add a a new section to chapter 23 introducing the contents of the header \tcode{<scope>}.
+Add a a new section to chapter 19 [utilities] introducing the contents of the header \tcode{<scope>}.
 
 %\rSec1[utilities.scope]{Scope Guard}
 \section{Scope guard support [scope]}
@@ -509,16 +538,13 @@ If the exit function object of a \tcode{scope_success} or \tcode{scope_exit} obj
 
 
 \pnum
-\requires
-%\mandates %% old concepts should stay requires.
 Template argument \tcode{EF} shall be a function object type ([function.objects]), 
 lvalue reference to function, or 
 lvalue reference to function object type.
 If EF is an object type, it shall meet
-the requirements of \oldconcept{Destructible} (Table~27
+the requirements of \oldconcept{Destructible} (Table~30
 %\ref{destructible}
 ). 
-%\tcode{is_callable<EF\&>::value} is \tcode{true}.
 Given an lvalue \tcode{g} of type \tcode{remove_reference_t<EF>}, the expression \tcode{g()} shall be well-formed.
 
 \pnum
@@ -537,22 +563,25 @@ scope_exit(EFP&& f) noexcept(is_nothrow_constructible_v<EF, EFP>
 \begin{itemdescr}
 \pnum
 \constraints
-%\tcode{is_same_v<remove_cvref_t<EFP>, scope_exit<EF>{}>} is \tcode{false}
-%and \tcode{is_constructible_v<EF, EFP>} is \tcode{true}.
-\tcode{(not is_same_v<remove_cvref_t<EFP>, scope_exit<EF>{}>} \tcode{\&\&}\\
-\tcode{is_constructible_v<EF, EFP>)}.
+\tcode{is_same_v<remove_cvref_t<EFP>, scope_exit>} is \tcode{false}
+and \\
+\tcode{is_constructible_v<EF, EFP>} is \tcode{true}.
+%\tcode{(not is_same_v<remove_cvref_t<EFP>, scope_exit<EF>{}>} \tcode{\&\&}\\
+%\tcode{is_constructible_v<EF, EFP>)}.
 
 \pnum
 \mandates % well-defined behavior not good here. 
 %Given an lvalue \tcode{f} of type \tcode{remove_reference_t<EFP>}, t
-The expression \tcode{f()} shall be well-formed.
+The expression \tcode{f()} is well-formed.
 
 \pnum
 \expects
-Calling \tcode{f()} shall have well-defined behavior and shall not throw an exception.
+Calling \tcode{f()} has well-defined behavior and does not throw an exception.
 
 \pnum
-\effects If \tcode{EFP} is not an lvalue reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, initialize  \tcode{exit_function} with \tcode{std::forward<EFP>(f)} otherwise initialize \tcode{exit_function} with \tcode{f}. 
+\effects If \tcode{EFP} is not an lvalue reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, 
+initialize  \tcode{exit_function} with \tcode{std::forward<EFP>(f)}; 
+otherwise initialize \tcode{exit_function} with \tcode{f}. 
 If the initialization of \tcode{exit_function} throws an exception, calls \tcode{f()}.
 
 \pnum
@@ -572,21 +601,25 @@ scope_fail(EFP&& f) noexcept(is_nothrow_constructible_v<EF, EFP>
 \begin{itemdescr}
 \pnum
 \constraints  
-%\tcode{is_same_v<remove_cvref_t<EFP>, scope_fail<EF>{}>} is \tcode{false}
-%and \tcode{is_constructible_v<EF,EFP>} is \tcode{true}.
-\tcode{(not is_same_v<remove_cvref_t<EFP>, scope_fail<EF>{}>} \tcode{\&\&}\\ \tcode{is_constructible_v<EF,EFP>)}.
+\tcode{is_same_v<remove_cvref_t<EFP>, scope_fail>} is \tcode{false}
+and \\
+\tcode{is_constructible_v<EF,EFP>} is \tcode{true}.
+%\tcode{(not is_same_v<remove_cvref_t<EFP>, scope_fail<EF>{}>} \tcode{\&\&}\\\tcode{is_constructible_v<EF,EFP>)}.
 
 \pnum
 \mandates 
 %Given an lvalue \tcode{f} of type \tcode{remove_reference_t<EFP>}, t
-The expression \tcode{f()} shall be well-formed.
+The expression \tcode{f()} is well-formed.
 
 \pnum
 \expects
-Calling \tcode{f()} shall have well-defined behavior and shall not throw an exception.
+Calling \tcode{f()} has well-defined behavior and does not throw an exception.
 
 \pnum
-\effects If \tcode{EFP} is not an lvalue reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, initialize  \tcode{exit_function} with \tcode{std::forward<EFP>(f)} otherwise initialize \tcode{exit_function} with \tcode{f}. If the initialization of \tcode{exit_function} throws an exception, calls \tcode{f()}.
+\effects If \tcode{EFP} is not an lvalue reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, 
+initialize \tcode{exit_function} with \tcode{std::forward<EFP>(f)}; 
+otherwise initialize \tcode{exit_function} with \tcode{f}. 
+If the initialization of \tcode{exit_function} throws an exception, calls \tcode{f()}.
 
 \pnum
 \throws Nothing unless the initialization of \tcode{exit_function} throws.
@@ -603,22 +636,27 @@ scope_success(EFP&& f) noexcept(is_nothrow_constructible_v<EF, EFP>
 \begin{itemdescr}
 \pnum
 \constraints  
-\tcode{(not is_same_v<remove_cvref_t<EFP>, scope_success<EF>{}>} \tcode{\&\&}\\
-\tcode{is_constructible_v<EF,EFP>)}.
+\tcode{is_same_v<remove_cvref_t<EFP>, scope_success>} is \tcode{false}
+and \\
+\tcode{is_constructible_v<EF,EFP>} is \tcode{true}.
+%\tcode{(not is_same_v<remove_cvref_t<EFP>, scope_success<EF>{}>} \tcode{\&\&}\\
+%\tcode{is_constructible_v<EF,EFP>)}.
 
 \pnum
 \mandates 
 %Given an lvalue \tcode{f} of type \tcode{remove_reference_t<EFP>}, the expression \tcode{f()} shall be well-formed and shall have well-defined behavior.
 %Tim Song: f never called by scope_success, later: need well-defined behavior
-The expression \tcode{f()} shall be well-formed.
+The expression \tcode{f()} is well-formed.
 
 \pnum
 \expects
-Calling \tcode{f()} shall have well-defined behavior.
+Calling \tcode{f()} has well-defined behavior.
 
 
 \pnum
-\effects If \tcode{EFP} is not an lvalue reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, initialize  \tcode{exit_function} with \tcode{std::forward<EFP>(f)} otherwise initialize \tcode{exit_function} with \tcode{f}. 
+\effects If \tcode{EFP} is not an lvalue reference type and \tcode{is_nothrow_constructible_v<EF,EFP>} is \tcode{true}, 
+initialize  \tcode{exit_function} with \tcode{std::forward<EFP>(f)}; 
+otherwise initialize \tcode{exit_function} with \tcode{f}. 
 \begin{note}
 If initialization of \tcode{exit_function} fails, \tcode{f()} won't be called.
 \end{note}
@@ -635,15 +673,25 @@ If initialization of \tcode{exit_function} fails, \tcode{f()} won't be called.
 
 \begin{itemdescr}
 \pnum
-%\mandates
 \requires % we use old concept names
 If \tcode{EF} is an object type:
 \begin{itemize}
  \item
-if \tcode{is_nothrow_move_constructible_v<EF>} is true, \tcode{EF} shall meet the requirements of \oldconcept{MoveConstructible} (Table 23), 
+if \tcode{is_nothrow_move_constructible_v<EF>} is true, \tcode{EF} shall meet the requirements of \oldconcept{MoveConstructible} (Table 26), 
 \item
-otherwise \tcode{EF} shall meet the requirements of \oldconcept{CopyConstructible} (Table 24).
+otherwise \tcode{EF} shall meet the requirements of \oldconcept{CopyConstructible} (Table 27).
 \end{itemize}
+
+%%% the following would get rid of requires clause above:
+%\expects
+%If \tcode{EF} is an object type:
+%\begin{itemize}
+% \item
+%if \tcode{is_nothrow_move_constructible_v<EF>} is true, \tcode{EF} meets the requirements of \\\oldconcept{MoveConstructible} (Table 26), 
+%\item
+%otherwise \tcode{EF} meets the requirements of \oldconcept{CopyConstructible} (Table 27).
+%\end{itemize}
+
 
 \pnum
 \constraints
@@ -753,18 +801,12 @@ Equivalent to
 
 %\rSec3[scope.unique_resource.class]{Class template \tcode{unique_resource}}
 \subsection {Class template \tcode{unique_resource} [scope.unique_resource.class]}
-
+%% Note default ctor blessed by LEWG?
 \begin{codeblock}
 template <class R,class D>
 class unique_resource {
 public:
-\end{codeblock}
-\begin{addedblock}
-\end{addedblock}
-\begin{codeblock}
-  @\added{unique_resource(); // \seebelow }@ 
-\end{codeblock}
-\begin{codeblock}
+  unique_resource();
   template <class RR, class DD>
   unique_resource(RR&& r, DD&& d) noexcept(@\seebelow@);
   unique_resource(unique_resource&& rhs) noexcept(@\seebelow@);
@@ -801,26 +843,25 @@ The clean-up function together with the result of the factory function is used t
 
 
 \pnum 
-\requires
 The template argument
 \tcode{D} shall meet the requirements of a 
 %CopyConstructible (Table~21
 %\ref{copyconstructible}
 %) and 
 \oldconcept{Destructible} 
-(Table~27
+(Table~30
 %\ref{destructible}
-) function object type~(23.14~
+) function object type~(19.14~
 \iref{function.objects}
 ), 
 for which, given
 a lvalue \tcode{d} of type \tcode{D} and a lvalue
 \tcode{r} of type \tcode{R}, the expression
 \tcode{d(r)} shall be well-formed. % Tim Song: to ctor: , shall have well-defined behavior, and shall not throw an exception.
-\tcode{D} shall either meet the \oldconcept{CopyConstructible} requirements (Table 24
+\tcode{D} shall either meet the \oldconcept{CopyConstructible} requirements (Table 27
 %\ref{copyconstructible}
 ), or 
-\tcode{D} shall meet the \oldconcept{MoveConstructible} requirements (Table 23
+\tcode{D} shall meet the \oldconcept{MoveConstructible} requirements (Table 26
 %\ref{moveconstructible}
 ) and
 \tcode{is_nothrow_move_constructible_v<D>} shall be \tcode{true}.
@@ -828,10 +869,10 @@ a lvalue \tcode{d} of type \tcode{D} and a lvalue
 \pnum
 For the purpose of this sub-clause, 
 a \emph{resource type} \tcode{T} is an object type that meets the
-\oldconcept{CopyConstructible} (Table 24
+\oldconcept{CopyConstructible} (Table 27
 %\ref{copyconstructible}
 ) requirements,  or 
-is an object type that meets the \oldconcept{MoveConstructible} (Table 23
+is an object type that meets the \oldconcept{MoveConstructible} (Table 26
 %\ref{moveconstructible}
 ) requirements and
 \tcode{is_nothrow_move_constructible_v<T>} is \tcode{true},
@@ -839,9 +880,9 @@ or is an lvalue reference to a resource type.
 \tcode{R} shall be a resource type.
 
 \pnum
-For the scope of this clause let \tcode{\textit{RESOURCE}} be defined as follows
+For the scope of this clause let \tcode{\textit{RESOURCE}} be defined as follows:
 \begin{itemize}
-\item \tcode{resource.get()} if \tcode{is_reference_v<R>} is \tcode{true}.
+\item \tcode{resource.get()} if \tcode{is_reference_v<R>} is \tcode{true},
 \item \tcode{resource} otherwise.
 \end{itemize}
 
@@ -864,7 +905,6 @@ For the scope of this clause let \tcode{\textit{RESOURCE}} be defined as follows
 %\rSec3[scope.unique_resource.ctor]{\tcode{unique_resource} constructors}}
 \subsection {\tcode{unique_resource} constructors [scope.unique_resource.ctor]}
 
-\begin{addedblock}
 \begin{itemdecl}
 unique_resource()
 \end{itemdecl}
@@ -877,9 +917,9 @@ unique_resource()
 
 \pnum
 \effects
-Constructs a \tcode{unique_resource} where \tcode{resource} and \tcode{deleter} are value-initialized and \tcode{execute_on_reset} is initialized with \tcode{false}.
+Value-initializes
+\tcode{resource} and \tcode{deleter}; \tcode{execute_on_reset} is initialized with \tcode{false}.
 \end{itemdescr}
-\end{addedblock}
 
 \begin{itemdecl}
 template <class RR, class DD>
@@ -901,32 +941,25 @@ The first two conditions prohibit initialization from a rvalue-reference when ei
 \end{note}
 
 \pnum
-%\requires % not mandates
-%The expression
-%\tcode{d(r)} shall be well-formed and shall have well-defined behavior.
-%The expressions \tcode{d(\textit{RESOURCE})} and \tcode{deleter(\textit{RESOURCE})} shall be well-formed and shall have well-defined behavior.
-% alt:
 \mandates
 The expression
-\tcode{d(r)}, \tcode{d(\textit{RESOURCE})} and \tcode{deleter(\textit{RESOURCE})} shall be well-formed.
+\tcode{d(r)}, \tcode{d(\textit{RESOURCE})} and \tcode{deleter(\textit{RESOURCE})} is well-formed.
 
 \pnum
 \expects
-Calling \tcode{d(r)}, \tcode{d(\textit{RESOURCE})} or \tcode{deleter(\textit{RESOURCE})} shall have well-defined behavior and shall not throw an exception. 
+Calling \tcode{d(r)}, \tcode{d(\textit{RESOURCE})} or \tcode{deleter(\textit{RESOURCE})} has well-defined behavior and does not throw an exception. 
 
 \pnum
 \effects 
 If \tcode{is_nothrow_constructible_v<R1,RR>} is \tcode{true}, initializes \tcode{resource} with \tcode{std::forward<RR>(r)}, otherwise initializes \tcode{resource} with \tcode{r}.
-%If RR is not an lvalue reference and \tcode{is_nothrow_constructible_v<R,RR>} is \tcode{true}, initializes \tcode{resource} with \tcode{std::move(r)}, otherwise initializes \tcode{resource} with \tcode{r}. 
 Then, if \tcode{is_nothrow_constructible_v<D,DD>} is \tcode{true}, initializes \tcode{deleter} with \tcode{std::forward<DD>(d)}, otherwise initializes \tcode{deleter} with \tcode{d}.
-%Then, if \tcode{DD} is not an lvalue reference and \tcode{is_nothrow_constructible_v<D,DD>} is \tcode{true}, initializes  \tcode{deleter} with \tcode{std::move(d)}, otherwise initializes \tcode{deleter} with \tcode{d}.
-If initialization of \tcode{resource} throws an exception, calls \tcode{d(r)}.  If initialization of \tcode{deleter} throws an exception, calls \tcode{d(\textit{RESOURCE})}.
+If initialization of \tcode{resource} throws an exception, calls \tcode{d(r)}. If initialization of \tcode{deleter} throws an exception, calls \tcode{d(\textit{RESOURCE})}.
 \begin{note}
 The explained mechanism ensures no leaking of resources.
 \end{note}
 
 \pnum
-\throws Any exception thrown during initialization.
+\throws Any exception thrown during initialization of \tcode{resource} or \tcode{deleter}.
 
 \pnum
 \remarks
@@ -934,7 +967,6 @@ The expression inside \tcode{noexcept} is equivalent to \\
 \tcode{(is_nothrow_constructible_v<R1, RR> || is_nothrow_constructible_v<R1, RR\&>) \&\&}\\\tcode{(is_nothrow_constructible_v<D , DD> || is_nothrow_constructible_v<D , DD\&>)}.
 
 \end{itemdescr}
-
 
 
 \begin{itemdecl}
@@ -945,17 +977,15 @@ unique_resource(unique_resource&& rhs) noexcept(@\seebelow@)
 \pnum
 \effects First, initialize \tcode{resource} as follows: 
 \begin{itemize}
-\item If \tcode{is_nothrow_move_constructible_v<R1>} is \tcode{true}, from \tcode{std::move(rhs.resource)}, 
+\item If \tcode{is_nothrow_move_constructible_v<R1>} is \tcode{true}, from \tcode{std::move(rhs.resource)}; 
 \item otherwise, from \tcode{rhs.resource}.  
 \end{itemize}
 %% forward<R> must stay because R might be a reference and resource is a reference_wrapper
 
-\pnum
 \begin{note}
 If initialization of \tcode{resource} throws an exception, \tcode{rhs} is left owning the resource and will free it in due time.
 \end{note}
 
-\pnum
 Then, initialize \tcode{deleter} as follows: 
 \begin{itemize}
 \item If \tcode{is_nothrow_move_constructible_v<D>} is \tcode{true}, 
@@ -964,15 +994,14 @@ from \tcode{std::move(rhs.deleter)};
 from \tcode{rhs.deleter}. 
 \end{itemize}
 
-\pnum
 If initialization of \tcode{deleter} throws an exception and 
  \tcode{is_nothrow_move_constructible_v<R1>} is \tcode{true} 
 and \tcode{rhs.execute_on_reset} is \tcode{true}: %% bugfix in R8
 \begin{codeblock}
-    rhs.deleter(@\textit{RESOURCE}@); rhs.release();
+    rhs.deleter(@\textit{RESOURCE}@);
+    rhs.release();
 \end{codeblock}
 
-\pnum
 Finally, \tcode{execute_on_reset} is initialized with \tcode{exchange(rhs.execute_on_reset,false)}.
 
 \pnum
@@ -996,15 +1025,14 @@ unique_resource& operator=(unique_resource&& rhs) noexcept(@\seebelow@);
 \begin{itemdescr}
 \pnum
 \requires %\mandates not useful for oldconcept
-If \tcode{is_nothrow_move_assignable_v<R1>} is \tcode{true}, \tcode{R1} shall meet the \oldconcept{MoveAssignable} requirements (Table 25), otherwise \tcode{R1} shall meet the \oldconcept{CopyAssignable} (Table 26) requirements.
-If \tcode{is_nothrow_move_assignable_v<D>} is \tcode{true}, \tcode{D} shall meet the \oldconcept{MoveAssignable} requirements (Table 25), otherwise \tcode{D} shall meet the \oldconcept{CopyAssignable} requirements (Table 26).
-%\requires %\mandates not useful for oldconcept
-%If \tcode{is_nothrow_move_assignable_v<R1>} is \tcode{true}, \tcode{R1} shall be \oldconcept{MoveAssignable} (Table 25), otherwise \tcode{R1} shall be \oldconcept{CopyAssignable} (Table 26).
-%If \tcode{is_nothrow_move_assignable_v<D>} is \tcode{true}, \tcode{D} shall be \oldconcept{MoveAssignable} (Table 25), otherwise \tcode{D} shall be \oldconcept{CopyAssignable} (Table 26).
-%\mandates
-%\\\tcode{(is_nothrow_move_assignable_v<R1> || is_copy_assignable_v<R1>)} is \tcode{true}
-%and\\
-%\tcode{(is_nothrow_move_assignable_v<D> || is_copy_assignable_v<D>)} is \tcode{true}.
+If \tcode{is_nothrow_move_assignable_v<R1>} is \tcode{true}, \tcode{R1} shall meet the \oldconcept{MoveAssignable} requirements (Table 28); otherwise \tcode{R1} shall meet the \oldconcept{CopyAssignable} (Table 29) requirements.
+If \tcode{is_nothrow_move_assignable_v<D>} is \tcode{true}, \tcode{D} shall meet the \oldconcept{MoveAssignable} requirements (Table 28); otherwise \tcode{D} shall meet the \oldconcept{CopyAssignable} requirements (Table 29).
+
+%\expects %\mandates not useful for oldconcept
+%If \tcode{is_nothrow_move_assignable_v<R1>} is \tcode{true}, \tcode{R1} meets the \oldconcept{MoveAssignable} requirements (Table 28); otherwise \tcode{R1} meets the \oldconcept{CopyAssignable} (Table 29) requirements.
+%If \tcode{is_nothrow_move_assignable_v<D>} is \tcode{true}, \tcode{D} meets the \oldconcept{MoveAssignable} requirements (Table 28); otherwise \tcode{D} meets the \oldconcept{CopyAssignable} requirements (Table 29).
+
+
 
 \pnum
 % std::move(rhs.resource) vs. std::forward<R>(rhs.resource)
@@ -1105,11 +1133,11 @@ void reset(RR && r);
 
 \pnum
 \mandates
-The expression \tcode{deleter(r)} shall be well-formed.
+The expression \tcode{deleter(r)} is well-formed.
 
 \pnum
 \expects
-Calling \tcode{deleter(r)} shall have well-defined behavior and shall not throw an exception.
+Calling \tcode{deleter(r)} has well-defined behavior and does not throw an exception.
 
 \pnum
 \effects 
@@ -1160,9 +1188,10 @@ const R& get() const noexcept;
 \begin{itemdescr}
 \pnum
 \constraints 
-\tcode{(is_pointer_v<R> \&\& !is_void_v<remove_pointer_t<R>{}>)}
+\tcode{is_pointer_v<R>} is \tcode{true} and \tcode{is_void_v<remove_pointer_t<R>{}>} is \tcode{false}.
+%\tcode{(is_pointer_v<R> \&\& !is_void_v<remove_pointer_t<R>{}>)}
 % is \tcode{true}
-.
+
 
 \pnum
 \effects 
@@ -1171,7 +1200,7 @@ Equivalent to:\\
 
 \pnum
 \remarks
-The return type is equivalent to 
+The return type is 
 \tcode{add_lvalue_reference_t<remove_pointer_t<R>{}>}. 
 \end{itemdescr}
 
@@ -1183,7 +1212,7 @@ R operator->() const noexcept;
 
 \pnum
 \constraints 
-\tcode{is_pointer_v<R>} 
+\tcode{is_pointer_v<R>} is \tcode{true}.
 %is \tcode{true}
 . 
 
@@ -1213,10 +1242,10 @@ noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
 
 \begin{itemdescr}
 \pnum
-\mandates The expression \tcode{( resource == invalid ? true : false )} shall be well-formed.
+\mandates The expression \tcode{( resource == invalid ? true : false )} is well-formed.
 
 \pnum
-\expects Evaluation of the expression \tcode{( resource == invalid ? true : false )} shall have well-defined behavior and shall not throw an exception.
+\expects Evaluation of the expression \tcode{( resource == invalid ? true : false )} has well-defined behavior and does not throw an exception.
 %If \tcode{s} denotes a value of type \tcode{remove_reference_t<S>} and \tcode{r} denotes a
 %value of type \tcode{remove_reference_t<R>}, the expressions \tcode{s == r} and \tcode{r == s}
 %are both valid, both have the same domain, both have a type that is
@@ -1227,12 +1256,15 @@ noexcept(is_nothrow_constructible_v<decay_t<R>, R> &&
 %% EqualityComparable<R,S> is a concept in ranges TS and would make the paragraph go away.
 
 \pnum
-\effects Constructs and returns \\
-\tcode{\{std::forward<R>(resource), std::forward<D>(d)\}}. 
+\effects 
+Returns an object constructed with members initialized from \tcode{std::forward<R>(resource)}, \tcode{std::forward<D>(d)}, and \tcode{!bool(resource == invalid)}. Any failure during construction of the return value will not call \tcode{d(resource)} if \tcode{bool(resource == invalid)} is \tcode{true}.
 
-\pnum
-If \tcode{bool(resource == invalid)} evaluates to \tcode{true} before the construction, the returned \tcode{unique_resource} object's \tcode{execute_on_reset} is \tcode{false}. 
-In that case, any failure during the construction of the return value will not call \tcode{d(resource)}.
+%Constructs and returns \\
+%\tcode{\{std::forward<R>(resource), std::forward<D>(d)\}}. 
+%
+%\pnum
+%If \tcode{bool(resource == invalid)} evaluates to \tcode{true} before the construction, the returned \tcode{unique_resource} object's \tcode{execute_on_reset} is \tcode{false}. 
+%In that case, any failure during the construction of the return value will not call \tcode{d(resource)}.
 
 \pnum
 \begin{note}

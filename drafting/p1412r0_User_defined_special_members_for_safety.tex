@@ -47,6 +47,7 @@
 \usepackage{threeparttable} % allow for table footnotes..
 \renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
 
+\usepackage{todonotes}
 
 %%%% reuse all three from std.tex:
 \input{macros}
@@ -55,12 +56,13 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{D1412r0}
-\newcommand{\paperdate}{2019-01-22}
+\newcommand{\papernumber}{P1412r0}
+\newcommand{\paperdate}{2019-06-17}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
-\title{\papernumber{} - On user-declared and user-defined special member functions in safety-critical code}
+\title{\papernumber{} - Class Natures for Safety Critical Code \\
+On user-declared and user-defined special member functions}
 \author{Peter Sommerlad}
 \date{\paperdate}                % Activate to display a given date or no date
 \setsecnumdepth{subsection}
@@ -75,13 +77,32 @@ Project: & Programming Language C++ \newline Programming Language Vulnerabilitie
 Audience: & SG12 / ISO SC22 WG23, SG20, Misra C++\\\hline
 \end{tabular}
 \end{center}
+
+%\item terminology, "type category" (type role), "aggregate"
+%\todo[inline]{ speak about function types, esp. function pointer and std::function}
+%\todo[inline]{ show examples with existing MISRA rules where they fail to address it}
+%\todo[inline]{ talk about getters and setters breaking encapsulation encouraged by MISRA}
+%\todo[inline]{aggregates not sanctioned by MISRA except POD}
+%\todo[inline]{mapping from defined special member functions to type role, speak about invalid mappings}
+%\todo[inline]{detail feedback Jan Babst}
+
 \chapter{Introduction}
 
 C++ is a complex language providing a lot of flexibility in its use. However, not all programs are valid or behave as a developer thinks. Because of its deterministic resource management C++ is used in many systems that have high quality and safety-related requirements. While high software quality does not make a system safe or fault-tolerant, it can be an enabling factor to achieve them. Therefore, in safety-critical environments adhering to programming guidelines restricting the language use are one of the required practices to avoid safety risks, especially undefined behavior.
 
-Over the decades of \Cpp{} evolution, best practices and what is considered good style changed a lot. Typical systems built with the language often outlive the style they were written in. With the introduction of a three years release cycle and the frequent innovation and updates it becomes hard to keep up. Some style guides try to achieve that by taking a looking glass and even proposing to use features of the language or library that are not yet standardized or even implemented (\cite{CppCGL}). Other relevant guidelines that are industry standards stem from a past and provide a style that is considered no longer recommendable by \Cpp{} experts.
+Over the decades of \Cpp{} evolution, best practices and what is considered good style changed a lot. Typical systems built with the language often outlive the style they were written in. With the introduction of a three years \Cpp{}-standard release cycle and the frequent innovation and updates it becomes hard to keep up. Some style guides try to achieve that by taking a looking glass and even proposing to use features of the language or library that are not yet standardized or even implemented (\cite{CppCGL}). Other relevant guidelines that are industry standards stem from a past and provide a style that is considered no longer recommendable by \Cpp{} experts.
 
-One area, where classic and more modern \Cpp{} versions differ are the recommended practices of declaring and defining special member functions in a user-defined class type. The introduction of move operations with \Cpp{}11 and the guaranteed copy-elision of \Cpp{}17 are game changers to the rules viable for \Cpp{}03, and the world has not become simpler for novices due to that. This paper explains the situation by repeating Howard Hinnant's classical special member functions table\cite{ACCU2014} and suggest a set of special member function declaration/definition combinations the author recommends. The underlying philosophy, such as categorizing class types into value types, empty types, managing types, pointing types, and object-oriented polymorphic types is explained below together with other attributes the author believes are important for modern high-quality \Cpp{} code.
+One area, where classic and more modern \Cpp{} versions differ are the recommended practices of declaring and defining special member functions in a user-defined class type. 
+The introduction of move operations with \Cpp{}11 and the guaranteed copy-elision of \Cpp{}17 are game changers to the rules viable for \Cpp{}03, and the world has not become simpler for novices due to that. 
+This paper explains the situation by repeating Howard Hinnant's classical special member functions table\cite{ACCU2014} and suggest a set of special member function declaration/definition combinations the author recommends. 
+The underlying philosophy, such as categorizing types into named "class natures" value types, empty types, managing types, potentially dangling types, and object-oriented polymorphic types is explained below.
+%together with other attributes the author believes are important for modern, safe, and high-quality \Cpp{} code. 
+
+Means on how to detect a class' nature from its defined special member functions and how member variable of a given class nature influence the nature of the surrounding class type are given.
+In contrast, guidelines for defining/declaring special member functions to achieve a safe implementation of a given class nature is also given. 
+While not all useful classes are covered by these class natures, I hope this document serves as a basis for discussion, detecting questionable programming, and guiding developers in designing their types.
+
+It is planned that future revisions of this paper will address MISRA C++2008 rules\cite{misra} to foster better rules for special member functions in an upcoming MISRA C++ standard.
 
 %Type system.
 
@@ -95,26 +116,56 @@ One area, where classic and more modern \Cpp{} versions differ are the recommend
 %context of audience.
 
 \chapter{History}
-With pre-\Cpp{}11, class type usage often is taught to introduce object-oriented programming with virtual functions and inheritance. The rule-of-three stems from that era and usage\cite{Meyers2005}. I have seen a lot of C++ software employing dynamic polymorphism where static polymorphism would have been sufficient. This is often due to the design and language know-how available, e.g., where developers were originally trained in Java or C\#,. For example, applying the Bridge Design Pattern \cite{GoF} to achieve portability across operating systems, where never two operating systems would be supported simultaneously. This practice might stem from times before policy-based design using template parameters was well known, or because the used compilers did not support templates appropriately. Another reason might be the "fear of template error messages" that lead developers shy away from them. We and modern \Cpp{} safety programming guidelines should explain that much better and provide more guidance to appropriately use the language features for software design.
+With pre-\Cpp{}11, class type usage often is taught to introduce object-oriented programming with \tcode{virtual} functions and inheritance. 
+The Rule-of-Three stems from that era and usage\cite{Meyers2005}. 
+I have seen a lot of C++ software employing dynamic polymorphism where static polymorphism would have been sufficient and provide better performance, simpler code and probably higher safety. 
+This is often due to the design and language know-how available, e.g., where developers were originally trained in Java or C\#, for example, applying the Bridge Design Pattern \cite{GoF} to achieve portability across operating systems, where never two operating systems could be supported simultaneously. 
+The practice might stem from times before policy-based design using template parameters was well known, or because the used compilers did not support templates appropriately. 
+Sometimes tools foster these practices by their default code generation, for example, the "New Class" command in Eclipse CDT generates a class with a virtual destructor without user intervention.
+Another reason might be the "fear of template error messages" that lead developers shy away from them. We and modern \Cpp{} safety programming guidelines should explain that much better and provide more guidance to appropriately use the language features for software design.
+%or by the defaults of tools, e.g., "New Class" command in Eclipse CDT generating a virtual destructor. 
 
+Many textbooks focus around the need for defining special member functions, like a copy constructor, while arguing about how the lack of such operations might foster using the class erroneously. This resulted in the famous Rule of Three\cite{Stroustrup2000}.
 
 \section{The Rule of Three for \Cpp{}03}
-TODO \cite{meyers2005}
+
+\begin{quotation}
+{If a class needs a copy operation or a destructor, it probably needs a constructor, a destructor, a copy assignment, and a copy constructor.}
+\cite{Stroustrup2000}
+\end{quotation}
+
+With the introduction of move semantics in \Cpp{}11 this rule was often extended to become the "Rule of Five" including defining move operations as well, even so \cite{Stroustrup2013} sticks with the Rule of Three. 
+While it is technically often correct that these five special member functions must be considered together, when one of them needs to be user/defined, its blind application can lead to superfluous or even incorrect definitions. 
+
 
 \section{Rule of Zero}
-The easiest solution to potential confusion of what special member functions to declare or define is to write class types by carefully selecting member variable types in a way that the compiler-provided default implementations are automatically correct.
+While there is danger in the incorrect application of the Rule of Three/Five, it would be best, if we program so that the compiler-provided default versions of the member functions are just correct\cite{RoZero}.
+%The easiest solution to potential confusion of what special member functions to declare or define is to write class types by carefully selecting member variable types in a way that the compiler-provided default implementations are automatically correct.
 For example, choosing only value types as member variable types and providing member initializers for their default values, will give a compiler to provide a defaulted default constructor as well as copy and move operations and a defaulted destructor, without the need to add any user code.
 
 Code that is not written is generally also not incorrect.\footnote{I know there are exceptions to that rule.}
 In addition code that is not there does not add to the cognitive burden of understanding code in reviews or when evolving it. One pre-requisite that makes that relieve is to understand and internalize compiler defaults.
 
+\section{Rule of DesDeMovA}
+Because I am a fan of the Rule of Zero, I invented the Rule of DesDeMovA\cite{RoDesDeMovA}\footnote{Desdemona is a character in Shakespeare's Othello} (\emph{Des}tructor defined, \emph{De}leted \emph{Mov}e-\emph{A}ssignment), that uses the minimal amount of user code to get a type that is non-copyable and non-movable, but that keeps the ability to have a default constructor, if applicable. The Rule of DesDeMovA is useful for base classes of polymorphic class hierarchies, where a virtual destructor must be defined as defaulted, or for scope-based resource management types that must not be copied or moved. So you apply the Rule of DesDeMovA when a destructor must be defined by defining the class' move assignment operator as deleted. This will prevent the compiler from providing the other copy or move special member functions without further ado.
 
-TODO: Properties to be discussed. 
+\section{Safety Properties implied}
+\Cpp{} is often selected for safety critical systems because of its familiarity for C programmers, but also because \Cpp{} has a deciding feature for creating safer software: its deterministic object lifetime model. This key feature reduces the chances for resource leaks enormously, when applied correctly, especially since \Cpp{}11 introduced move semantics. Later in this paper we look at what makes such a resource managing type and what special member functions are implied by it.
 
-TODO: Potential dangers.
+A second ability of \Cpp{} is operator overloading for pointer operations that allow definition of smart pointers that limit the need for passing around raw memory addresses, often happening in C code. There is no need to pass arrays without their dimension/size in \Cpp{} that is common in C and use pointer arithmetic in an unsafe way.\footnote{The exception is within the implementation of such smart pointer or array abstractions such as \tcode{std::unique_ptr}, \tcode{std::array}, or \tcode{std::vector}}
+
+While we can ensure not to dereference a null pointer, by checking first, before using the pointer, there is one remaining problem of using references or pointing types: using the reference/pointer after its original's lifetime ended. This situation has several names, such as use-after-free, but I prefer \emph{dangling}, because there is more to the situation than accessing dynamically allocated memory. WG23 defined types that could lead to dangling as \emph{"potentially dangling types"} in their workshop in Kona 2019.
+
+The good thing is, as long as our types behave like values and can not potentially dangle, our \Cpp{} code can be safe. 
+Before we got there, let us first look at what special member functions a \Cpp{} compiler will provide when.
+
+%TODO: Properties to be discussed. 
+
+%TODO: Potential dangers.
 
 \section{Howard Hinnant's special member function overview}
-At ACCU 2014 Howard Hinnant \cite{ACCU2014} explained move operations of \Cpp{}11 and showed and explained the Table \ref{tab:hinnant} in his famous keynote.
+At ACCU 2014 Howard Hinnant \cite{ACCU2014} explained move operations of \Cpp{}11 and showed and explained the Table \ref{tab:hinnant} in his famous keynote. This is a good rehearsal of what the compiler provided special member functions exist. However, it is incomplete, since also member variables can influence the existing of special member functions. For example, a reference member prohibits the generation or implementation of assignment operators, because references can not be rebound after initialization. However, replacing a reference member \tcode{T\&} by \tcode{std::reference_wrapper<T>} mitigates that situation.
+
 \begin{table}[htp]
 \caption{Howard Hinnant's special member functions table}
 \label{tab:hinnant}
@@ -146,7 +197,7 @@ At ACCU 2014 Howard Hinnant \cite{ACCU2014} explained move operations of \Cpp{}1
 \item[2] Defining a destructor while allowing default copying is almost always an error.
 \item[3] Inconsistent copy operations (one user-defined, one compiler-provided) are almost always wrong.
 \item[4] Inconsistent move operations (one user-declared/defined, the other deleted) are often wrong.
-\item[5] Declaring a deleted move-assignment operator can help to suppress compiler-provided copy operations in the case of a user-declared virtual destructor without influencing the provisioning of a default constructor.
+\item[5] Declaring a deleted move-assignment operator can help to suppress compiler-provided copy operations in the case of a user-declared virtual destructor without influencing the provisioning of a default constructor. This is the \emph{Rule of DesDeMovA}.
 \end{tablenotes}
 \end{threeparttable}
 \end{center}
@@ -154,69 +205,89 @@ At ACCU 2014 Howard Hinnant \cite{ACCU2014} explained move operations of \Cpp{}1
 \end{table}%
 
 
-\chapter{Forces for Safety in Source Code}
-As a pattern (book) author I would like to introduce so-called "forces" that are used in a pattern's problem description to denote design constraints that influence the pattern's solution. Often such forces are not absolute and a pattern make conscious trade-offs. That is also a reason, why often conflicting patterns for a problem exist that resolve to different solutions.
+%\chapter{Forces for Safety in Source Code}
+%As a pattern (book) author I would like to introduce so-called "forces" that are used in a pattern's problem description to denote design constraints that influence the pattern's solution. Often such forces are not absolute and a pattern make conscious trade-offs. That is also a reason, why often conflicting patterns for a problem exist that resolve to different solutions.
+%
+%Here I collect forces that in my observation have influenced existing programming guidelines.
+%\begin{itemize}
+%\item Simplicity
+%\item Familiarity
+%\item Code Evolution (aka Maintenance)
+%\end{itemize}
+%
+%TODO.
 
-Here I collect forces that in my observation have influenced existing programming guidelines.
-\begin{itemize}
-\item Simplicity
-\item Familiarity
-\item Code Evolution (aka Maintenance)
-\end{itemize}
 
-TODO.
-
-
-\chapter{Class type categories}
+\chapter{Class Natures}
 I observed that programming guidelines tend to shy away from helping developers think about their design.
-This is a situation I'd like to change. One of the contributions I'd like to make is give guidance on roles of types, here class types. While a user-defined class type can be defined in a very flexible way, mixing these roles unconsciously can lead to serious problems. 
-I distinguish the following major categories:
+This is a situation I'd like to change. One of the contributions I'd like to make is give guidance on natures of types by the role their special member functions or corresponding features play. While a user-defined class type can be defined in a very flexible way, mixing these roles unconsciously can lead to serious problems. 
+I distinguish the following major natures:
 \begin{itemize}
 \item value types
 \item empty types
 \item managing types
-\item pointing types
+\item potentially dangling types
 \item object-oriented polymorphic types
 \end{itemize}
 
-\section{plain categories}
-This section introduces the different core type categories and their implication on special member functions. Later on, some useful combinations are considered.
-\subsection{value types}
-\Cpp{}'s built-in mechanics all directly support value types. Initialization, assignment and comparison. Scott Myers explains it, "when in doubt, do as the \tcode{int}s do!". While I have some problem with the built-in integral types as well, this covers the intention well. If you do not define any special member function and your member variable types are also value types, then your class type will work as a value type without thinking.
+Note, these type natures are not distinct, for example, \tcode{std::vector<int>} can be treated as a value type, but also is a managing type, managing the memory and life-time of its elements.
 
-If a value type supports equality comparison it is supporting the concept Regular. Regular means, default construction, copying and assignment are well defined and equality comparison works as expected. Without comparison, the concept is Semiregular.  A plain C-like struct with only value-type data members is automatically Semiregular.
+\section{Basic Type Natures}
+This section introduces the different core type natures and their implication on special member functions. Later on, some useful combinations are considered and how member variables of different type natures influence the nature of the enclosing type without further notice.
+
+\subsection{Value Types}
+\Cpp{}'s built-in mechanics all directly support value types. Initialization, assignment and comparison. Scott Myers explains it, "when in doubt, do as the \tcode{int}s do!"\cite{Meyers2005}. While I have some problem with the built-in integral types as well, this covers the intention well. If you do not define any special member function and your member variable types are also value types, then your class type will work as a value type without thinking.
+
+If a value type supports equality comparison it is supporting the concept \emph{Regular}. Regular means, default construction, copying and assignment are well defined and equality comparison works as expected. Without comparison operation but the equality intent, the concept is called Semiregular. A plain C-like struct with only value-type data members is automatically Semiregular, and might become even a Regular type with the automatic provisioning of comparison operators as proposed for \Cpp{}20.
 Such an aggregate, a struct with public value type data members, automatically obtains all compiler-provided special member functions (default constructor, destructor, copy- and move-operations).
 
 Plain value types will automatically obtain correct compiler-provided special member functions.
+There is a slight risk, if member variables are trivial, then the default initialization is uninitialized. 
+However, that risk is mitigated by typical safety guidelines that enforce always initializing variables (e.g., with \tcode{\{\}} when its member variables become zero initialized).
 
-\subsection{empty types}
+\subsection{Empty Types}
 It might sound counter-intuitive to define class types without any non-static data members. There can be only one value in such a type, since there are no bits to distinguish different values. However, empty types in a strong type system, like \Cpp{}, can serve a variety of purposes:
 \begin{description}
 \item[tags] Used as a function parameter type, such empty types can help to distinguish function overloads. For example, the iterator tags obtainable from an iterator type help library algorithms to select better performing implementations for "stronger" iterator.
-\item[mix-ins] Empty types can contain additional member or regular (friend) functions that can be mixed into the scope of a class deriving from such a mix-in type. This can be used to ease introducing generic (operator-)function overloads for a class type without overhead. C++'s Empty Base-class Optimization (EBO) or the new \Cpp{}20 attribute \tcode{[no_unique_address]} help with employing functionality of empty types.
-\item[traits] Empty types are often used as template meta functions that allow compile-time type and value computations. For example, \tcode{std::is_same<U,V>} is a binary type trait comparing two types for equality. Such a type trait class does not contain any non-static data members or non-static member functions. Another use of such traits is to implement values or value sequences as types, such as std::true_type, std::integral_number, or std::index_sequence. Newer \Cpp{} versions introduced template aliases with the suffix \tcode{_t} for type computing type traits and variable templates with the suffix \tcode{_v} for type conditions that ease the use of the standard type traits.
+\item[mix-ins] Empty types can contain additional member or regular (friend) functions that can be mixed into the scope of a class deriving from such a mix-in type. This can be used to ease introducing generic (operator-)function overloads for a class type without overhead. C++'s Empty Base-class Optimization (EBO) or the new \Cpp{}20 attribute \tcode{[no_unique_address]} help with employing functionality of empty types without the risk of superfluous memory consumption by its objects.
+\item[traits] Empty types are often used as template meta functions that allow compile-time type and value computations. For example, \tcode{std::is_same<U,V>} is a binary type trait comparing two types for equality. Such a type trait class does not contain any non-static data members. Another use of such traits is to implement values or value sequences as types, such as \tcode{std::true_type}, \tcode{std::integral_number}, or \tcode{std::index_sequence}. Newer \Cpp{} versions introduced template aliases with the suffix \tcode{_t} for type computing type traits and \tcode{bool} variable templates with the suffix \tcode{_v} for type conditions that ease the use of the standard type traits.
 \end{description}
-Since there is nothing that can go wrong with a type that has only one value, the rule-of-zero applies here as well. There is no invariant to guarantee and no cleanup to care for. In addition there is no difference between copy or move operations and the compiler provided ones are perfectly safe and sane.
+Since there is nothing that can go wrong with a type that has only one value, the Rule of Zero applies here as well. There is no invariant to guarantee and no cleanup to care for. In addition there is no difference between copy or move operations and the compiler provided ones are perfectly safe and sane.
 
-Empty types will automatically obtain correct and trivial compiler-provided special member functions.
+Empty types will automatically obtain correct and trivial compiler-provided special member functions that result in no extra binary code produced.
 
-\subsection{managing types}
-Managing types have a destructor that has non-trivial behavior. Typical managing types hold on to a resource that is either acquired or given to it at construction time and release that resource in the destructor. \Cpp{} RAII (resource acquisition is initialization) principle often as SBRM (scope bound resource management) using local variables is one of the cornerstones.
+\subsection{Managing Types}
+Managing types have a destructor that has non-trivial behavior: a side effect for cleaning the managed resource. Considering the "Rule-of-Three/Five" this means, we should consider all compiler-provided special member functions, because the destructor is defined. All managing types follow the resource acquisition is initialization (RAII) pattern \cite{Stroustrup2000}, because other means of managing resources is not exception safe and too easy to use in an unsafe way.
+ 
+We introduce several sub-categories of managing types:
+
+\begin{enumerate}
+\setcounter{enumi}{-1}
+\item SBRM - Scope-based resource management (non-copy,non-move)
+\item Stateful - changing state, e.g., state machine (non-copy, non-move)
+\item Registry - keeps (changing) collection of objects (non-copy, non-move)
+\item Unique -  (non-copy, move-only)
+\item Value semantic - like standard containers, regular (copy, move)\footnote{copy is always "deep".}
+\end{enumerate}
+
+\footnote{You might have noted that I refrained from providing a "shared" category. Even \tcode{std::shared_ptr<T>} has a whole set of potential problems, overhead (atomics) and non-intuitive behavior. So its use is already potentially dangerous, whereas implementing such a managing type with safe sharing behavior is hard. That does not mean, we can not have shared access to manager objects, but we should not falsely attempt the illusion of garbage collection provided but follow the rules given below for potentially dangling types and keep the managing object alive while it can be used.}
+
+Typical managing types hold on to a resource that is either acquired or given to it at construction time and release that resource in the destructor. \Cpp{} RAII (resource acquisition is initialization) principle often as SBRM (scope bound resource management) using local variables is one of the cornerstones.
 The need for a destructor also means that copying and moving must be taken care for. Either of these operations require careful consideration.
 
-Managing types of member variables make a containing class also a managing type, even so it does not itself define a destructor.
+Managing types of member variables make a containing class also a managing type, even so it does not itself define a destructor, but its compiler-provided one will be non-trivial, by calling the managing member's destructor.
 
 A simple managing type is usually not copyable and encapsulates its managed state. If that state can not be empty or requires user arguments to create it will also not provide a default constructor. So in the simple SBRM case, a destructor is defined and copying can be prohibited by defining the move-assignment operator as deleted.
 
-In case the managing object needs to be returned from a factory function pre-\Cpp{}17, a move constructor is necessary to guarantee a unique managing object per allocated resource. This means, that in a moved-from state needs to be representable to avoid double-release of the managed resource. This can mean overhead, such as using a \tcode{std::optional<Resource>} data member instead of representing the \tcode{Resource} type directly. In case of pointer types as resources, such as std::unique_ptr manages, the unique value for invalid/released pointers \tcode{nullptr} is always available.
+In case the managing object needs to be returned from a factory function pre-\Cpp{}17, a move constructor is necessary to guarantee a unique managing object per allocated resource. This means, that in a moved-from state needs to be representable to avoid double-release of the managed resource. This can mean overhead, such as using a \tcode{std::optional<Resource>} data member instead of representing the \tcode{Resource} type directly. In case of pointer types as resources, such as \tcode{std::unique_ptr} manages, the unique value for invalid/released pointers \tcode{nullptr} is always available.
 
-For more complex managing types that also take one or more of the other type categories (value, OO), expert knowledge for design and implementation is required. For example, implementing a container class, like std::vector that manages multiple objects, while itself is a Regular type, if the elements' type is, requires really world-class expertise to do well. So better use what is available than re-invent the wheel. Only in the case of a proven need, e.g., via profiling and test cases, a special-purpose solution should be considered.
+For more complex managing types that also take one or more of the other type categories (value, OO), expert knowledge for design and implementation is required. For example, implementing a container class, like \tcode{std::vector} that manages multiple objects, while itself is a Regular type, if the elements' type is, requires really world-class expertise to do well. So better use what is available than re-invent the wheel. Only in the case of a proven need, e.g., via profiling and test cases, a special-purpose solution should be considered.
 
 For managing multiple resource object members, it is better to wrap each resource in its own manger type, so that construction failures half way through the object construction are automatically cleaned up correctly by the compiler-provided mechanics rather than trying to do that by hand. To make the latter work well, all resource manager member variables must be initialized in all constructor's member initializer list or via member initializers. This wisdom was a tough learning from specifying and implementing the proposed generic \tcode{std::unique_resource} class. The latter as well as several resource management helper types of the standard library, like \tcode{std::unique_ptr}, containers like \tcode{std::vector}, \tcode{std::string}, etc. should be your go-to building blocks to implement your own managing types on top.
 
 Managing types will typically user-define one or more constructors. It depends on the members if a user-defined destructor is necessary. A plain managing type will inhibit copying, often by allowing move operations, at least move construction for returning from a factory function. If no such factory facility is required or at least \Cpp{}17 is used, a managing type can also define move-assignment as deleted to inhibit all copy- and move operations. Richard Corden calls such a type "monomorphic" object type, because it encapsulates functionality, it is not a value type, and thus its object identity is an important factor.
 
-\subsection{pointing types}
+\subsection{Potentially Dangling Types}
 
 One potentially dangerous area of \Cpp{}'s types are \emph{pointing types}\footnote{This document uses terms references and pointers for objects of \emph{pointing types} interchangeably, unless specified.}. The language allows constructing references to objects (\tcode{T\&} or \tcode{T\&\&}) that must be initialized and eliminate assignment and copy-operations if used as members and it allows to construct pointers to objects (\tcode{T*}) that need to be initialized to avoid invalid references to be used. One can think of \tcode{T*} as if it be an \tcode{std::optional<T\&>} that is unfortunately not allowed (yet?). Beside the plain reference or pointer types constructed by the language, all library container's iterator types fall in the category of pointing types. Also, less obvious, \tcode{std::string_view}, \tcode{std::span}, or \tcode{std::reference_wrapper} are pointing types.
 
@@ -274,60 +345,97 @@ If you do not need your own managing types to behave as values and the underlyin
 \subsection{Pointing Types as Value Types}
 Plain pointers and (most of the) standard iterators in C++ are Regular types. You can assign a value to another variable and both refer to the same pointee. You can even compare two pointers for equality if they are from the same underlying range of objects or have the \tcode{nullptr} value. Copying pointing objects is cheap in general but increases the risk of dangling, when no care is taken how many pointing objects to a given pointee are around. 
 
-The class \tcode{std::shared_ptr} tries to keep track of existing pointer objects to a given pointee and manages the lifetime of the pointee. But this comes at an increased cost for each copy, due to synchronization of the atomic counter. In addition sharing the pointers across threads is well defined, but the pointees must take synchronization seriously if not immutable. If possible use \tcode{std::unique_ptr} and pass references to the pointees instead. For creating simple object graphs unique_ptr might be sufficient, but if there are more interesting toplogies, plain pointers might be needed in addition. Do always encapsulate such a situation with a corresponding managing type and use that to create and navigate the underlying object graph.
+The class \tcode{std::shared_ptr} tries to keep track of existing pointer objects to a given pointee and manages the lifetime of the pointee. But this comes at an increased cost for each copy, due to synchronization of the atomic counter. In addition sharing the pointers across threads is well defined, but the pointees must take synchronization seriously if not immutable. If possible use \tcode{std::unique_ptr} and pass references to the pointees instead. For creating simple object graphs \tcode{unique_ptr} might be sufficient, but if there are more interesting toplogies, plain pointers might be needed in addition. Do always encapsulate such a situation with a corresponding managing type and use that to create and navigate the underlying object graph.
 
 \subsection{Managing Types and Pointing Types}
 This is often a natural combination, since managing types often need to employ pointing types for member variables to keep track of the managed stuff. Using "nullable" pointing types also provides a simple to identify up moved-from state, where the corresponding member variable gets assigned nullptr if the managing object gets into a moved-from state, i.e., by being passed as an argument to a move constructor.
 
 \subsection{Value Types as dynamic polymorphic Types}
 Sean Parent gave a nice talk \footnote{\url{https://sean-parent.stlab.cc/papers-and-presentations/\#better-code-runtime-polymorphism}} on how to get the benefits of dynamic polymorphism with the ease of use of value types. His approach nicely encapsulates virtual members in a common and generic handle type and even allows the different types to be used polymorphically to be plain value types completely unrelated by inheritance.
-Sean Paraent's "trick" thus allows retrofitting dynamic polymorphism and encapsulates all uses of virtual, which is nice. However, it might also hide the fact that some seemingly unrelated classes implement a common abstraction.
+Sean Paraent's "trick" thus allows retrofitting dynamic polymorphism and encapsulates all uses of \tcode{virtual}, which is nice. However, it might also hide the fact that some seemingly unrelated classes implement a common abstraction.
 
 \subsection{O-O polymorphic Types as Value Types}
-Another approach is fostered by a paper \url{https://wg21.link/p0201} currently considered for standardization where a \tcode{polymorphic_value} wrapper type adds value semantics to a class hierarchy, where copying through \tcode{polymorphic_value<base>} that actually hold an object of type \tcode{derived} will not slice. This requires heap allocation and defined copy operations for all classes in the class hierarchy, either by providing copy constructors (with the risk of slicing) or by parameterizing polymorphic_value's constructors with a non-default copy operation function object. While useful in cases where such polymorphic class hierarchies already exist or are an appropriate design choice, I would not consider such a design at first, unless proven necessary.
+Another approach is fostered by a paper \url{https://wg21.link/p0201} currently considered for standardization where a \tcode{polymorphic_value} wrapper type adds value semantics to a class hierarchy, where copying through \tcode{polymorphic_value<base>} that actually hold an object of type \tcode{derived} will not slice. This requires heap allocation and defined copy operations for all classes in the class hierarchy, either by providing copy constructors (with the risk of slicing) or by parameterizing \tcode{polymorphic_value}'s constructors with a non-default copy operation function object. While useful in cases where such polymorphic class hierarchies already exist or are an appropriate design choice, I would not consider such a design at first, unless proven necessary.
+
+It also takes the risk of future unintended slicing if a subclass does not provide appropriate copy operations itself. The Rule of DesDeMovA would then not be applicable.
+
+An alternative approach for run-time polymorphism is to employ \tcode{std::variant} instead of a polymorphic reference. If all potential types of \tcode{std::variant} are value types, polymorphic copying is given and safe.
 
 \section{Outlier Types}
 One might argue that the above categories do not cover all useful \Cpp{} types. For example, in my teaching I use a tracer class that generates output on construction and destruction to demonstrated the deterministic lifetime of objects in \Cpp{}. This tracer class violates the rules set out in this paper, by defining a destructor with a side effect and still allow copying and in some cases even declares a move operation. But such a class and corresponding mechanisms (e.g., side effects in destructors that might fail) is not something you should use to model a production quality safety critical software system.
 
-A second use case for really strange behaving types are test cases for generic code. For example, if you need to make sure no resource leaks on exceptions for generic code, you will have to create classes that throw on move or copy operations deliberately to see if the implement mechanism fulfills its exception safety guarantee promises. Again such strangely behaving types will never be used in production. Developers doing so, should get their compiler license withdrawn.
+A second use case for really strange behaving types are test cases for generic code. For example, if you need to make sure no resource leaks on exceptions for generic code, you will have to create classes that throw on move or copy operations deliberately to see if the implement mechanism fulfills its exception safety guarantee promises. Again such strangely behaving types will never be used in production.\footnote{Developers doing so, should get their compiler license withdrawn :-)}
 
 \begin{table}[htp]
 \caption{Safe and Sane combinations of Special Member Functions (TODO)}
 \label{tab:safesane}
 \begin{center}
 \begin{threeparttable}
-\begin{tabular}{|p{2cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|}\hline
+\begin{tabular}{|p{2cm}|p{1.5cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}|p{1.7cm}|}\hline
   & some ctor & default ctor & destructor & copy ctor & copy assign & move ctor & move assign \\\hline
   
 Aggregate & none & defaulted & defaulted & defaulted & defaulted & defaulted & defaulted \\\hline
-Values & yes & \raggedright{none / \tcode{=default}} & defaulted & defaulted & defaulted & defaulted & defaulted \\\hline
-Manager & typical & \raggedright{none / \tcode{=default}} & \tcode{=default} to expert level & (=delete) & (=delete) & \raggedright{\tcode{=default} (=delete)}& \tcode{=default}  \tcode{=delete} \\\hline
-RAII & yes & \raggedright{none / \tcode{=default}} & \raggedright{user declared} & (=delete) & (=delete) & \tcode{=default}  (=delete) & (=delete) \tcode{=delete} \\\hline
-OO - base & maybe & may be & \tcode{virtual} \tcode{=default} & (=delete) & (=delete) & (=delete) & \tcode{=delete} \\\hline
-\raggedright{Manager as Value} & typical & \tcode{=default} & expert level & expert level & expert level & expert level & expert level \\\hline
+Simple Values & yes & \raggedright{none / \tcode{=default}} & defaulted & defaulted & defaulted & defaulted & defaulted \\\hline
+Scope Manager & typical & {none} & \raggedright{user defined} & (\tcode{=delete})\tnote{1} & (\tcode{=delete})\tnote{1} & (\tcode{=delete})\tnote{1}& \tcode{=delete} \\\hline
+Unique Manager & yes & \tcode{=default}\tnote{2} & \raggedright{user defined} & (\tcode{=delete})\tnote{3} & (\tcode{=delete})\tnote{3} & {user defined} & {user defined} \\\hline
+OO - base & may be & may be & \tcode{virtual} \tcode{=default} & (\tcode{=delete})\tnote{1} & (\tcode{=delete})\tnote{1} & (\tcode{=delete})\tnote{1} & \tcode{=delete} \\\hline
+\raggedright{Manager as Value} & typical & \tcode{=default} & user defined & expert level & expert level & \raggedright{expert level or swap} & {expert level or swap} \\\hline
 \raggedright{polymorph from value  (S.~Parent) }&   &   & expert level to \tcode{=default} & expert level & expert level & expert level & expert level \\\hline
 \end{tabular}
 
 \begin{tablenotes}
-\item
+\item[1] Rule of DesDeMovA implies deleted operations
+\item[2] Default constructed object is in moved-from state
+\item[3] Copying implicitly deleted
 \end{tablenotes}
  \end{threeparttable}
  \end{center}
 \label{default}
 \end{table}%
 
+%\todo[inline]{mapping special member functions to roles}
+%\todo[inline]{mapping member variable natures and influence on class nature}
+%\todo[inline]{insane combinations}
+
+\begin{table}[htp]
+\caption{Influence of member variable type nature to special member functions}
+\label{tab:safesane}
+\begin{center}
+\begin{threeparttable}
+\begin{tabular}{|p{1.8cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|p{2cm}|}
+\hline
+Member Variable Kind & Some Constructor & default constructor & destructor & copy constructor & copy assignment & move constructor & move assignment & Rule of Zero effect \\\hline\hline
+value & none some & defaulted & defaulted & defaulted & defaulted & defaulted & defaulted & value \\\hline
+T\& & yes & =delete & defaulted & defaulted & =delete & defaulted & =delete & special\tnote{1} \\\hline
+SBRM Manager & typical & none & defaulted nontrivial & deleted & deleted & deleted & deleted & Rule of DesDemMovA \tnote{2} \tnote{3} \\\hline
+Unique Manager & typical & defined/ =default & defaulted & deleted & deleted & defaulted & defaulted & Rule of Three for Unique\tnote{3} \\\hline
+Potentially Dangling & typical & defined/ =default & defaulted & defaulted & defaulted & defaulted & defaulted & potentially dangling\tnote{3}\\\hline
+\end{tabular}
+\begin{tablenotes}
+\item[1] consider \tcode{std::reference_wrapper} for achieving assignability
+\item[2] non-copyability is transitive.
+\item[3] contagious member, influences nature of surrounding class without further measures like a manager 
+\end{tablenotes}
+\end{threeparttable}
+
+\end{center}\end{table}
 
 
 \section{Items to be discussed}
-Things I am unsure
+
+This paper revision is intentionally incomplete to serve as a basis for discussions in the addressed study groups. Further work could be around a catalog of standard library classes serving the different natures. A collection of idioms to mitigate the safety risks involved with non-value types, especially potentially dangling types and other questions:
+
 \begin{itemize}
-\item Are there further useful and safe exceptions?
+\item Can tools safely determine the intended class nature from the given special member functions?
+\item What type natures did I forget? 
+\item Should shared_ptr really be banned from safety critical code?
+\item Should reference-counted shared mutable resources be a separate type nature?
 \end{itemize}
 
 
 %%%%%%
 
-\chapter{Bibliography}
+%\chapter{Bibliography}
 \bibliographystyle{alpha}
 \bibliography{cpppapers}
 \end{document}
