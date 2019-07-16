@@ -113,6 +113,7 @@ The feedback by LWG in Cologne 2019 was incorporated.
 \item make initialization sequencing more clear by replacing ". Calls..." with ". Then calls..."
 \item reformulate constraint on constraint constructor (taking a string with a different allocator) to be in line with current wording guidelines (sentence instead of code). (also for str(SAlloc) overload).
 \item simplified effects clause of constructors moving from string.
+\item make conditional noexcept conform with synopsis.
 \end{itemize}
 
 
@@ -328,7 +329,15 @@ This section also adopts the changes of p1163 by only marking the single argumen
     basic_stringbuf(basic_stringbuf&& rhs);
     @\added{basic_stringbuf(basic_stringbuf\&\& rhs, const Allocator\& a);}@        
 
+
+    // \iref{stringbuf.assign}, assign and swap
+    basic_stringbuf& operator=(const basic_stringbuf& rhs) = delete;
+    basic_stringbuf& operator=(basic_stringbuf&& rhs);
+    void swap(basic_stringbuf& rhs) @\added{noexcept(\seebelow)};
+
 \end{codeblock}
+
+
 
 \begin{em}
 {The following list summarizes the edits:}
@@ -380,12 +389,12 @@ This section also adopts the changes of p1163 by only marking the single argumen
     @\added{void init_buf_ptrs(); // \expos }@
 \end{codeblock}
 
-%\textit{May be: Add a conditional noexcept specification to swap based on Allocator's behaviour?:}
-%\begin{codeblock}
-%  template <class charT, class traits, class Allocator>
-%    void swap(basic_stringbuf<charT, traits, Allocator>& x,
-%              basic_stringbuf<charT, traits, Allocator>& y);
-%\end{codeblock}
+\textit{Add a conditional noexcept specification to swap with see below:}
+\begin{codeblock}
+  template <class charT, class traits, class Allocator>
+    void swap(basic_stringbuf<charT, traits, Allocator>& x,
+              basic_stringbuf<charT, traits, Allocator>& y) @\added{noexcept(\seebelow)}@;
+\end{codeblock}
 
 \emph{Adjust p2 of the section to include the additionbal exposition only members and add a note on the allocator properties of \tcode{basic_stringbuf}.}
 
@@ -636,7 +645,7 @@ have had if it had been move constructed from \tcode{rhs} (see~\iref{stringbuf.c
 
 \indexlibrarymember{swap}{basic_stringbuf}%
 \begin{itemdecl}
-void swap(basic_stringbuf& rhs)@\removed{;}@
+void swap(basic_stringbuf& rhs)
 @\added{noexcept(allocator_traits<Allocator>::propagate_on_container_swap::value ||}\\
        \added{allocator_traits<Allocator>::is_always_equal::value)}@;
 \end{itemdecl}
@@ -653,8 +662,7 @@ and \tcode{rhs}.
 \begin{itemdecl}
 template <class charT, class traits, class Allocator>
   void swap(basic_stringbuf<charT, traits, Allocator>& x,
-            basic_stringbuf<charT, traits, Allocator>& y)@\removed{;}@
-@\added{noexcept(noexcept(x.swap(y)))}@;
+            basic_stringbuf<charT, traits, Allocator>& y) @\added{noexcept(noexcept(x.swap(y)))}@;
 \end{itemdecl}
 
 \begin{itemdescr}
