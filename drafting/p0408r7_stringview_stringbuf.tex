@@ -59,8 +59,8 @@
 \pagestyle{myheadings}
 
 
-\newcommand{\papernumber}{p0408r6}
-\newcommand{\paperdate}{2019-01-21}
+\newcommand{\papernumber}{d0408r78}
+\newcommand{\paperdate}{2019-07-18}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -105,6 +105,16 @@ C++17 and library TS have \tcode{basic_string_view} allowing an efficient read-o
 On the other hand, there is no means to construct a \tcode{basic_string} and move from it into a \tcode{basic_stringbuf} via a constructor or a move-enabled overload of \tcode{str(basic_string \&\&)}.
 
 \section{History}
+\subsection{Changes from r6}
+The feedback by LWG in Cologne 2019 was incorporated.
+\begin{itemize}
+\item bump paper revision and base it on current working draft  (Daniel Krügler checked that all existing context wording is still OK.)
+\item specify the moved from state to be "\tcode{str().empty()} is \tcode{true}" instead of comparing with an empty string literal.
+\item make initialization sequencing more clear by replacing ". Calls..." with ". Then calls..."
+\item reformulate constraint on constraint constructor (taking a string with a different allocator) to be in line with current wording guidelines (sentence instead of code). (also for str(SAlloc) overload).
+\item simplified effects clause of constructors moving from string.
+\end{itemize}
+
 
 \subsection{Changes from r5}
 There was a review in my absence (again) in San Diego, November 2018. I'll try my best to incorporate the feedback here.
@@ -259,7 +269,7 @@ Note: this list includes the discussion of p0407 features.
 
 
 \chapter{Technical Specifications}
-The following is relative to n4791.
+The following is relative to n4820.
 
 Remove section on \tcode{char*} streams [depr.str.strstreams] and all its subsections from appendix D.
 
@@ -453,7 +463,7 @@ are initialized to null pointers.
 
 \pnum
 \ensures
-\tcode{str() == ""}.
+\tcode{str()}\added{\tcode{.empty()} is \tcode{true}}\removed{\tcode{ == ""}}.
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -470,7 +480,7 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_streambuf()}\iref{streambuf.cons}, \removed{and} initializing
 \tcode{mode}
-with \tcode{which} \added{, and \tcode{buf} with \tcode{s}. Calls  \tcode{init_buf_ptrs()}}.
+with \tcode{which} \added{, and \tcode{buf} with \tcode{s}. Then calls  \tcode{init_}\tcode{buf_}\tcode{ptrs()}}.
 \removed{Then calls \tcode{str(s)}.}
 \end{itemdescr}
 
@@ -491,11 +501,11 @@ Constructs an object of class
 initializing the base class with
 \tcode{basic_streambuf()}\iref{streambuf.cons}, initializing
 \tcode{mode}
-with \tcode{which}, and \tcode{buf} with \tcode{a}. Calls \tcode{init_buf_ptrs()}.
+with \tcode{which}, and \tcode{buf} with \tcode{a}. Then calls \tcode{init_buf_ptrs()}.
 
 \pnum
 \ensures
-\tcode{str() == ""}.
+\tcode{str().empty()} is \tcode{true}.
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -505,7 +515,7 @@ explicit basic_stringbuf(
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{std::move(s)}. Calls \tcode{init\_buf\_ptrs()}.
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{std::move(s)}. Then calls \tcode{init\_buf\_ptrs()}.
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -524,7 +534,7 @@ basic_stringbuf(
 %% TODO
 
 \pnum
-\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{\{s,a\}}. Calls \tcode{init\_buf\_ptrs()}.
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{\{s,a\}}. Then calls \tcode{init\_buf\_ptrs()}.
 
 \end{itemdescr}
 
@@ -537,13 +547,13 @@ explicit basic_stringbuf(
 \begin{itemdescr}
 
 \pnum
-\constraints \tcode{!is_same_v<SAlloc,Allocator>}.
+\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
 %\tcode{SAlloc} shall satisfy the \oldconcept{Allocator} requirements
 %(\tref{utilities.allocator.requirements}).
 %% TODO
 
 \pnum
-\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{s}. Calls \tcode{init\_buf\_ptrs()}.
+\effects Constructs an object of class \tcode{basic_stringbuf}, initializing the base class with \tcode{basic_streambuf()} \iref{streambuf.cons}, initializing \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{s}. Then calls \tcode{init\_buf\_ptrs()}.
 
 \end{itemdescr}
 
@@ -563,17 +573,18 @@ basic_stringbuf(basic_stringbuf&& rhs);
 
 \begin{itemdescr}
 \pnum
-\effects Move constructs from the rvalue \tcode{rhs}. 
-\added{This is accomplished by copy constructing the base class and initializing \tcode{mode} with \tcode{rhs.mode}. %% drive by clarification
+\effects \removed{Move constructs from the rvalue \tcode{rhs}. }
+\added{Copy constructs the base class from \tcode{rhs} and initializes \tcode{mode} with \tcode{rhs.mode}. %% drive by clarification
 In the first form \tcode{buf} is initialized from \tcode{std::move(rhs).str()}. In the second form \tcode{buf} is initialized from \tcode{\{std::move(rhs).str(), a\}}.}
 It is
 \impldef{whether sequence pointers are copied by \tcode{basic_stringbuf} move
 constructor} whether the sequence pointers in \tcode{*this}
 (\tcode{eback()}, \tcode{gptr()}, \tcode{egptr()},
 \tcode{pbase()}, \tcode{pptr()}, \tcode{epptr()}) obtain
-the values which \tcode{rhs} had. Whether they do or not, \tcode{*this}
+the values which \tcode{rhs} had. 
+\removed{Whether they do or not, \tcode{*this}
 and \tcode{rhs} reference separate buffers (if any at all) after the
-construction. \removed{The openmode, locale and any other state of \tcode{rhs} is
+construction. The openmode, locale and any other state of \tcode{rhs} is
 also copied.}
 
 \pnum
@@ -848,7 +859,7 @@ void str(const basic_string<charT, traits, Allocator>& s);
 \begin{itemdescr}
 \begin{addedblock}
 \pnum
-\constraints \tcode{!is_same_v<SAlloc,Allocator>}.
+\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
 \end{addedblock}
 
 \pnum
@@ -1049,7 +1060,7 @@ explicit basic_istringstream(
 
 \begin{itemdescr}
 \pnum
-\constraints \tcode{!is_same_v<SAlloc,Allocator>}.
+\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
 
 \pnum
 \effects 
@@ -1143,7 +1154,7 @@ void str(const basic_string<charT, traits, SAlloc>& s);
 
 \begin{itemdescr}
 \pnum
-\constraints \tcode{!is_same_v<SAlloc,Allocator>}.
+\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
 
 \pnum
 \effects
@@ -1337,7 +1348,7 @@ explicit basic_ostringstream(
 
 \begin{itemdescr}
 \pnum
-\constraints \tcode{!is_same_v<SAlloc,Allocator>}.
+\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
 
 \pnum
 \effects 
@@ -1431,7 +1442,7 @@ void str(const basic_string<charT, traits, SAlloc>& s);
 
 \begin{itemdescr}
 \pnum
-\constraints \tcode{!is_same_v<SAlloc,Allocator>}.
+\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
 
 \pnum
 \effects
@@ -1623,7 +1634,7 @@ explicit basic_stringstream(
 
 \begin{itemdescr}
 \pnum
-\constraints \tcode{!is_same_v<SAlloc,Allocator>}.
+\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
 
 \pnum
 \effects 
@@ -1718,7 +1729,7 @@ void str(const basic_string<charT, traits, SAlloc>& s);
 
 \begin{itemdescr}
 \pnum
-\constraints \tcode{!is_same_v<SAlloc,Allocator>}.
+\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
 
 \pnum
 \effects
