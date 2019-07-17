@@ -120,6 +120,7 @@ The feedback by LWG in Cologne 2019 was incorporated.
 \item simplifies wording for str() member functions by relating to view() (except for rvalue-ref qualified one)
 \item make view() member specification simpler and more correct, by using "Let sv be basic_string_view<....>" and referring to sv instead of the incomplete type right now.
 \item minor cosmetic adjustments wrt spacing
+\item make stream swap operations more clear and implicitly add preconditions through specifying them with effects equivalent to (as suggested by Tomasz Kaminski).
 \end{itemize}
 
 
@@ -960,7 +961,12 @@ Provide constructor overloads taking an Allocator argument and also those that a
 \begin{codeblock}      
     basic_istringstream(const basic_istringstream& rhs) = delete;
     basic_istringstream(basic_istringstream&& rhs);
-\end{codeblock}
+
+    // \iref{istringstream.assign}, assign and swap
+    basic_istringstream& operator=(const basic_istringstream& rhs) = delete;
+    basic_istringstream& operator=(basic_istringstream&& rhs);
+    void swap(basic_istringstream& rhs);
+\end{codeblock} % no noexcept possible because base class does not have it.
 
 \textit{Adjust getter/setter members according to basic_stringbuf:}
 
@@ -1096,6 +1102,24 @@ and \tcode{sb} with
 \end{itemdescr}
 \end{addedblock}
 
+\subsection{28.8.3.2 Assignment and swap [istringstream.assign]}
+\textit{change the definition of the swap member to incorporate the new requirement implicitly given by \tcode{basic_stringbuf::swap}:}
+
+\indexlibrarymember{swap}{basic_istringstream}%
+\begin{itemdecl}
+void swap(basic_istringstream& rhs);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects \removed{Exchanges the state of \tcode{*this} and
+\tcode{rhs} by calling}
+\added{Equivalent to:}\\
+\tcode{basic_istream<charT, traits>::swap(rhs)}\added{\tcode{;}}\removed{ and}\\
+\tcode{sb.swap(rhs.sb)}\added{\tcode{;}}\removed{.}
+\end{itemdescr}
+
+
 \subsection{28.8.3.3 Member functions [istringstream.members]}
 \textit{Extend \tcode{str()} overloads according to basic_stringbuf and add \tcode{view()}}:
 
@@ -1227,6 +1251,11 @@ Provide constructor overloads taking an Allocator argument and also those that a
 \begin{codeblock}      
     basic_ostringstream(const basic_ostringstream& rhs) = delete;
     basic_ostringstream(basic_ostringstream&& rhs);
+    
+    // \iref{ostringstream.assign}, assign and swap
+    basic_ostringstream& operator=(const basic_ostringstream& rhs) = delete;
+    basic_ostringstream& operator=(basic_ostringstream&& rhs);
+    void swap(basic_ostringstream& rhs);
 \end{codeblock}
 
 \textit{Adjust getter/setter members according to basic_stringbuf:}
@@ -1363,6 +1392,24 @@ and \tcode{sb} with
 \end{itemdescr}
 \end{addedblock}
 
+\subsection{28.8.4.2 Assignment and swap [istringstream.assign]}
+\textit{change the definition of the swap member to incorporate the new requirement implicitly given by \tcode{basic_stringbuf::swap}:}
+
+\indexlibrarymember{swap}{basic_ostringstream}%
+\begin{itemdecl}
+void swap(basic_ostringstream& rhs);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects \removed{Exchanges the state of \tcode{*this} and
+\tcode{rhs} by calling}
+\added{Equivalent to:}\\
+\tcode{basic_ostream<charT, traits>::swap(rhs)}\added{\tcode{;}}\removed{ and}\\
+\tcode{sb.swap(rhs.sb)}\added{\tcode{;}}\removed{.}
+\end{itemdescr}
+
+
 \subsection{28.8.4.3 Member functions [ostringstream.members]}
 \textit{Extend \tcode{str()} overloads according to basic_stringbuf and add \tcode{view()}}:
 
@@ -1493,6 +1540,11 @@ Provide constructor overloads taking an Allocator argument and also those that a
 \begin{codeblock}      
     basic_stringstream(const basic_stringstream& rhs) = delete;
     basic_stringstream(basic_stringstream&& rhs);
+    
+    // \iref{stringstream.assign}, assign and swap
+    basic_stringstream& operator=(const basic_stringstream& rhs) = delete;
+    basic_stringstream& operator=(basic_stringstream&& rhs);
+    void swap(basic_stringstream& rhs);
 \end{codeblock}
 
 \textit{Adjust getter/setter members according to basic_stringbuf:}
@@ -1522,7 +1574,7 @@ Provide constructor overloads taking an Allocator argument and also those that a
 \end{codeblock}
 \end{addedblock}
 
-\subsection{28.8.4.1 basic\_stringstream constructors [stringstream.cons]}
+\subsection{28.8.5.1 basic\_stringstream constructors [stringstream.cons]}
 \begin{em}
 Adjust the constructor specifications analog to basic_stringbuf. deliberately do not provide the special move constructor taking an allocator. Drive-by editorial fix to include Allocator template argument.
 \end{em}
@@ -1629,8 +1681,25 @@ and \tcode{sb} with
 \end{itemdescr}
 \end{addedblock}
 
+\subsection{28.8.5.2 Assignment and swap [istringstream.assign]}
+\textit{change the definition of the swap member to incorporate the new requirement implicitly given by \tcode{basic_stringbuf::swap}:}
 
-\subsection{28.8.4.3 Member functions [stringstream.members]}
+\indexlibrarymember{swap}{basic_stringstream}%
+\begin{itemdecl}
+void swap(basic_stringstream& rhs);
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects \removed{Exchanges the state of \tcode{*this} and
+\tcode{rhs} by calling}
+\added{Equivalent to:}\\
+\tcode{basic_iostream<charT, traits>::swap(rhs)}\added{\tcode{;}}\removed{ and}\\
+\tcode{sb.swap(rhs.sb)}\added{\tcode{;}}\removed{.}
+\end{itemdescr}
+
+
+\subsection{28.8.5.3 Member functions [stringstream.members]}
 \textit{Extend \tcode{str()} overloads according to basic_stringbuf and add \tcode{view()}}:
 
 \indexlibrarymember{str}{basic_stringstream}%
