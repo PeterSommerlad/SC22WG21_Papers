@@ -227,7 +227,7 @@ As with all existing stream classes, using a stream object or a streambuf object
 
 \emph{Introduce a new header \tcode{\textless{}spanstream\textgreater} in subclause ([headers]): Table 19 ([tab:headers.cpp]).}
 
-\emph{Add the feature test macro \tcode{__cpp_lib_spanstream} to Table 17 ([tab:cpp.predefined.ft]) with the corresponding value.}
+\emph{Add the feature test macro \tcode{__cpp_lib_spanstream} to Table 17 ([tab:cpp.predefined.ft]) with the corresponding value for the header \tcode{\textless{}spanstream\textgreater}.}
 
 \emph{Insert a new section 29.x in chapter 29 [input.output] after section 29.8 [string.streams]}
 
@@ -245,19 +245,19 @@ A user of theses classes is responsible that the character sequence represented 
 
 \begin{codeblock}
 namespace std {
-  template <class charT, class traits = char_traits<charT> >
+  template <class charT, class traits = char_traits<charT>>
     class basic_spanbuf;
   using spanbuf = basic_spanbuf<char>;
   using wspanbuf = basic_spanbuf<wchar_t>;
-  template <class charT, class traits = char_traits<charT> >
+  template <class charT, class traits = char_traits<charT>>
     class basic_ispanstream;
   using ispanstream = basic_ispanstream<char>;
   using wispanstream = basic_ispanstream<wchar_t>;
-  template <class charT, class traits = char_traits<charT> >
+  template <class charT, class traits = char_traits<charT>>
     class basic_ospanstream;
   using ospanstream = basic_ospanstream<char>;
   using wospanstream = basic_ospanstream<wchar_t>;
-  template <class charT, class traits = char_traits<charT> >
+  template <class charT, class traits = char_traits<charT>>
     class basic_spanstream;
   using spanstream = basic_spanstream<char>;
   using wspanstream = basic_spanstream<wchar_t>;
@@ -433,15 +433,12 @@ basic_spanbuf& operator=(basic_spanbuf&& rhs) noexcept;
 
 \begin{itemdescr}
 \pnum
-\effects After the 
-%copy/
-move assignment \tcode{*this} has the observable state it would
-have had if it had been 
-%copy/
-move constructed from \tcode{rhs} (see~\iref{spanbuf.cons}).
-
-\pnum
-\returns \tcode{*this}.
+\effects Equivalent to:
+\begin{codeblock}
+    basic_spanbuf tmp{std::move(rhs)};
+    this->swap(tmp);
+    return *this;
+\end{codeblock}
 \end{itemdescr}
 
 %\indexlibrarymember{swap}{basic_spanbuf}%
@@ -454,9 +451,10 @@ void swap(basic_spanbuf& rhs) noexcept;
 \effects Equivalent to:
 \begin{codeblock} 
     basic_streambuf<charT, traits>::swap(rhs);
-    std::swap(mode, rhs.mode);
-    std::swap(buf, rhs.buf);
+    swap(mode, rhs.mode);
+    swap(buf, rhs.buf);
 \end{codeblock}
+% swap is std::swap, because mode and buf's types are from std.
 \end{itemdescr}
 
 %\indexlibrarymember{swap}{basic_spanbuf}%
@@ -483,7 +481,7 @@ span<charT> span() const;
 \begin{itemdescr}
 \pnum
 \returns
-If \tcode{mode == ios_base::out} is true,
+If \tcode{ios_base::out} is set in \tcode{mode},
 returns \tcode{span<charT>(pbase(),pptr())}, 
 otherwise returns \tcode{buf}. 
 
@@ -509,15 +507,19 @@ void span(span<charT,Extent> s);
 
 \pnum
 \postconditions 
-If \tcode{mode \& ios_base::out} is true, 
-\tcode{pbase() == s.data()} and \tcode{epptr() == pbase() + s.size()} holds; 
-in addition, 
-if \tcode{mode \& ios_base::ate} is true,
-\tcode{pptr() == pbase() + s.size()} holds, 
-otherwise \tcode{pptr() == pbase()} is true. 
-If \tcode{mode \& ios_base::in} is true, 
-\tcode{eback() == s.data()}, and both \tcode{gptr()
-== eback()} and \tcode{egptr() == eback() + s.size()} hold.
+\begin{itemize}
+\item If \tcode{ ios_base::out} is set in \tcode{mode}, 
+\tcode{(pbase() == s.data()} \tcode{\&\&} \tcode{epptr() == pbase() + s.size())} is \tcode{true}; 
+\begin{itemize}
+\item in addition, 
+if \tcode{ios_base::ate} is set in \tcode{mode},
+\tcode{pptr() == pbase() + s.size()} is \tcode{true}, 
+\item otherwise \tcode{pptr() == pbase()} is \tcode{true}. 
+\end{itemize}
+\item If \tcode{ios_base::in} is set in \tcode{mode}, 
+\tcode{(eback() == s.data()} \tcode{\&\&}  \tcode{gptr()
+== eback()} \tcode{\&\&} \tcode{egptr() == eback() + s.size())} is \tcode{true}.
+\end{itemize}
 
 \begin{note}
 Using append mode does not make sense for \tcode{span}-based streams.
@@ -618,9 +620,9 @@ Table~\ref{tab:spanbuf.newoff.values}2\iref{tab:spanbuf.newoff.values}.
 \tcode{way == ios_base::beg}  &
  0  \\ \rowsep
 \tcode{way == ios_base::cur}  &
- \tcode{pptr()-pbase()} or \tcode{gptr()-eback()}. \\ \rowsep
+ \tcode{pptr() - pbase()} or \tcode{gptr() - eback()}. \\ \rowsep
 \tcode{way == ios_base::end}  &
-  \tcode{(mode == ios_base::out)?} \tcode{pptr()-pbase() : }\tcode{buf.size()}   \\
+  \tcode{(mode == ios_base::out)?} \tcode{pptr() - pbase() : }\tcode{buf.size()}   \\
 \end{libtab2}
 
 \pnum
@@ -655,14 +657,7 @@ pos_type seekpos(pos_type sp,
 \begin{itemdescr}
 \pnum
 \effects
-Equivalent to: \tcode{seekoff(off_type(sp), ios_base::beg, which)}.
-
-\pnum
-\returns
-\tcode{sp}
-to indicate success, or
-\tcode{pos_type(off_type(-1))}
-to indicate failure.
+Equivalent to: \tcode{return seekoff(off_type(sp), ios_base::beg, which);}
 \end{itemdescr}
 
 %\indexlibrarymember{setbuf}{basic_streambuf}%
@@ -791,10 +786,8 @@ basic_ispanstream& operator=(basic_ispanstream&& rhs);
 \begin{codeblock}
    basic_istream<charT, traits>::swap(rhs);
    sb = std::move(rhs.sb);
+   return *this;
 \end{codeblock}
-
-\pnum
-\returns \tcode{*this}.
 \end{itemdescr}
 
 %\indexlibrarymember{swap}{basic_ispanstream}%
@@ -979,10 +972,8 @@ basic_ospanstream& operator=(basic_ospanstream&& rhs) noexcept;
 \begin{codeblock}
     basic_ostream<charT, traits>::swap(rhs);
     sb = std::move(rhs.sb);
+    return *this;
 \end{codeblock}
-
-\pnum
-\returns \tcode{*this}.
 \end{itemdescr}
 
 %\indexlibrarymember{swap}{basic_ospanstream}%
@@ -1163,10 +1154,8 @@ basic_spanstream& operator=(basic_spanstream&& rhs) noexcept;
 \begin{codeblock}
     basic_iostream<charT, traits>::swap(rhs);
     sb = std::move(rhs.sb);
+    return *this;
 \end{codeblock}
-
-\pnum
-\returns \tcode{*this}.
 \end{itemdescr}
 
 %\indexlibrarymember{swap}{basic_spanstream}%

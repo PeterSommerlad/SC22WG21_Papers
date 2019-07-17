@@ -60,7 +60,7 @@
 
 
 \newcommand{\papernumber}{d0408r7}
-\newcommand{\paperdate}{2019-07-18}
+\newcommand{\paperdate}{2019-07-17}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -640,7 +640,13 @@ basic_stringbuf& operator=(basic_stringbuf&& rhs);
 \begin{itemdescr}
 \pnum
 \effects
-%\added{Move assigns \tcode{buf} from \tcode{std::move(rhs).str()}.}
+%% could upgrade the effects clause like with spanstream, but won't
+%Equivalent to:
+%\begin{codeblock}
+%    basic_stringbuf tmp{std::move(rhs)};
+%    this->swap(tmp); // would mean noexcept could be different, because of allocator propagation
+%    return *this;
+%\end{codeblock}
 After that move assignment \tcode{*this} has the observable state it would
 have had if it had been move constructed from \tcode{rhs} (see~\iref{stringbuf.cons}).
 
@@ -717,9 +723,8 @@ Initializes the input and output sequences from \tcode{buf} according to \tcode{
 \begin{itemize}
 \item If \tcode{ios_base::out} is set in \tcode{mode},\\ 
 \tcode{pbase()} points to \tcode{buf.front()} and \\\tcode{epptr() >= pbase() + buf.size()} is \tcode{true}; 
-\item in addition, 
 \begin{itemize}
-\item if \tcode{ios_base::ate} is set in \tcode{mode}, \\
+\item in addition, if \tcode{ios_base::ate} is set in \tcode{mode}, \\
 \tcode{pptr() == pbase() + buf.size()} is \tcode{true}, 
 \item otherwise \tcode{pptr() == pbase()} is \tcode{true}. 
 \end{itemize}
