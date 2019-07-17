@@ -115,7 +115,7 @@ The feedback by LWG in Cologne 2019 was incorporated.
 \item simplified effects clause of constructors moving from string.
 \item make conditional noexcept conform with synopsis for swap, but non-member swap gets it in synopsis without see below, because it is short enough.
 \item remove obsolete wording in constructor definitions ("Constructs..." to "Initilizes")
-\item replace many "Returns:" with "Effects: Equivalent to: " to obtain requirements in many places. This allows to remove some Constraints on SAlloc (if Marshall believes so).
+\item replace many "Returns:" with "Effects: Equivalent to: " to obtain requirements in many places. This allows to remove some Constraints on SAlloc (if Marshall believes so - Tomasz said to remove the str() constraints on SAlloc is OK).
 \item replace many "Calls " with "Equivalent to:" in Effects clauses
 \item simplifies wording for str() member functions by relating to view() (except for rvalue-ref qualified one)
 \item make view() member specification simpler and more correct, by using "Let sv be basic_string_view<....>" and referring to sv instead of the incomplete type right now.
@@ -802,7 +802,7 @@ in neither input nor output mode and a zero length \tcode{basic_string} is retur
 \constraints \tcode{SAlloc} is a type that qualifies as an allocator ([container.requirements.general]).
 
 \pnum
-\effects Equivalent to: \tcode{return basic_string<charT, traits, SAlloc>(view());}
+\effects Equivalent to: \tcode{return basic_string<charT, traits, SAlloc>(view(), sa);}
 \end{itemdescr}
 \end{addedblock}
 
@@ -831,20 +831,22 @@ basic_string_view<charT, traits> view() const;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\returns A \tcode{basic_string_view} object referring to the \tcode{basic_stringbuf}'s underlying character sequence
-in \tcode{buf}. 
-Let \tcode{sv} be \tcode{basic_string_view<charT, traits>}:
+Let \tcode{sv} be \tcode{basic_string_view<charT, traits>}.
+
+\pnum
+\returns A \tcode{sv} object referring to the \tcode{basic_stringbuf}'s underlying character sequence
+in \tcode{buf}:
 \begin{itemize}
 \item If \tcode{ios_base::out} is set in \tcode{mode},
 then \tcode{sv(pbase(), high_mark-pbase())} is returned.
 \item Otherwise, if \tcode{ios_base::in} is set in \tcode{mode},
 then \tcode{sv(eback(), egptr()-eback())} is returned.
-\item Otherwise, a \tcode{basic_string_view} referring to an empty range is returned. 
+\item Otherwise, \tcode{sv()} is returned. 
 \end{itemize}
 
 \pnum
 \begin{note}
-Using the returned \tcode{basic_string_view} object after destruction or invalidation of the character sequence underlying \tcode{*this} is undefined behavior. 
+Using the returned \tcode{sv} object after destruction or invalidation of the character sequence underlying \tcode{*this} is undefined behavior, unless \tcode{sv.empty()} is \tcode{true}. 
 \end{note}
 \end{itemdescr}
 \end{addedblock}
@@ -1082,9 +1084,9 @@ explicit basic_istringstream(
 \end{itemdecl}
 
 \begin{itemdescr}
-\pnum
-\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
-
+%\pnum
+%\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
+%
 \pnum
 \effects 
 Initializes the base class with
@@ -1163,10 +1165,10 @@ void str(const basic_string<charT, traits, SAlloc>& s);
 \end{itemdecl}
 
 \begin{itemdescr}
-\pnum
-\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
-%Marshall to decide
-
+%\pnum
+%\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
+%%Marshall to decide
+%
 \pnum
 \effects
 Equivalent to: 
@@ -1430,10 +1432,10 @@ void str(const basic_string<charT, traits, SAlloc>& s);
 \end{itemdecl}
 
 \begin{itemdescr}
-\pnum
-\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
-%Marshall to decide
-
+%\pnum
+%\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
+%%Marshall to decide
+%
 \pnum
 \effects
 Equivalent to: 
@@ -1698,10 +1700,10 @@ void str(const basic_string<charT, traits, SAlloc>& s);
 \end{itemdecl}
 
 \begin{itemdescr}
-\pnum
-\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
-%Marshall to decide
-
+%\pnum
+%\constraints \tcode{is_same_v<SAlloc,Allocator>} is \tcode{false}.
+%%Marshall to decide
+%
 \pnum
 \effects
 Equivalent to: 
