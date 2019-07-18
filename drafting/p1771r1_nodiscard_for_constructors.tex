@@ -90,7 +90,7 @@ R1 of this paper extends the example to demonstrate the added cases and integrat
 
 Reviewers, please note that a constructor declaration is a function declaration.
 
-Thanks to EWG, CWG and Alisdar Meredith for helping with this paper and giving feedback.
+Thanks to EWG, CWG, Mike Miller, and Alisdair Meredith for helping with this paper and giving feedback.
 
 \chapter{Wording}
 
@@ -112,18 +112,20 @@ no \grammarterm{attribute-argument-clause} shall be present.
 \begin{note}
 \added{A \emph{nodiscard type} is a possibly cv-qualified class or enumeration type
 marked \tcode{nodiscard}.}
-A \emph{nodiscard call} is a function call expression \added{(7.6.1.2 [expr.call])}
-that
-calls a function 
+A \emph{nodiscard call} is \added{either}
+\begin{itemize}
+\item a function call expression \added{(7.6.1.2 [expr.call])}
+that calls a function 
 previously declared \tcode{nodiscard}, or
 whose return type is a 
 \removed{possibly cv-qualified class or enumeration type marked \tcode{nodiscard}}
-\added{\emph{nodiscard type}}. 
-\added{Also, a \emph{nodiscard call} is an explicit type conversion (7.6.1.8 [expr.static.cast], 7.6.3 [expr.cast], 7.6.1.3 [expr.type.conv])
+\added{\emph{nodiscard type}, or}\removed{.}
+\item
+\added{an explicit type conversion (7.6.1.8 [expr.static.cast], 7.6.3 [expr.cast], 7.6.1.3 [expr.type.conv])
 that constructs an object through a constructor
 previously declared \tcode{nodiscard}, or
 that initializes an object of a \emph{nodiscard type}.}
- 
+\end{itemize} 
 Appearance of a nodiscard call as
 a potentially-evaluated discarded-value expression (7.2)%\iref{expr.prop}
 is discouraged unless explicitly cast to \tcode{void}.
