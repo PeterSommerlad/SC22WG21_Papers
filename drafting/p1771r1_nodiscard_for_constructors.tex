@@ -56,8 +56,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{P1771r0}
-\newcommand{\paperdate}{2019-06-17}
+\newcommand{\papernumber}{D1771r1}
+\newcommand{\paperdate}{2019-07-18}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -85,6 +85,8 @@ The  paper p0189 that introduced the \tcode{[[nodiscard]]} attribute did not con
 The need is more obvious in C++ 17 and later, where CTAD allows for fewer factory functions and thus the easy to make mistake by just typing the type and constructor arguments instead of defining a local variable.
 
 Since this change is editorial only, it might be considered to be applied for the current working paper.
+
+R1 of this paper extends the example to demonstrate the added cases.
 
 \chapter{Impact on the standard}
 
@@ -120,12 +122,23 @@ of a nodiscard call has surprising consequences.
 \end{note}
 
 \pnum
-\begin{example}
+\begin{example}\begin{addedblock}\begin{codeblock}
+struct [[nodiscard]] my_scopeguard { @\commentellip@ };
+struct my_unique {
+  my_unique()=default; // does not acquire resource
+  [[nodiscard]] my_unique(int fd) { @\commentellip@ } // acquires resource
+  ~my_unique() noexcept { @\commentellip@ } // releases resource, if any
+  @\commentellip@
+};
+\end{codeblock}\end{addedblock}
 \begin{codeblock}
 struct [[nodiscard]] error_info { @\commentellip@ };
 error_info enable_missile_safety_mode();
 void launch_missiles();
 void test_missiles() {
+  @\added{my_scopeguard();}@              // \added{warning encouraged}
+  @\added{my_unique(42);}@                // \added{warning encouraged}
+  @\added{my_unique();}@                  // \added{warning not encouraged}
   enable_missile_safety_mode(); // warning encouraged
   launch_missiles();
 }
