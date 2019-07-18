@@ -59,8 +59,8 @@
 \pagestyle{myheadings}
 
 
-\newcommand{\papernumber}{d0408r7}
-\newcommand{\paperdate}{2019-07-17}
+\newcommand{\papernumber}{p0408r7}
+\newcommand{\paperdate}{2019-07-18}
 
 %\definecolor{insertcolor}{rgb}{0,0.5,0.25}
 %\newcommand{\del}[1]{\textcolor{red}{\sout{#1}}}
@@ -110,7 +110,7 @@ The feedback by LWG in Cologne 2019 was incorporated.
 \begin{itemize}
 \item bump paper revision and base it on current working draft  (Daniel Krügler checked that all existing context wording is still OK.)
 \item specify the moved from state to be "\tcode{str().empty()} is \tcode{true}" instead of comparing with an empty string literal.
-\item make initialization sequencing more clear by replacing ". Calls..." with ". Then calls..."
+\item make initialization sequencing more clear by replacing ". Calls..." with ", then calls..."
 \item reformulate constraint on constraint constructor (taking a string with a different allocator) to be in line with current wording guidelines (sentence instead of code). (also for str(SAlloc) overload).
 \item simplified effects clause of constructors moving from string.
 \item make conditional noexcept conform with synopsis for swap, but non-member swap gets it in synopsis without see below, because it is short enough.
@@ -121,6 +121,8 @@ The feedback by LWG in Cologne 2019 was incorporated.
 \item make view() member specification simpler and more correct, by using "Let sv be basic_string_view<....>" and referring to sv instead of the incomplete type right now.
 \item minor cosmetic adjustments wrt spacing
 \item make stream swap operations more clear and implicitly add preconditions through specifying them with effects equivalent to (as suggested by Tomasz Kaminski).
+\item consistently make view() noexcept
+\item add get_allocator() to str() calling view.
 \end{itemize}
 
 
@@ -496,7 +498,7 @@ explicit basic_stringbuf(
 initializing}\added{Initializes} the base class with
 \tcode{basic_streambuf()}(\iref{streambuf.cons}), \removed{and initializing}
 \tcode{mode}
-with \tcode{which} \added{, and \tcode{buf} with \tcode{s}. Then calls  \tcode{init_}\tcode{buf_}\tcode{ptrs()}}.
+with \tcode{which} \added{, and \tcode{buf} with \tcode{s}, then calls  \tcode{init_}\tcode{buf_}\tcode{ptrs()}}.
 \removed{Then calls \tcode{str(s)}.}
 \end{itemdescr}
 
@@ -515,7 +517,7 @@ basic_stringbuf(
 Initializes the base class with
 \tcode{basic_streambuf()}(\iref{streambuf.cons}), 
 \tcode{mode}
-with \tcode{which}, and \tcode{buf} with \tcode{a}. Then calls \tcode{init_buf_ptrs()}.
+with \tcode{which}, and \tcode{buf} with \tcode{a}, then calls \tcode{init_buf_ptrs()}.
 
 \pnum
 \ensures
@@ -529,7 +531,7 @@ explicit basic_stringbuf(
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects \removed{Constructs an object of class \tcode{basic_stringbuf}, initializing}\added{Initializes} the base class with \tcode{basic_streambuf()} (\iref{streambuf.cons}),\removed{ initializing} \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{std::move(s)}. Then calls \tcode{init\_buf\_ptrs()}.
+\effects \removed{Constructs an object of class \tcode{basic_stringbuf}, initializing}\added{Initializes} the base class with \tcode{basic_streambuf()} (\iref{streambuf.cons}),\removed{ initializing} \tcode{mode} with \tcode{which}, and  \tcode{buf} with \tcode{std::move(s)}, then calls \tcode{init\_buf\_ptrs()}.
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -549,7 +551,7 @@ basic_stringbuf(
 
 \pnum
 \effects 
-Initializes the base class with \tcode{basic_streambuf()} (\iref{streambuf.cons}), \tcode{mode} with \tcode{which}, and \tcode{buf} with \tcode{\{s,a\}}. Then calls \tcode{init\_buf\_ptrs()}.
+Initializes the base class with \tcode{basic_streambuf()} (\iref{streambuf.cons}), \tcode{mode} with \tcode{which}, and \tcode{buf} with \tcode{\{s,a\}}, then calls \tcode{init\_buf\_ptrs()}.
 
 \end{itemdescr}
 
@@ -569,7 +571,7 @@ explicit basic_stringbuf(
 
 \pnum
 \effects 
-Initializes the base class with \tcode{basic_streambuf()} (\iref{streambuf.cons}),  \tcode{mode} with \tcode{which}, and \tcode{buf} with \tcode{s}. Then calls \tcode{init\_buf\_ptrs()}.
+Initializes the base class with \tcode{basic_streambuf()} (\iref{streambuf.cons}),  \tcode{mode} with \tcode{which}, and \tcode{buf} with \tcode{s}, then calls \tcode{init\_buf\_ptrs()}.
 \end{itemdescr}
 
 
@@ -664,7 +666,7 @@ void swap(basic_stringbuf& rhs) @\added{noexcept(\seebelow)}@;
 \begin{itemdescr}
 \begin{addedblock}
 \pnum
-\expects \tcode{allocator_traits<Allocator>::propagate_on_container_swap::value} is \tcode{true} or \tcode{get_allocator() == s.get_allocator()}.
+\expects \tcode{allocator_traits<Allocator>::propagate_on_container_swap::value} is \tcode{true} or \tcode{get_allocator() == s.get_allocator()} is \tcode{true}.
 \end{addedblock}
 
 \pnum
@@ -788,7 +790,7 @@ in neither input nor output mode and a zero length \tcode{basic_string} is retur
 }
 
 \begin{addedblock} 
-\effects Equivalent to: \tcode{return basic_string<charT, traits, Allocator>(view());}
+\effects Equivalent to: \tcode{return basic_string<charT, traits, Allocator>(view(), get_allocator());}
 \end{addedblock}
 \end{itemdescr}
 
@@ -824,11 +826,11 @@ in \tcode{buf}.
 This can be achieved by first adjusting \tcode{buf} to have the same content as \tcode{view()}.
 
 \pnum
-\ensures The underlying character sequence \tcode{buf} is empty and \tcode{pbase()}, \tcode{pptr()}, \tcode{epptr()}, \tcode{eback()}, \tcode{gptr()}, \tcode{egptr()} are initialized as if calling \tcode{init_buf_ptrs()} with an empty \tcode{buf}.
+\ensures The underlying character sequence \tcode{buf} is empty and \tcode{pbase()}, \tcode{pptr()}, \tcode{epptr()}, \tcode{eback()}, \tcode{gptr()}, \tcode{egptr()} are initialized as if by calling \tcode{init_buf_ptrs()} with an empty \tcode{buf}.
 \end{itemdescr}
 
 \begin{itemdecl}
-basic_string_view<charT, traits> view() const;
+basic_string_view<charT, traits> view() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
@@ -981,7 +983,7 @@ Provide constructor overloads taking an Allocator argument and also those that a
     template<class SAlloc>
     basic_string<charT,traits,SAlloc> str(const SAlloc& sa) const;
     basic_string<charT, traits, Allocator> str() &&;
-    basic_string_view<charT, traits> view() const;
+    basic_string_view<charT, traits> view() const noexcept;
 \end{codeblock}
 \end{addedblock}
 \begin{codeblock}
@@ -1143,7 +1145,7 @@ basic_string<charT,traits,SAlloc> str(const SAlloc& sa) const;
 \begin{itemdescr}
 \pnum
 \effects Equivalent to: \tcode{return} 
-\tcode{rdbuf()->str(sa)}.
+\tcode{rdbuf()->str(sa);}
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -1151,7 +1153,7 @@ basic_string<charT,traits,Allocator> str() &&;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{return}  \tcode{std::move(*rdbuf()).str()}.
+\effects Equivalent to: \tcode{return}  \tcode{std::move(*rdbuf()).str();}
 
 %\pnum
 %\begin{note}
@@ -1160,11 +1162,11 @@ basic_string<charT,traits,Allocator> str() &&;
 \end{itemdescr}
 
 \begin{itemdecl}
-basic_string_view<charT, traits> view() const;
+basic_string_view<charT, traits> view() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{return}  \tcode{rdbuf()->view()}.
+\effects Equivalent to: \tcode{return}  \tcode{rdbuf()->view();}
 % can not be noexcept, because rdbuf() might return nullptr or even throw.
 \end{itemdescr}
 
@@ -1271,7 +1273,7 @@ Provide constructor overloads taking an Allocator argument and also those that a
     template<class SAlloc>
     basic_string<charT,traits,SAlloc> str(const SAlloc& sa) const;
     basic_string<charT, traits, Allocator> str() &&;
-    basic_string_view<charT, traits> view() const;
+    basic_string_view<charT, traits> view() const noexcept;
 \end{codeblock}
 \end{addedblock}
 \begin{codeblock}
@@ -1299,7 +1301,7 @@ explicit basic_ostringstream(ios_base::openmode which);
 \pnum
 \effects
 \removed{Constructs an object of class
-\tcode{basic_ostringstream<charT, traits\added{, Allocator}>},
+\tcode{basic_ostringstream<charT, traits>},
 initializing}\added{Initializes} the base class with
 \tcode{basic_ostream<charT, traits>(addressof(sb))}(\iref{ostream})
 and \removed{initializing }\tcode{sb} with %\linebreak % avoid Overfull
@@ -1317,10 +1319,10 @@ explicit basic_ostringstream(
 \pnum
 \effects
 \removed{Constructs an object of class
-\tcode{basic_ostringstream<charT, traits\added{, Allocator}>},
+\tcode{basic_ostringstream<charT, traits>},
 initializing}\added{Initializes} the base class with
 \tcode{basic_ostream<charT, traits>(addressof(sb))}(\iref{ostream})
-and \removed{initializing }\tcode{sb} with%\linebreak % avoid Overfull
+and \removed{initializing }\tcode{sb} with %\linebreak % avoid Overfull
 \tcode{basic_stringbuf<charT, traits, Allocator>(str, which | ios_base::out)}~(\iref{stringbuf.cons}).
 \end{itemdescr}
 
@@ -1392,7 +1394,7 @@ and \tcode{sb} with
 \end{itemdescr}
 \end{addedblock}
 
-\subsection{28.8.4.2 Assignment and swap [istringstream.assign]}
+\subsection{28.8.4.2 Assignment and swap [ostringstream.assign]}
 \textit{change the definition of the swap member to incorporate the new requirement implicitly given by \tcode{basic_stringbuf::swap}:}
 
 \indexlibrarymember{swap}{basic_ostringstream}%
@@ -1433,7 +1435,7 @@ basic_string<charT,traits,SAlloc> str(const SAlloc& sa) const;
 \begin{itemdescr}
 \pnum
 \effects Equivalent to: \tcode{return} 
-\tcode{rdbuf()->str(sa)}.
+\tcode{rdbuf()->str(sa);}
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -1441,7 +1443,7 @@ basic_string<charT,traits,Allocator> str() &&;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{return}  \tcode{std::move(*rdbuf()).str()}.
+\effects Equivalent to: \tcode{return}  \tcode{std::move(*rdbuf()).str();}
 
 %\pnum
 %\begin{note}
@@ -1450,11 +1452,11 @@ basic_string<charT,traits,Allocator> str() &&;
 \end{itemdescr}
 
 \begin{itemdecl}
-basic_string_view<charT, traits> view() const;
+basic_string_view<charT, traits> view() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{return}  \tcode{rdbuf()->view()}.
+\effects Equivalent to: \tcode{return}  \tcode{rdbuf()->view();}
 % can not be noexcept, because rdbuf() might return nullptr or even throw.
 \end{itemdescr}
 
@@ -1560,7 +1562,7 @@ Provide constructor overloads taking an Allocator argument and also those that a
     template<class SAlloc>
     basic_string<charT,traits,SAlloc> str(const SAlloc& sa) const;
     basic_string<charT, traits, Allocator> str() &&;
-    basic_string_view<charT, traits> view() const;
+    basic_string_view<charT, traits> view() const noexcept;
 \end{codeblock}
 \end{addedblock}
 \begin{codeblock}
@@ -1587,7 +1589,7 @@ explicit basic_stringstream(ios_base::openmode which);
 \pnum
 \effects
 \removed{Constructs an object of class
-\tcode{basic_stringstream<charT, traits\added{, Allocator}>},
+\tcode{basic_stringstream<charT, traits>},
 initializing}\added{Initializes} the base class with
 \tcode{basic_iostream<charT, traits>(addressof(sb))}(\iref{iostream.cons})
 and initializing \tcode{sb} with %\linebreak % avoid Overfull
@@ -1606,7 +1608,7 @@ explicit basic_stringstream(
 \pnum
 \effects
 \removed{Constructs an object of class
-\tcode{basic_stringstream<charT, traits\added{, Allocator}>},
+\tcode{basic_stringstream<charT, traits>},
 initializing}\added{Initializes} the base class with
 \tcode{basic_iostream<charT, traits>(addressof(sb))}(\iref{iostream.cons})
 and \removed{initializing }\tcode{sb} with%\linebreak % avoid Overfull
@@ -1681,7 +1683,7 @@ and \tcode{sb} with
 \end{itemdescr}
 \end{addedblock}
 
-\subsection{28.8.5.2 Assignment and swap [istringstream.assign]}
+\subsection{28.8.5.2 Assignment and swap [stringstream.assign]}
 \textit{change the definition of the swap member to incorporate the new requirement implicitly given by \tcode{basic_stringbuf::swap}:}
 
 \indexlibrarymember{swap}{basic_stringstream}%
@@ -1722,7 +1724,7 @@ basic_string<charT,traits,SAlloc> str(const SAlloc& sa) const;
 \begin{itemdescr}
 \pnum
 \effects Equivalent to: \tcode{return} 
-\tcode{rdbuf()->str(sa)}.
+\tcode{rdbuf()->str(sa);}
 \end{itemdescr}
 
 \begin{itemdecl}
@@ -1730,7 +1732,7 @@ basic_string<charT,traits,Allocator> str() &&;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{return}  \tcode{std::move(*rdbuf()).str()}.
+\effects Equivalent to: \tcode{return} \tcode{std::move(*rdbuf()).str();}
 
 %\pnum
 %\begin{note}
@@ -1739,11 +1741,11 @@ basic_string<charT,traits,Allocator> str() &&;
 \end{itemdescr}
 
 \begin{itemdecl}
-basic_string_view<charT, traits> view() const;
+basic_string_view<charT, traits> view() const noexcept;
 \end{itemdecl}
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{return}  \tcode{rdbuf()->view()}.
+\effects Equivalent to: \tcode{return} \tcode{rdbuf()->view();}
 % can not be noexcept, because rdbuf() might return nullptr or even throw.
 \end{itemdescr}
 
