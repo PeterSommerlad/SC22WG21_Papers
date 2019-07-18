@@ -86,11 +86,17 @@ The need is more obvious in C++ 17 and later, where CTAD allows for fewer factor
 
 Since this change is editorial only, it might be considered to be applied for the current working paper.
 
-R1 of this paper extends the example to demonstrate the added cases.
+R1 of this paper extends the example to demonstrate the added cases and integrates feedback by CWG in Cologne 2019.
 
-\chapter{Impact on the standard}
+Reviewers, please note that a constructor declaration is a function declaration.
 
-The change is IMHO editorial only, since the semantics of warnings is only in a note. Change section [dcl.attr.nodiscard] as follows. Note that a constructor declaration is a function declaration.
+Thanks to EWG, CWG and Alisdar Meredith for helping with this paper and giving feedback.
+
+\chapter{Wording}
+
+The following changes are relative to n4820. 
+
+Change section [dcl.attr.nodiscard] as follows. 
 
 \rSec2[dcl.attr.nodiscard]{Nodiscard attribute}%
 %\indextext{attribute!nodiscard}
@@ -104,16 +110,21 @@ no \grammarterm{attribute-argument-clause} shall be present.
 
 \pnum
 \begin{note}
-A nodiscard call is a function call expression 
-\added{or an explicit type conversion}
+\added{A \emph{nodiscard type} is a possibly cv-qualified class or enumeration type
+marked \tcode{nodiscard}.}
+A \emph{nodiscard call} is a function call expression \added{(7.6.1.2 [expr.call])}
 that
 calls a function 
-\added{or constructs an object through a constructor}
 previously declared \tcode{nodiscard}, or
-whose return type
-\added{or type} % to be discussed
-is a possibly cv-qualified class or enumeration type
-marked \tcode{nodiscard}. Appearance of a nodiscard call as
+whose return type is a 
+\removed{possibly cv-qualified class or enumeration type marked \tcode{nodiscard}}
+\added{\emph{nodiscard type}}. 
+\added{Also, a \emph{nodiscard call} is an explicit type conversion (7.6.1.8 [expr.static.cast], 7.6.3 [expr.cast], 7.6.1.3 [expr.type.conv])
+that constructs an object through a constructor
+previously declared \tcode{nodiscard}, or
+that initializes an object of a \emph{nodiscard type}.}
+ 
+Appearance of a nodiscard call as
 a potentially-evaluated discarded-value expression (7.2)%\iref{expr.prop}
 is discouraged unless explicitly cast to \tcode{void}.
 Implementations should issue a warning in such cases.
@@ -125,7 +136,7 @@ of a nodiscard call has surprising consequences.
 \begin{example}\begin{addedblock}\begin{codeblock}
 struct [[nodiscard]] my_scopeguard { @\commentellip@ };
 struct my_unique {
-  my_unique()=default; // does not acquire resource
+  my_unique() = default; // does not acquire resource
   [[nodiscard]] my_unique(int fd) { @\commentellip@ } // acquires resource
   ~my_unique() noexcept { @\commentellip@ } // releases resource, if any
   @\commentellip@
@@ -137,6 +148,8 @@ error_info enable_missile_safety_mode();
 void launch_missiles();
 void test_missiles() {
   @\added{my_scopeguard();}@              // \added{warning encouraged}
+  @\added{void(my_scopeguard()),}@        // \added{warning not encouraged, cast to void}
+    @\added{launch_missiles();}@          // \added{comma operator, statement continues}
   @\added{my_unique(42);}@                // \added{warning encouraged}
   @\added{my_unique();}@                  // \added{warning not encouraged}
   enable_missile_safety_mode(); // warning encouraged
