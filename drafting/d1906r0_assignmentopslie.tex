@@ -1,0 +1,284 @@
+\documentclass[ebook,11pt,article]{memoir}
+\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
+\geometry{a4paper}  % ... or a4paper or a5paper or ... 
+%\geometry{landscape}  % Activate for for rotated page geometry
+%%% from std.tex
+%\usepackage[american]
+%           {babel}        % needed for iso dates
+%\usepackage[iso,american]
+%           {isodate}      % use iso format for dates
+\usepackage[final]
+           {listings}     % code listings
+%\usepackage{longtable}    % auto-breaking tables
+%\usepackage{ltcaption}    % fix captions for long tables
+\usepackage{relsize}      % provide relative font size changes
+%\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{underscore}   % remove special status of '_' in ordinary text
+%\usepackage{parskip}      % handle non-indented paragraphs "properly"
+\usepackage{array}        % new column definitions for tables
+\usepackage[normalem]{ulem}
+\usepackage{enumitem}
+\usepackage{color}        % define colors for strikeouts and underlines
+%\usepackage{amsmath}      % additional math symbols
+%\usepackage{mathrsfs}     % mathscr font
+\usepackage[final]{microtype}
+%\usepackage{multicol}
+\usepackage{xspace}
+%\usepackage{lmodern}
+\usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
+%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex,
+%            pdftitle={C++ International Standard},
+%            pdfsubject={C++ International Standard},
+%            pdfcreator={Richard Smith},
+            bookmarks=true,
+            bookmarksnumbered=true,
+            pdfpagelabels=true,
+            pdfpagemode=UseOutlines,
+            pdfstartview=FitH,
+            linktocpage=true,
+            colorlinks=true,
+            linkcolor=blue,
+            plainpages=false
+           ]{hyperref}
+%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
+%
+\usepackage{threeparttable} % allow for table footnotes..
+\renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
+
+\usepackage{todonotes}
+
+%%%% reuse all three from std.tex:
+\input{macros}
+\input{layout}
+\input{styles}
+\renewcommand{\iref}[1]{[#1]}
+
+\pagestyle{myheadings}
+
+\newcommand{\papernumber}{P1906R0}
+\newcommand{\paperdate}{2019-10-06}
+
+\markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
+
+\title{\papernumber{} - Provided operator= return lvalue-ref on rvalue}
+\author{Peter Sommerlad}
+\date{\paperdate}                % Activate to display a given date or no date
+\setsecnumdepth{subsection}
+
+
+
+\begin{document}
+\maketitle
+\begin{center}
+\begin{tabular}[t]{|l|p{8cm}|}\hline 
+Document Number:&  \papernumber \\\hline
+Date: & \paperdate \\\hline
+Project: & Programming Language C++ \newline Programming Language Vulnerabilities C++\\\hline 
+Audience: & EWGI/EWG/CWG and SG12/WG23\\\hline
+\end{tabular}
+\end{center}
+
+
+\chapter{Introduction}
+
+When preparing my CPPCon 2019 talk I tried to explain that the only typical problem inherited from C is "dangling".
+During his CPPCon 2019 keynote Sean Parent introduced the terms "relationship type" and "relationship object", meaning an object that relates to another object. Changes to or the end of the lifetime of that referred object can sever the relationship and thus invalidate the state of the relationship object.
+This is what commonly is called "dangling" or "use after free". In my own CPPCon talk I referred to such "relationship types" as "designating types", which I now consider a worse name.
+Typical examples of relationship types are references, pointers, views, span, and iterators.
+
+The problem and its remedy described here will also be given as a Swiss national body commend to the C++20 CD.
+
+\section{The Problem: Immediate Dangling}
+
+A recent trend I observed (and am guilty of as well) in example code shown in presentations, blog posts and social media is to rely on the lifetime extension of temporary objects by binding them to temporaries.
+This lifetime extension mechanic is needed to be able to pass temporaries down the call chain via references, but is dangerous when applied with local references.
+Small changes might lead to binding the local reference to a returned reference instead of the materialized temporary leading to immediate dangling.
+Even worse are non-reference relationship types that are often Regular types that immediate dangle when returned from member function on a temporary object, such as \tcode{vector::data()}.
+
+C++11 introduced reference qualifiers for member functions that can prohibit calling member functions on temporaries (rvalues), especially those that return a relationship object referring to \tcode{*this}, a non-static data member of \tcode{*this}, or data managed by \tcode{*this}, such as elements in a vector.
+Non-member versions of corresponding functionality, such as \tcode{std::begin()} do not have the same problem, because for them the special rule for unqualified member functions [over.maptch.funcs] p5.1 does not apply. Views from std::ranges also do never bind to temporaries, because the overloads taking an rvalue-reference are deleted.
+
+The standard library suffers from that legacy that was never considered or cleaned after ref-qualifiers for member functions were introduced. But that is a topic of another paper.
+
+This paper is about core language wording. For class types, if nothing is specified the compiler provides copy and move assignment operators as unqualified member functions that return an lvalue reference to the assigned to object ([class.copy.assign] p.2 and p.5). As unqualified members they can be called on temporary objects and rvalues. This violates Scott Meyers' principle "do as the ints do" for operator overloading.
+
+\begin{example}
+\begin{codeblock}
+#include <complex>
+
+template <typename INT>
+struct check{
+	INT x{};
+	INT side_effect(INT &lv){
+		lv = INT{42};
+		return lv;
+	}
+	void demo(){
+		auto &dangle = (INT{} = INT{42});
+		auto side = side_effect(dangle);
+		side = side_effect(INT{} = INT{42});
+	}
+};
+
+struct Int {
+	int val{};
+};
+
+struct SafeInt {
+	int val{};
+	constexpr SafeInt& operator=(SafeInt const &other) & = default;
+	constexpr SafeInt& operator=(SafeInt &&other) & = default;
+	// need to provide copy move ctor and default ctor as well
+	constexpr SafeInt() = default;
+	constexpr SafeInt(SafeInt const &other) = default;
+	constexpr SafeInt(SafeInt &&other) = default;
+};
+
+
+int main() {
+	check<Int> c{};
+	c.demo(); // compiles
+	check<int> fail{};
+	fail.demo(); // compile error
+	check<std::complex<double>> cc{};
+	cc.demo(); // compiles
+	check<SafeInt> failstoo{};
+	failstoo.demo(); // compile error
+}
+\end{codeblock}
+
+The \tcode{demo()} member function calls on variables fail and failstoo do not compile with the following error messages. 
+The other versions happily produce UB.
+
+\begin{codeblock}
+15:52:40 **** Incremental Build of configuration Debug for project p1906_examples ****
+make all 
+Building file: ../src/p1906_examples.cpp
+Invoking: GCC C++ Compiler
+g++ -std=c++17 -O0 -g3 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wconversion -c -fmessage-length=0 -Wno-attributes -MMD -MP -MF"src/p1906_examples.d" -MT"src/p1906_examples.o" -o "src/p1906_examples.o" "../src/p1906_examples.cpp"
+../src/p1906_examples.cpp: In instantiation of 'void check<INT>::demo() [with INT = int]':
+../src/p1906_examples.cpp:36:12:   required from here
+../src/p1906_examples.cpp:11:25: error: using rvalue as lvalue [-fpermissive]
+   11 |   auto &dangle = (INT{} = INT{42});
+      |                  ~~~~~~~^~~~~~~~~~
+../src/p1906_examples.cpp:13:28: error: using rvalue as lvalue [-fpermissive]
+   13 |   side = side_effect(INT{} = INT{42});
+      |                      ~~~~~~^~~~~~~~~
+../src/p1906_examples.cpp: In instantiation of 'void check<INT>::demo() [with INT = SafeInt]':
+../src/p1906_examples.cpp:40:16:   required from here
+../src/p1906_examples.cpp:11:25: error: passing 'SafeInt' as 'this' argument discards qualifiers [-fpermissive]
+   11 |   auto &dangle = (INT{} = INT{42});
+      |                  ~~~~~~~^~~~~~~~~~
+../src/p1906_examples.cpp:24:21: note:   in call to 'constexpr SafeInt& SafeInt::operator=(SafeInt&&) &'
+   24 |  constexpr SafeInt& operator=(SafeInt &&other) & = default;
+      |                     ^~~~~~~~
+../src/p1906_examples.cpp:13:28: error: passing 'SafeInt' as 'this' argument discards qualifiers [-fpermissive]
+   13 |   side = side_effect(INT{} = INT{42});
+      |                      ~~~~~~^~~~~~~~~
+../src/p1906_examples.cpp:24:21: note:   in call to 'constexpr SafeInt& SafeInt::operator=(SafeInt&&) &'
+   24 |  constexpr SafeInt& operator=(SafeInt &&other) & = default;
+      |                     ^~~~~~~~
+make: *** [src/p1906_examples.o] Error 1
+"make all" terminated with exit code 2. Build might be incomplete.
+
+15:52:41 Build Failed. 5 errors, 0 warnings. (took 562ms)
+\end{codeblock}
+\end{example}
+
+Why is this a problem now? 
+
+Well it has long been a problem, but today C++ is used more and more for safety critical systems instead of previously used C, e.g., in the automotive sector (AUTOSAR Adaptive C++ programming guidelines). 
+So we can expect that more and more programmers coming from C or other languages come to C++ to build safety critical systems.
+For familiar built-in types assignment to an rvalue is prohibited, but it might be advisable to use wrapper classes to avoid mistakes like units or dimension mismatch in arithmetic, e.g., by adding apples and pears (this is an application of the Whole Value design pattern from Ward Cunningham's CHECKS pattern language). 
+With such class types, assignment, e.g., as a typo where comparison was meant, can be called with an rvalue on the left-hand side.
+In addition I expect that C++ novices can become inventive, by casting an rvalue to an lvalue through assignment to pass rvalues indirectly to lvalue-taking functions, such as the view constructors of std::ranges.
+
+
+\section{Potential Remedies}
+
+While one can argue that static analysis tools can detect and diagnose 'abominational' uses of assignment operators, I believe the assignment operators provided by the compiler should not lie about their return value and as with the built-in types should only work with lvalues on the left-hand side.
+
+There is one option to special case [over.maptch.funcs] p5.1 for compiler-provided non-deleted assignment operators, or as I suggest below, to add non-const lvalue ref qualification to the compiler-provided assignment operators.
+
+Unfortunately, I do not have the means to check the impact of such a small but significant change to the language. 
+However, I believe that usages that rely on assigning to an rvalue of a class type by the compiler provided assignment operators is broken anyway.
+Help by those with large enough code bases and query tools is highly appreciated and results can be shown in future versions of this paper.
+
+It has further be considered if such a fix can and should be considered a bug in all previous versions of the language.
+
+
+\chapter{Wording}
+
+The suggested changes are relative to N5410 - the C++20 CD ballot document. 
+The corresponding positions in older revisions of the standard are as follows, if this is to be considered a bug since.
+\begin{description}
+\item[2011] section [class.copy] p.18 and p.21
+\item[2014] section [class.copy] p.18 and p.21
+\item[2017] section [class.copy.assign] p.2 and p.5
+\end{description}
+
+\pnum
+\emph{Change [class.copy.assign] (11.3.5. Copy/move assignment operator) p.2 as follows:}
+
+\pnum
+If the class definition does not explicitly declare a copy assignment operator,
+one is declared \defnx{implicitly}{assignment operator!copy!implicitly declared}.
+If the class definition declares a move
+constructor or move assignment operator, the implicitly declared copy
+assignment operator is defined as deleted; otherwise, it is defined as
+defaulted\iref{dcl.fct.def}.
+The latter case is deprecated if the class has a user-declared copy constructor
+or a user-declared destructor \iref{depr.impldec}.
+The implicitly-declared copy assignment operator for a class
+\tcode{X}
+will have the form
+\begin{codeblock}
+X& X::operator=(const X&) @\added{\tcode{\&}}@
+\end{codeblock}
+if
+\begin{itemize}
+\item
+each direct base class \tcode{B} of \tcode{X}
+has a copy assignment operator whose parameter is of type
+\tcode{const B\&}, \tcode{const volatile B\&}, or \tcode{B}, and
+\item
+for all the non-static data members of \tcode{X}
+that are of a class type \tcode{M} (or array thereof),
+each such class type has a copy assignment operator whose parameter is of type
+\tcode{const M\&}, \tcode{const volatile M\&},
+or \tcode{M}.\footnote{This implies that the reference parameter of the
+implicitly-declared copy assignment operator cannot bind to a
+\tcode{volatile} lvalue; see~\ref{diff.class}.}
+\end{itemize}
+
+Otherwise, the implicitly-declared copy assignment operator
+will have the form
+\begin{codeblock}
+X& X::operator=(X&) @\added{\tcode{\&}}@
+\end{codeblock}
+
+
+\pnum
+\pnum
+\emph{And change p.5 as follows, removing the inconsistent semicolon is an editorial drive-by fix:}
+
+\pnum
+The implicitly-declared move assignment operator for a class \tcode{X} will have the form
+\begin{codeblock}
+X& X::operator=(X&&) @\added{\tcode{\&}}\removed{\tcode{;}}@
+\end{codeblock}
+
+\chapter{Recommendations for SG12 and WG23}
+
+I suggest that recommendations are added to existing guidelines to not embed assignment operations for objects of class type in other expressions. 
+This is already common practice for conditional statements, where assignment might be a misspelled equality comparison.
+
+I further suggest that user-defined classes that need to overload assignment operators do so as ref-qualified versions as the \tcode{SafeInt} class from the example.
+
+As a corollary, all member functions should be ref-qualified if they are returning a relationship object referring to \tcode{*this}, a member of or data entity managed by \tcode{*this}.
+
+ 
+\end{document}
+
