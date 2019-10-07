@@ -58,7 +58,7 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{P1906R0}
-\newcommand{\paperdate}{2019-10-06}
+\newcommand{\paperdate}{2019-10-07}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -88,8 +88,6 @@ During his CPPCon 2019 keynote Sean Parent introduced the terms "relationship ty
 This is what commonly is called "dangling" or "use after free". In my own CPPCon talk I referred to such "relationship types" as "designating types", which I now consider a worse name.
 Typical examples of relationship types are references, pointers, views, span, and iterators.
 
-The problem and its remedy described here will also be given as a Swiss national body commend to the C++20 CD.
-
 \section{The Problem: Immediate Dangling}
 
 A recent trend I observed (and am guilty of as well) in example code shown in presentations, blog posts and social media is to rely on the lifetime extension of temporary objects by binding them to temporaries.
@@ -100,9 +98,24 @@ Even worse are non-reference relationship types that are often Regular types tha
 C++11 introduced reference qualifiers for member functions that can prohibit calling member functions on temporaries (rvalues), especially those that return a relationship object referring to \tcode{*this}, a non-static data member of \tcode{*this}, or data managed by \tcode{*this}, such as elements in a vector.
 Non-member versions of corresponding functionality, such as \tcode{std::begin()} do not have the same problem, because for them the special rule for unqualified member functions [over.maptch.funcs] p5.1 does not apply. Views from std::ranges also do never bind to temporaries, because the overloads taking an rvalue-reference are deleted.
 
-The standard library suffers from that legacy that was never considered or cleaned after ref-qualifiers for member functions were introduced. But that is a topic of another paper.
+The standard library suffers from that legacy that was never considered or cleaned after ref-qualifiers for member functions were introduced. But that is a topic of another future paper.
 
 This paper is about core language wording. For class types, if nothing is specified the compiler provides copy and move assignment operators as unqualified member functions that return an lvalue reference to the assigned to object ([class.copy.assign] p.2 and p.5). As unqualified members they can be called on temporary objects and rvalues. This violates Scott Meyers' principle "do as the ints do" for operator overloading.
+
+A summary is given in the following table by providing the synthesized signatures for each kind of member functions \tcode{mf} for a class type \tcode{X}.
+
+\begin{table}[ht]\begin{center}\begin{tabular}{l|cccccc}
+  & \tcode{(X)} & \tcode{(X const)} & \tcode{(X\&)} & \tcode{(X\&\&)} & \tcode{(X const \&)} & \tcode{(X const \&\&)} \\\hline
+\tcode{mf()} & + & - & + & + & - & - \\
+\tcode{mfc() const} & + & + & + & + & + & + \\
+\tcode{mflc() const \&} & + & + & + & + & + & + \\
+\tcode{mfr() \&} & + & - & + & - & - & - \\
+\tcode{mfr() const \&} & - & + & - & - & + & - \\
+\tcode{mfr() \&\&} & - & - & - & + & - & - \\
+\tcode{mfr() const \&\&} & - & - & - & - & - & +
+\end{tabular} \caption{member bindings with respect to reference categories (full set see also \url{https://godbolt.org/z/kgSQrm} ) } \end{center}\label{defaulttable}\end{table}
+
+
 
 \begin{example}
 \begin{codeblock}
@@ -200,7 +213,7 @@ In addition I expect that C++ novices can become inventive, by casting an rvalue
 
 While one can argue that static analysis tools can detect and diagnose 'abominational' uses of assignment operators, I believe the assignment operators provided by the compiler should not lie about their return value and as with the built-in types should only work with lvalues on the left-hand side.
 
-There is one option to special case [over.maptch.funcs] p5.1 for compiler-provided non-deleted assignment operators, or as I suggest below, to add non-const lvalue ref qualification to the compiler-provided assignment operators.
+There is one option to special case [over.maptch.funcs] p5.1 for compiler-provided non-deleted assignment operators, or as I suggest below, to add non-const lvalue ref qualification to the compiler-provided assignment operators. From some discussion on the 'ext' mailing list, I came up with a further idea to actually see the unqualified members as implicitly providing two overloads. That leads to the second proposal as suggested by Jens Maurer, to actually provide two overloads, each preserving its value category.
 
 Unfortunately, I do not have the means to check the impact of such a small but significant change to the language. 
 However, I believe that usages that rely on assigning to an rvalue of a class type by the compiler provided assignment operators is broken anyway.
@@ -219,6 +232,8 @@ The corresponding positions in older revisions of the standard are as follows, i
 \item[2017] section [class.copy.assign] p.2 and p.5
 \end{description}
 
+I implicitly provide two versions for the change. First one, just adding a lvalue-ref qualifier to the provided assignment operators. The second one, provide each a second overload preserving the rvalue value category by returning \tcode{X\&\&} from an rvalue-ref qualified overload. 
+
 \pnum
 \emph{Change [class.copy.assign] (11.3.5. Copy/move assignment operator) p.2 as follows:}
 
@@ -236,6 +251,7 @@ The implicitly-declared copy assignment operator for a class
 will have the form
 \begin{codeblock}
 X& X::operator=(const X&) @\added{\tcode{\&}}@
+@\added{X\&\& X::operator=(const X\&) \&\&}@ // 2nd suggestion
 \end{codeblock}
 if
 \begin{itemize}
@@ -257,6 +273,7 @@ Otherwise, the implicitly-declared copy assignment operator
 will have the form
 \begin{codeblock}
 X& X::operator=(X&) @\added{\tcode{\&}}@
+@\added{X\&\& X::operator=(X\&) \&\&}@ // 2nd suggestion
 \end{codeblock}
 
 
@@ -268,6 +285,7 @@ X& X::operator=(X&) @\added{\tcode{\&}}@
 The implicitly-declared move assignment operator for a class \tcode{X} will have the form
 \begin{codeblock}
 X& X::operator=(X&&) @\added{\tcode{\&}}\removed{\tcode{;}}@
+@\added{X\&\& X::operator=(X\&\&) \&\&}@ // 2nd suggestion
 \end{codeblock}
 
 \chapter{Recommendations for SG12 and WG23}
@@ -279,6 +297,106 @@ I further suggest that user-defined classes that need to overload assignment ope
 
 As a corollary, all member functions should be ref-qualified if they are returning a relationship object referring to \tcode{*this}, a member of or data entity managed by \tcode{*this}.
 
+\chapter{Appendix}
+
+Here a short test program to show, which member functions bind to which value category, also available to play with at \url{https://godbolt.org/z/kgSQrm}
+
+\begin{codeblock}
+#include <array>
+#include <type_traits>
+using one = char;
+static_assert(1==sizeof(one));
+using two = std::array<char,2>;
+static_assert(sizeof(two)==2);
+using three = std::array<char,3>;
+static_assert(sizeof(three)==3);
+using four = std::array<char,4>;
+static_assert(sizeof(four)==4);
+
+struct Y{
+	one m() { return {};}
+
+	one
+	mf() { return {};}
+	two mf() const { return {};}
+
+	one mfc() const { return {};}
+
+    one mfr() & { return {};}
+    two mfr() && { return {};}
+    three mfr() const & { return {};}
+    four mfr() const && { return {};}
+
+    one mfl() & { return {};}
+    two mfl() const & { return {};}
+
+    one mflc() const & { return {};}
+
+    one mfx() && { return {};}
+    two mfx() const && { return {};}
+
+    one mfxnc() && { return {};}
+
+};
+static_assert(1 == sizeof(std::declval<Y>().m()));
+//static_assert(1 == sizeof(std::declval<Y const>().m()));
+static_assert(1 == sizeof(std::declval<Y&>().m()));
+static_assert(1 == sizeof(std::declval<Y&&>().m()));
+//static_assert(1 == sizeof(std::declval<Y const \&>().m()));
+//static_assert(1 == sizeof(std::declval<Y const \&\&>().m()));
+
+
+static_assert(1 == sizeof(std::declval<Y>().mf()));
+static_assert(2 == sizeof(std::declval<Y const>().mf()));
+static_assert(1 == sizeof(std::declval<Y&>().mf()));
+static_assert(1 == sizeof(std::declval<Y&&>().mf()));
+static_assert(2 == sizeof(std::declval<Y const &>().mf()));
+static_assert(2 == sizeof(std::declval<Y const &&>().mf()));
+
+static_assert(1 == sizeof(std::declval<Y>().mfc()));
+static_assert(1 == sizeof(std::declval<Y const>().mfc()));
+static_assert(1 == sizeof(std::declval<Y&>().mfc()));
+static_assert(1 == sizeof(std::declval<Y&&>().mfc()));
+static_assert(1 == sizeof(std::declval<Y const &>().mfc()));
+static_assert(1 == sizeof(std::declval<Y const &&>().mfc()));
+
+
+static_assert(2 == sizeof(std::declval<Y>().mfr()));
+static_assert(4 == sizeof(std::declval<Y const>().mfr()));
+static_assert(1 == sizeof(std::declval<Y &>().mfr()));
+static_assert(2 == sizeof(std::declval<Y &&>().mfr()));
+static_assert(3 == sizeof(std::declval<Y const &>().mfr()));
+static_assert(4 == sizeof(std::declval<Y const &&>().mfr()));
+
+static_assert(2 == sizeof(std::declval<Y>().mfl()));
+static_assert(2 == sizeof(std::declval<Y const>().mfl()));
+static_assert(1 == sizeof(std::declval<Y&>().mfl()));
+static_assert(2 == sizeof(std::declval<Y&&>().mfl()));
+static_assert(2 == sizeof(std::declval<Y const &>().mfl()));
+static_assert(2 == sizeof(std::declval<Y const &&>().mfl()));
+
+static_assert(1 == sizeof(std::declval<Y>().mflc()));
+static_assert(1 == sizeof(std::declval<Y const>().mflc()));
+static_assert(1 == sizeof(std::declval<Y&>().mflc()));
+static_assert(1 == sizeof(std::declval<Y&&>().mflc()));
+static_assert(1 == sizeof(std::declval<Y const &>().mflc()));
+static_assert(1 == sizeof(std::declval<Y const &&>().mflc()));
+
+
+static_assert(1 == sizeof(std::declval<Y>().mfx()));
+static_assert(2 == sizeof(std::declval<Y const>().mfx()));
+//static_assert(1 == sizeof(std::declval<Y\&>().mfx()));
+static_assert(1 == sizeof(std::declval<Y&&>().mfx()));
+//static_assert(2 == sizeof(std::declval<Y const \&>().mfx()));
+static_assert(2 == sizeof(std::declval<Y const &&>().mfx()));
+
+static_assert(1 == sizeof(std::declval<Y>().mfxnc()));
+//static_assert(1 == sizeof(std::declval<Y const>().mfxnc()));
+//static_assert(1 == sizeof(std::declval<Y\&>().mfxnc()));
+static_assert(1 == sizeof(std::declval<Y&&>().mfxnc()));
+//static_assert(1 == sizeof(std::declval<Y const \&>().mfxnc()));
+//static_assert(1 == sizeof(std::declval<Y const \&\&>().mfxnc()));
+\end{codeblock}
  
 \end{document}
 

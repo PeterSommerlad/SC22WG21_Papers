@@ -7,10 +7,14 @@ struct check{
 		lv = INT{42};
 		return lv;
 	}
+	check& lytome(){
+		return *this;
+	}
 	void demo(){
 		auto &dangle = (INT{} = INT{42});
 		auto side = side_effect(dangle);
 		side = side_effect(INT{} = INT{42});
+		check{}.lytome().x = side;
 	}
 	static_assert(std::is_trivially_copy_assignable_v<INT>);
 	static_assert(std::is_trivially_move_assignable_v<INT>);
@@ -36,10 +40,10 @@ struct SafeInt {
 int main() {
 	check<Int> c{};
 	c.demo(); // compiles
-	check<int> fail{};
-	fail.demo(); // compile error
+//	check<int> fail{};
+//	fail.demo(); // compile error
 	check<std::complex<double>> cc{};
 	cc.demo(); // compiles
-	check<SafeInt> failstoo{};
-	failstoo.demo(); // compile error
+//	check<SafeInt> failstoo{};
+//	failstoo.demo(); // compile error
 }
