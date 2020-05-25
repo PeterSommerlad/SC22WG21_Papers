@@ -104,16 +104,20 @@ This paper is about core language wording. For class types, if nothing is specif
 
 A summary is given in the following table by providing the synthesized signatures for each kind of member functions \tcode{mf} for a class type \tcode{X}.
 
-\begin{table}[ht]\begin{center}\begin{tabular}{l|cccccc}
+\begin{table}[ht]
+\begin{center}\begin{tabular}{l|cccccc}
   & \tcode{(X)} & \tcode{(X const)} & \tcode{(X\&)} & \tcode{(X\&\&)} & \tcode{(X const \&)} & \tcode{(X const \&\&)} \\\hline
-\tcode{mf()} & + & - & + & + & - & - \\
-\tcode{mfc() const} & + & + & + & + & + & + \\
-\tcode{mflc() const \&} & + & + & + & + & + & + \\
-\tcode{mfr() \&} & + & - & + & - & - & - \\
-\tcode{mfr() const \&} & - & + & - & - & + & - \\
-\tcode{mfr() \&\&} & - & - & - & + & - & - \\
-\tcode{mfr() const \&\&} & - & - & - & - & - & +
-\end{tabular} \caption{member bindings with respect to reference categories (full set see also \url{https://godbolt.org/z/kgSQrm} ) } \end{center}\label{defaulttable}\end{table}
+\tcode{mf()}             & + & - & + & + & - & - \\
+\tcode{mfc() const}      & o & + & o & o & + & + \\
+\tcode{mfr() \&}         & - & - & + & - & - & - \\
+\tcode{mfr() const \&}   & o & o & o & o & + & o \\
+\tcode{mfr() \&\&}       & + & - & - & + & - & - \\
+\tcode{mfr() const \&\&} & - & + & - & - & - & +
+\end{tabular} \caption{member bindings with respect to reference categories, 'o' = matches, when no other overload is better/existing
+(full set see also \url{https://godbolt.org/z/kgSQrm} ) } 
+\end{center}
+\label{defaulttable}
+\end{table}
 
 
 
