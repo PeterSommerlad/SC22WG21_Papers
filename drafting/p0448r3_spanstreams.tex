@@ -59,7 +59,7 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{d0448r3}
-\newcommand{\paperdate}{2019-07-17}
+\newcommand{\paperdate}{2020-12-03}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -90,6 +90,10 @@ Based on the review of p0408 in Cologne 2019, some adjustments were made here ac
 \begin{itemize}
 \item update editorial advise to include header and feature test macro, as well as the section number to 29.
 \item made wording adjustments like suggested for p0408 in Cologne 2019 by LWG in the hope to make reviewing it faster.
+\item removed mentioning a template parameter Extent in all uses of span.
+\item tried to fix the adopted wording (from \tcode{basic_stringbuf}) wrt seekoff.
+\item removed impossible to achieve \tcode{noexcept} from move and swap operations.
+\item some more initial review feedback from LWG.
 \end{itemize}
 
 
@@ -112,7 +116,7 @@ Why a separate <spanstream> header? why not just put it in one of the existing o
 Third, the base class already has the dependency to char_traits.}
 \item  7.4.2/1 is really generic: "Move assigns the base and members of *this from the base and corresponding members of rhs."
 \textit{These words are almost identical to basic_istringstream move assignment. Took the challenge and now use (more) code.}
-\item  7.4.2/2 is mixing prose and code ; I suspect it would be better just as code. "Effects Equivalent to: <two lines of code>"
+\item  7.4.2/2 is mixing prose and code; I suspect it would be better just as code. "Effects Equivalent to: <two lines of code>"
 \textit{almost identical to basic_istringstream::swap wording. see above.}
 \item  Is the span that you pass to the constructors required to be non-empty?  setbuf does have that requirement.
 \textit{The latter is not really true: setbuf() is defined per streambuf subclass and we are free to define it any way. most subclasses say that setbuf(0,0) has no effect, filebuf makes I/O unbuffered and all say any other combination has implementation defined behavior. I do not require a non-empty span, the stream is then just not particularly useful, except to behave as a null object.}
@@ -176,7 +180,7 @@ ispanstream is{span<char>{input}};
 int i;
 is >> i;
 ASSERT_EQUAL(10,i);
-is >> i ;
+is >> i;
 ASSERT_EQUAL(20,i);
 is >> i;
 ASSERT_EQUAL(30,i);
@@ -188,7 +192,7 @@ ASSERT(!is);
 \begin{codeblock}
 char  output[30]{}; // zero-initialize array
 ospanstream os{span<char>{output}};
-os << 10 << 20 << 30 ;
+os << 10 << 20 << 30;
 auto const sp = os.span();
 ASSERT_EQUAL(6,sp.size());
 ASSERT_EQUAL("102030",std::string(sp.data(),sp.size()));
@@ -229,10 +233,41 @@ As with all existing stream classes, using a stream object or a streambuf object
 
 \emph{Add the feature test macro \tcode{__cpp_lib_spanstream} to Table 17 ([tab:cpp.predefined.ft]) with the corresponding value for the header \tcode{\textless{}spanstream\textgreater}.}
 
-\emph{Insert a new section 29.x in chapter 29 [input.output] after section 29.8 [string.streams]}
+\emph{Insert a new section 29.x in chapter 29 [input.output] after section 29.8 [string.streams] and adjust table [tab:iostreams.summary] accordingly.}
+
+
+\section{29.3.1 Header \tcode{<iosfwd>} synopsis [iosfwd.syn]}
+
+\emph{In 29.3.1 [iosfwd.syn] add the following forward declarations and type aliases in the appropriate places.}
+
+\begin{codeblock}
+namespace std {
+  template <class charT, class traits = char_traits<charT>>
+    class basic_spanbuf;
+  template <class charT, class traits = char_traits<charT>>
+    class basic_ispanstream;
+  template <class charT, class traits = char_traits<charT>>
+    class basic_ospanstream;
+  template <class charT, class traits = char_traits<charT>>
+    class basic_spanstream;
+
+  using spanbuf     = basic_spanbuf<char>;
+  using ispanstream = basic_ispanstream<char>;
+  using ospanstream = basic_ospanstream<char>;
+  using spanstream  = basic_spanstream<char>;
+
+  using wspanbuf     = basic_spanbuf<wchar_t>;
+  using wispanstream = basic_ispanstream<wchar_t>;
+  using wospanstream = basic_ospanstream<wchar_t>;
+  using wspanstream  = basic_spanstream<wchar_t>;
+}
+\end{codeblock}
+
 
 
 \section{29.x Span-based Streams [span.streams]}
+
+\pnum
 This section introduces a stream interface for user-provided fixed-size buffers. 
 \subsection{29.x.1 Overview [span.streams.overview]}
 The header \tcode{<spanstream>} defines four class templates and eight types that associate stream buffers with objects of class \tcode{span} as described in [views.span]. 
@@ -281,28 +316,24 @@ namespace std {
     // \iref{spanbuf.cons}, constructors:
     basic_spanbuf() : basic_spanbuf(ios_base::in | ios_base::out) {}
     explicit basic_spanbuf(ios_base::openmode which)
-      : basic_spanbuf(span<charT>(),which) {}
-    template <ptrdiff_t Extent>
+      : basic_spanbuf(span<charT>(), which) {}
     explicit basic_spanbuf(
-      span<charT, Extent> span,
+      std::span<charT> s,
       ios_base::openmode which = ios_base::in | ios_base::out);
-    basic_spanbuf(const basic_spanbuf& rhs) = delete;
-    basic_spanbuf(basic_spanbuf&& rhs) noexcept;
+    basic_spanbuf(const basic_spanbuf&) = delete;
+    basic_spanbuf(basic_spanbuf&& rhs);
 
     // \iref{spanbuf.assign}, assign and swap:
-    basic_spanbuf& operator=(const basic_spanbuf& rhs) = delete;
-    basic_spanbuf& operator=(basic_spanbuf&& rhs) noexcept;
-    void swap(basic_spanbuf& rhs) noexcept;
+    basic_spanbuf& operator=(const basic_spanbuf&) = delete;
+    basic_spanbuf& operator=(basic_spanbuf&& rhs);
+    void swap(basic_spanbuf& rhs);
 
     // \iref{spanbuf.members}, get and set:
-    span<charT> span() const noexcept;
-    void span(span<charT> s) noexcept;
+    std::span<charT> span() const noexcept;
+    void span(std::span<charT> s) noexcept;
 
   protected:
     // \iref{spanbuf.virtuals}, overridden virtual functions:
-    int_type underflow() override;
-    int_type pbackfail(int_type c = traits::eof()) override;
-    int_type overflow (int_type c = traits::eof()) override;
     basic_streambuf<charT, traits>* setbuf(charT*, streamsize) override;
 
     pos_type seekoff(off_type off, ios_base::seekdir way,
@@ -314,12 +345,12 @@ namespace std {
 
   private:
     ios_base::openmode mode;  // \expos
-    span<charT> buf; // \expos
+    std::span<charT> buf; // \expos
   };
 
   template <class charT, class traits>
     void swap(basic_spanbuf<charT, traits>& x,
-              basic_spanbuf<charT, traits>& y) noexcept;
+              basic_spanbuf<charT, traits>& y);
 }
 \end{codeblock}
 
@@ -346,7 +377,7 @@ set if the input sequence can be read, and
 \tcode{out}
 set if the output sequence can be written.
 \item
-\tcode{span<charT> buf}
+\tcode{std::span<charT> buf}
 is the view to the underlying character sequence.
 \end{itemize}
 %%%
@@ -356,9 +387,8 @@ is the view to the underlying character sequence.
 
 \indexlibrary{\idxcode{basic_spanbuf}!constructor}%
 \begin{itemdecl}
-template <ptrdiff_t Extent>
 explicit basic_spanbuf(
-  basic_span<charT, Extent> s,
+  basic_span<charT> s,
   ios_base::openmode which = ios_base::in | ios_base::out);
 \end{itemdecl}
 
@@ -375,7 +405,7 @@ Initializes the internal pointers as if calling \tcode{span(s)}.
 \indexlibrary{\idxcode{basic_spanbuf}!constructor}%
 %basic_spanbuf(basic_spanbuf const & rhs) noexcept;
 \begin{itemdecl}
-basic_spanbuf(basic_spanbuf&& rhs) noexcept;
+basic_spanbuf(basic_spanbuf&& rhs);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -410,7 +440,8 @@ wether \tcode{rhs.buf.empty()} returns true after the move.
 \tcode{rhs} just prior to this construction.
 
 \begin{itemize}
-\item \tcode{span() == rhs_p.span()}
+\item \tcode{span().data() == rhs_p.span().data()}
+\item \tcode{span().size() == rhs_p.span().size()}
 \item \tcode{eback() == rhs_p.eback()}
 \item \tcode{gptr() == rhs_p.gptr()}
 \item \tcode{egptr() == rhs_p.egptr()}
@@ -428,7 +459,7 @@ wether \tcode{rhs.buf.empty()} returns true after the move.
 %\indexlibrarymember{operator=}{basic_spanbuf}%
 %basic_spanbuf& operator=(basic_spanbuf const & rhs) noexcept;
 \begin{itemdecl}
-basic_spanbuf& operator=(basic_spanbuf&& rhs) noexcept;
+basic_spanbuf& operator=(basic_spanbuf&& rhs);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -443,7 +474,7 @@ basic_spanbuf& operator=(basic_spanbuf&& rhs) noexcept;
 
 %\indexlibrarymember{swap}{basic_spanbuf}%
 \begin{itemdecl}
-void swap(basic_spanbuf& rhs) noexcept;
+void swap(basic_spanbuf& rhs);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -461,7 +492,7 @@ void swap(basic_spanbuf& rhs) noexcept;
 \begin{itemdecl}
 template <class charT, class traits>
   void swap(basic_spanbuf<charT, traits>& x,
-            basic_spanbuf<charT, traits>& y) noexcept;
+            basic_spanbuf<charT, traits>& y);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -475,14 +506,14 @@ template <class charT, class traits>
 
 %\indexlibrarymember{span}{basic_spanbuf}%
 \begin{itemdecl}
-span<charT> span() const;
+std::span<charT> span() const;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \returns
 If \tcode{ios_base::out} is set in \tcode{mode},
-returns \tcode{span<charT>(pbase(),pptr())}, 
+returns \tcode{std::span<charT>(pbase(), pptr())}, 
 otherwise returns \tcode{buf}. 
 
 \begin{note}
@@ -494,8 +525,7 @@ In constrast to \tcode{basic_stringbuf} the underlying sequence can never grow a
 
 %\indexlibrarymember{str}{basic_spanbuf}%
 \begin{itemdecl}
-template<ptrdiff_t Extent>
-void span(span<charT,Extent> s);
+void span(std::span<charT> s);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -514,6 +544,9 @@ void span(span<charT,Extent> s);
 \item in addition, 
 if \tcode{ios_base::ate} is set in \tcode{mode},
 \tcode{pptr() == pbase() + s.size()} is \tcode{true}, 
+\begin{note}
+Using append mode does not make sense for \tcode{span}-based streams.
+\end{note}
 \item otherwise \tcode{pptr() == pbase()} is \tcode{true}. 
 \end{itemize}
 \item If \tcode{ios_base::in} is set in \tcode{mode}, 
@@ -521,9 +554,6 @@ if \tcode{ios_base::ate} is set in \tcode{mode},
 == eback()} \tcode{\&\&} \tcode{egptr() == eback() + s.size())} is \tcode{true}.
 \end{itemize}
 
-\begin{note}
-Using append mode does not make sense for \tcode{span}-based streams.
-\end{note}
 
 \end{itemdescr}
 
@@ -533,46 +563,6 @@ Using append mode does not make sense for \tcode{span}-based streams.
 \begin{note}
 Since the underlying buffer is of fixed size, neither \tcode{overflow}, \tcode{underflow} or \tcode{pbackfail} can provide useful behavior.
 \end{note}
-
-%\indexlibrarymember{underflow}{basic_spanbuf}%
-\begin{itemdecl}
-int_type underflow() override;
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\returns
-%If the input sequence has a read position available,
-%returns
-%\tcode{traits::to_int_type(*gptr())}.
-%Otherwise, returns
-\tcode{traits::eof()}.
-%Any character in the underlying buffer which has been initialized is considered
-%to be part of the input sequence. 
-\end{itemdescr}
-
-%\indexlibrarymember{pbackfail}{basic_spanbuf}%
-\begin{itemdecl}
-int_type pbackfail(int_type c = traits::eof()) override;
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\returns
-\tcode{traits::eof()}.
-\end{itemdescr}
-
-%\indexlibrarymember{overflow}{basic_spanbuf}%
-\begin{itemdecl}
-int_type overflow(int_type c = traits::eof()) override;
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\returns
-\tcode{traits::eof()}.
-
-\end{itemdescr}
 
 %\indexlibrarymember{seekoff}{basic_spanbuf}%
 \begin{itemdecl}
@@ -589,10 +579,10 @@ controlled sequences, if possible, as indicated in Table~\ref{tab:spanbuf.seekof
 
 \begin{libtab2}{\tcode{seekoff} positioning}{tab:spanbuf.seekoff.positioning}
 {p{2.5in}l}{Conditions}{Result}
-\tcode{(which \& ios_base::in)}\tcode{ == ios_base::in}  &
- positions the input sequence (xnext is \tcode{gptr()}, xbeg is \tcode{eback()}) \\ \rowsep
-\tcode{(which \& ios_base::out)}\tcode{ == ios_base::out}  &
- positions the output sequence (xnext is \tcode{pptr()}, xbeg is \tcode{pbase()}) \\ \rowsep
+\tcode{(which \& ios_base::in)}\br\tcode{ == ios_base::in}  &
+ positions the input sequence; \tcode{xnext} is \tcode{gptr()}, \tcode{xbeg} is \tcode{eback()} \\ \rowsep
+\tcode{(which \& ios_base::out)}\br\tcode{ == ios_base::out}  &
+ positions the output sequence; \tcode{xnext} is \tcode{pptr()}, \tcode{xbeg} is \tcode{pbase()} \\ \rowsep
 \tcode{(which \& (ios_base::in |}\br
 \tcode{ios_base::out)) ==}\br
 \tcode{(ios_base::in |}\br
@@ -606,17 +596,17 @@ Otherwise &
 \end{libtab2}
 
 \pnum
-For a sequence to be positioned, if its next pointer xnext
+For a sequence to be positioned, if its next pointer \tcode{xnext}
 (either
 \tcode{gptr()}
 or
 \tcode{pptr()})
-is a null pointer and the new offset \tcode{newoff} is nonzero, the positioning
-operation fails. Otherwise, the function determines \tcode{newoff} as indicated in
-Table~\ref{tab:spanbuf.newoff.values}2\iref{tab:spanbuf.newoff.values}.
+is a null pointer and the new offset \tcode{newoff} as computed below is nonzero, the positioning
+operation fails. Otherwise, the function determines \tcode{baseoff} as a value of type \tcode{off_type} as indicated in
+Table~\ref{tab:spanbuf.baseoff.values}2\iref{tab:spanbuf.baseoff.values}.
 
-\begin{libtab2}{\tcode{newoff} values}{tab:spanbuf.newoff.values}
-{lp{2.0in}}{Condition}{\tcode{newoff} Value}
+\begin{libtab2}{\tcode{baseoff} values}{tab:spanbuf.baseoff.values}
+{lp{2.0in}}{Condition}{\tcode{baseoff} Value}
 \tcode{way == ios_base::beg}  &
  0  \\ \rowsep
 \tcode{way == ios_base::cur}  &
@@ -627,24 +617,18 @@ Table~\ref{tab:spanbuf.newoff.values}2\iref{tab:spanbuf.newoff.values}.
 
 \pnum
 If
-\tcode{(newoff + off) < 0},
-or if \tcode{(newoff + off)}  \tcode{ >= buf.size()},
+\tcode{(baseoff + off) < 0},
+or if \tcode{size_t(baseoff) + size_t(off)}  \tcode{ >= buf.size()},
+or if \tcode{baseoff + off} would overflow, 
 the positioning operation fails.
-Otherwise, the function assigns
-\tcode{xbeg + newoff + off}
+Otherwise, the function computes the value \tcode{newoff} of type \tcode{off_type} as \tcode{baseoff + off} and assigns
+\tcode{xbeg + newoff}
 to the next pointer \tcode{xnext}.
 
 \pnum
 \returns
-\tcode{pos_type(newoff)},
-constructed from the resultant offset \tcode{newoff}
-(of type
-\tcode{off_type}),
-that stores the resultant stream position, if possible.
-If the positioning operation fails, or
-if the constructed object cannot represent the resultant stream position,
-the return value is
-\tcode{pos_type(off_type(-1))}.
+\tcode{pos_type(off_type(-1))} if the positioning operation fails;
+\tcode{pos_type(newoff)} otherwise.
 \end{itemdescr}
 
 %\indexlibrarymember{seekpos}{basic_spanbuf}%
@@ -668,8 +652,9 @@ basic_streambuf<charT, traits>* setbuf(charT* s, streamsize n);
 \begin{itemdescr}
 \pnum
 \effects
-If \tcode{s} and \tcode{n} denote a non-empty span
-\tcode{this->span(span<charT>(s,n));}
+\tcode{this->span(std::span<charT>(s, n));}
+
+\emph{Review question: can we construct \tcode{span(nullptr, 0)} ?}
 
 \pnum
 \returns
@@ -693,47 +678,45 @@ namespace std {
     using traits_type    = traits;
 
     // \iref{ispanstream.cons}, constructors:
-    template <ptrdiff_t Extent>
     explicit basic_ispanstream(
-      span<charT, Extent> span,
+      std::span<charT> s,
       ios_base::openmode which = ios_base::in);
-    basic_ispanstream(const basic_ispanstream& rhs) = delete;
-    basic_ispanstream(basic_ispanstream&& rhs) noexcept;
+    basic_ispanstream(const basic_ispanstream&) = delete;
+    basic_ispanstream(basic_ispanstream&& rhs);
 
     // \iref{ispanstream.assign}, assign and swap:
-    basic_ispanstream& operator=(const basic_ispanstream& rhs) = delete;
-    basic_ispanstream& operator=(basic_ispanstream&& rhs) noexcept;
-    void swap(basic_ispanstream& rhs) noexcept;
+    basic_ispanstream& operator=(const basic_ispanstream&) = delete;
+    basic_ispanstream& operator=(basic_ispanstream&& rhs);
+    void swap(basic_ispanstream& rhs);
 
     // \iref{ispanstream.members}, members:
     basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 
-    span<charT> span() const noexcept;
-	template<ptrdiff_t Extent>
-    void span(span<charT> s) noexcept;
+    std::span<charT> span() const noexcept;
+    void span(std::span<charT> s) noexcept;
   private:
     basic_spanbuf<charT, traits> sb; // \expos
   };
 
   template <class charT, class traits>
     void swap(basic_ispanstream<charT, traits>& x,
-              basic_ispanstream<charT, traits>& y) noexcept;
+              basic_ispanstream<charT, traits>& y);
 }
 \end{codeblock}
 
-\pnum
-The class
-\tcode{basic_ispanstream<charT, traits>}
-supports reading from objects of class
-\tcode{span<charT>}.
-It uses a
-\tcode{basic_spanbuf<charT, traits>}
-object to control the associated span.
-For the sake of exposition, the maintained data is presented here as:
-\begin{itemize}
-\item
-\tcode{sb}, the \tcode{spanbuf} object.
-\end{itemize}
+%\pnum
+%The class
+%\tcode{basic_ispanstream<charT, traits>}
+%supports reading from objects of class
+%\tcode{span<charT>}.
+%It uses a
+%\tcode{basic_spanbuf<charT, traits>}
+%object to control the associated span.
+%For the sake of exposition, the maintained data is presented here as:
+%\begin{itemize}
+%\item
+%\tcode{sb}, the \tcode{spanbuf} object.
+%\end{itemize}
 
 %\rSec3[ispanstream.cons]{\tcode{basic_ispanstream} constructors}
 \subsection{29.x.3.1 \tcode{basic_ispanstream} constructors [ispanstream.cons]}
@@ -741,9 +724,8 @@ For the sake of exposition, the maintained data is presented here as:
 
 %\indexlibrary{\idxcode{basic_ispanstream}!constructor}%
 \begin{itemdecl}
-template <ptrdiff_t Extent>
 explicit basic_ispanstream(
-  span<charT, Extent> span,
+  span<charT> s,
   ios_base::openmode which = ios_base::in);
 \end{itemdecl}
 
@@ -753,7 +735,7 @@ explicit basic_ispanstream(
 Initializes the base class with
 \tcode{basic_istream<charT, traits>(\&sb)}
 and \tcode{sb} with
-\tcode{basic_spanbuf<charT, traits>(span, which | ios_base::in)}~(\iref{spanbuf.cons}).
+\tcode{basic_spanbuf<charT, traits>(s, which | ios_base::in)}~(\iref{spanbuf.cons}).
 \end{itemdescr}
 
 %\indexlibrary{\idxcode{basic_ispanstream}!constructor}%
@@ -840,7 +822,7 @@ basic_spanbuf<charT>* rdbuf() const noexcept;
 
 %\indexlibrarymember{str}{basic_ispanstream}%
 \begin{itemdecl}
-span<charT> span() const noexcept;
+std::span<charT> span() const noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -851,8 +833,7 @@ span<charT> span() const noexcept;
 
 %\indexlibrarymember{str}{basic_ispanstream}%
 \begin{itemdecl}
-template<ptrdiff_t Extent>
-void span(span<charT, Extent> s) noexcept;
+void span(span<charT> s) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -879,23 +860,21 @@ namespace std {
     using traits_type    = traits;
 
     // \iref{ospanstream.cons}, constructors:
-    template <ptrdiff_t Extent>
     explicit basic_ospanstream(
-      span<charT, Extent> span,
+      span<charT> s,
       ios_base::openmode which = ios_base::out);
-    basic_ospanstream(const basic_ospanstream& rhs) = delete;
-    basic_ospanstream(basic_ospanstream&& rhs) noexcept;
+    basic_ospanstream(const basic_ospanstream&) = delete;
+    basic_ospanstream(basic_ospanstream&& rhs);
 
     // \iref{ospanstream.assign}, assign and swap:
-    basic_ospanstream& operator=(const basic_ospanstream& rhs) = delete;
-    basic_ospanstream& operator=(basic_ospanstream&& rhs) noexcept;
-    void swap(basic_ospanstream& rhs) noexcept;
+    basic_ospanstream& operator=(const basic_ospanstream&) = delete;
+    basic_ospanstream& operator=(basic_ospanstream&& rhs);
+    void swap(basic_ospanstream& rhs);
 
     // \iref{ospanstream.members}, members:
     basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 
     span<charT> span() const noexcept;
-	template<ptrdiff_t Extent>
     void span(span<charT> s) noexcept;
   private:
     basic_spanbuf<charT, traits> sb; // \expos
@@ -903,23 +882,23 @@ namespace std {
 
   template <class charT, class traits>
     void swap(basic_ospanstream<charT, traits>& x,
-              basic_ospanstream<charT, traits>& y) noexcept;
+              basic_ospanstream<charT, traits>& y);
 }
 \end{codeblock}
 
-\pnum
-The class
-\tcode{basic_ospanstream<charT, traits>}
-supports writing to objects of class
-\tcode{span<charT, traits>}.
-It uses a
-\tcode{basic_spanbuf<charT, traits>}
-object to control the associated span.
-For the sake of exposition, the maintained data is presented here as:
-\begin{itemize}
-\item
-\tcode{sb}, the \tcode{spanbuf} object.
-\end{itemize}
+%\pnum
+%The class
+%\tcode{basic_ospanstream<charT, traits>}
+%supports writing to objects of class
+%\tcode{span<charT, traits>}.
+%It uses a
+%\tcode{basic_spanbuf<charT, traits>}
+%object to control the associated span.
+%For the sake of exposition, the maintained data is presented here as:
+%\begin{itemize}
+%\item
+%\tcode{sb}, the \tcode{spanbuf} object.
+%\end{itemize}
 
 %\rSec3[ospanstream.cons]{\tcode{basic_ospanstream} constructors}
 \subsection{29.x.4.1 \tcode{basic_ospanstream} constructors [ospanstream.cons]}
@@ -927,9 +906,8 @@ For the sake of exposition, the maintained data is presented here as:
 
 %\indexlibrary{\idxcode{basic_ospanstream}!constructor}%
 \begin{itemdecl}
-template <ptrdiff_t Extent>
 explicit basic_ospanstream(
-  span<charT, Extent> span,
+  std::span<charT> s,
   ios_base::openmode which = ios_base::out);
 \end{itemdecl}
 
@@ -963,7 +941,7 @@ install the contained \tcode{basic_spanbuf}.
 
 %\indexlibrarymember{operator=}{basic_ospanstream}%
 \begin{itemdecl}
-basic_ospanstream& operator=(basic_ospanstream&& rhs) noexcept;
+basic_ospanstream& operator=(basic_ospanstream&& rhs);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -978,7 +956,7 @@ basic_ospanstream& operator=(basic_ospanstream&& rhs) noexcept;
 
 %\indexlibrarymember{swap}{basic_ospanstream}%
 \begin{itemdecl}
-void swap(basic_ospanstream& rhs) noexcept;
+void swap(basic_ospanstream& rhs);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -995,7 +973,7 @@ void swap(basic_ospanstream& rhs) noexcept;
 \begin{itemdecl}
 template <class charT, class traits>
   void swap(basic_ospanstream<charT, traits>& x,
-            basic_ospanstream<charT, traits>& y) noexcept;
+            basic_ospanstream<charT, traits>& y);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1020,7 +998,7 @@ basic_spanbuf<charT>* rdbuf() const noexcept;
 
 %\indexlibrarymember{str}{basic_ospanstream}%
 \begin{itemdecl}
-span<charT> span() const noexcept;
+std::span<charT> span() const noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1031,8 +1009,7 @@ span<charT> span() const noexcept;
 
 %\indexlibrarymember{str}{basic_ospanstream}%
 \begin{itemdecl}
-template<ptrdiff_t Extent>
-void span(span<charT, Extent> s) noexcept;
+void span(std::span<charT> s) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1059,47 +1036,45 @@ namespace std {
     using traits_type    = traits;
 
     // \iref{spanstream.cons}, constructors:
-    template <ptrdiff_t Extent>
     explicit basic_spanstream(
-      span<charT, Extent> span,
+      span<charT> span,
       ios_base::openmode which = ios_base::out);
-    basic_spanstream(const basic_spanstream& rhs) = delete;
-    basic_spanstream(basic_spanstream&& rhs) noexcept;
+    basic_spanstream(const basic_spanstream&) = delete;
+    basic_spanstream(basic_spanstream&& rhs);
 
     // \iref{spanstream.assign}, assign and swap:
-    basic_spanstream& operator=(const basic_spanstream& rhs) = delete;
-    basic_spanstream& operator=(basic_spanstream&& rhs) noexcept;
-    void swap(basic_spanstream& rhs) noexcept;
+    basic_spanstream& operator=(const basic_spanstream&) = delete;
+    basic_spanstream& operator=(basic_spanstream&& rhs);
+    void swap(basic_spanstream& rhs);
 
     // \iref{spanstream.members}, members:
     basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 
     span<charT> span() const noexcept;
-	template<ptrdiff_t Extent>
-    void span(span<charT> s) noexcept;
+    void span(std::span<charT> s) noexcept;
   private:
     basic_spanbuf<charT, traits> sb; // \expos
   };
 
   template <class charT, class traits>
     void swap(basic_spanstream<charT, traits>& x,
-              basic_spanstream<charT, traits>& y) noexcept;
+              basic_spanstream<charT, traits>& y);
 }
 \end{codeblock}
 
-\pnum
-The class
-\tcode{basic_spanstream<charT, traits>}
-supports reading from and writing to objects of class
-\tcode{span<charT, traits>}.
-It uses a
-\tcode{basic_spanbuf<charT, traits>}
-object to control the associated span.
-For the sake of exposition, the maintained data is presented here as:
-\begin{itemize}
-\item
-\tcode{sb}, the \tcode{spanbuf} object.
-\end{itemize}
+%\pnum
+%The class
+%\tcode{basic_spanstream<charT, traits>}
+%supports reading from and writing to objects of class
+%\tcode{span<charT, traits>}.
+%It uses a
+%\tcode{basic_spanbuf<charT, traits>}
+%object to control the associated span.
+%For the sake of exposition, the maintained data is presented here as:
+%\begin{itemize}
+%\item
+%\tcode{sb}, the \tcode{spanbuf} object.
+%\end{itemize}
 
 %\rSec3[spanstream.cons]{\tcode{basic_spanstream} constructors}
 \subsection{29.x.5.1 \tcode{basic_spanstream} constructors [spanstream.cons]}
@@ -1107,9 +1082,8 @@ For the sake of exposition, the maintained data is presented here as:
 
 %\indexlibrary{\idxcode{basic_spanstream}!constructor}%
 \begin{itemdecl}
-template <ptrdiff_t Extent>
 explicit basic_spanstream(
-  span<charT, Extent> span,
+  std::span<charT> span,
   ios_base::openmode which = ios_base::out | ios_bas::in);
 \end{itemdecl}
 
@@ -1126,7 +1100,7 @@ and initializing \tcode{sb} with
 
 %\indexlibrary{\idxcode{basic_spanstream}!constructor}%
 \begin{itemdecl}
-basic_spanstream(basic_spanstream&& rhs) noexcept;
+basic_spanstream(basic_spanstream&& rhs);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1145,7 +1119,7 @@ install the contained \tcode{basic_spanbuf}.
 
 %\indexlibrarymember{operator=}{basic_spanstream}%
 \begin{itemdecl}
-basic_spanstream& operator=(basic_spanstream&& rhs) noexcept;
+basic_spanstream& operator=(basic_spanstream&& rhs);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1160,7 +1134,7 @@ basic_spanstream& operator=(basic_spanstream&& rhs) noexcept;
 
 %\indexlibrarymember{swap}{basic_spanstream}%
 \begin{itemdecl}
-void swap(basic_spanstream& rhs) noexcept;
+void swap(basic_spanstream& rhs);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1177,7 +1151,7 @@ void swap(basic_spanstream& rhs) noexcept;
 \begin{itemdecl}
 template <class charT, class traits>
   void swap(basic_spanstream<charT, traits>& x,
-            basic_spanstream<charT, traits>& y) noexcept;
+            basic_spanstream<charT, traits>& y);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1202,7 +1176,7 @@ basic_spanbuf<charT>* rdbuf() const noexcept;
 
 %\indexlibrarymember{str}{basic_spanstream}%
 \begin{itemdecl}
-span<charT> span() const noexcept;
+std::span<charT> span() const noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -1213,8 +1187,7 @@ span<charT> span() const noexcept;
 
 %\indexlibrarymember{str}{basic_spanstream}%
 \begin{itemdecl}
-template<ptrdiff_t Extent>
-void span(span<charT, Extent> s) noexcept;
+void span(std::span<charT> s) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
