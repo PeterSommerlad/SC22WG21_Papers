@@ -59,7 +59,7 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{d0448r3}
-\newcommand{\paperdate}{2020-12-03}
+\newcommand{\paperdate}{2020-12-04}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -231,7 +231,9 @@ As with all existing stream classes, using a stream object or a streambuf object
 
 \emph{Introduce a new header \tcode{\textless{}spanstream\textgreater} in subclause ([headers]): Table 19 ([tab:headers.cpp]).}
 
-\emph{Add the feature test macro \tcode{__cpp_lib_spanstream} to Table 17 ([tab:cpp.predefined.ft]) with the corresponding value for the header \tcode{\textless{}spanstream\textgreater}.}
+\emph{Add the feature test macro \tcode{__cpp_lib_spanstream} 
+%to Table 19 ([tab:cpp.predefined.ft]) 
+with the corresponding value for the header \tcode{\textless{}spanstream\textgreater}.}
 
 \emph{Insert a new section 29.x in chapter 29 [input.output] after section 29.8 [string.streams] and adjust table [tab:iostreams.summary] accordingly.}
 
@@ -270,7 +272,7 @@ namespace std {
 \pnum
 This section introduces a stream interface for user-provided fixed-size buffers. 
 \subsection{29.x.1 Overview [span.streams.overview]}
-The header \tcode{<spanstream>} defines four class templates and eight types that associate stream buffers with objects of class \tcode{span} as described in [views.span]. 
+The header \tcode{<spanstream>} defines class templates and types that associate stream buffers with objects of class template \tcode{span} as described in [views.span]. 
 
 \begin{note}
 A user of theses classes is responsible that the character sequence represented by the given \tcode{span} outlives the use of the sequence by objects of the classes in this chapter. Using multiple \tcode{basic_spanbuf} objects referring to overlapping underlying sequences from different threads, where at least one \tcode{basic_spanbuf} object is used for writing to the sequence, results in a data race.
@@ -282,18 +284,25 @@ A user of theses classes is responsible that the character sequence represented 
 namespace std {
   template <class charT, class traits = char_traits<charT>>
     class basic_spanbuf;
+    
   using spanbuf = basic_spanbuf<char>;
   using wspanbuf = basic_spanbuf<wchar_t>;
+
   template <class charT, class traits = char_traits<charT>>
     class basic_ispanstream;
+
   using ispanstream = basic_ispanstream<char>;
   using wispanstream = basic_ispanstream<wchar_t>;
+
   template <class charT, class traits = char_traits<charT>>
     class basic_ospanstream;
+
   using ospanstream = basic_ospanstream<char>;
   using wospanstream = basic_ospanstream<wchar_t>;
+
   template <class charT, class traits = char_traits<charT>>
     class basic_spanstream;
+
   using spanstream = basic_spanstream<char>;
   using wspanstream = basic_spanstream<wchar_t>;
 }
@@ -313,27 +322,27 @@ namespace std {
     using off_type       = typename traits::off_type;
     using traits_type    = traits;
 
-    // \iref{spanbuf.cons}, constructors:
+    // \iref{spanbuf.cons}, constructors
     basic_spanbuf() : basic_spanbuf(ios_base::in | ios_base::out) {}
     explicit basic_spanbuf(ios_base::openmode which)
-      : basic_spanbuf(span<charT>(), which) {}
+      : basic_spanbuf(std::span<charT>(), which) {}
     explicit basic_spanbuf(
       std::span<charT> s,
       ios_base::openmode which = ios_base::in | ios_base::out);
     basic_spanbuf(const basic_spanbuf&) = delete;
     basic_spanbuf(basic_spanbuf&& rhs);
 
-    // \iref{spanbuf.assign}, assign and swap:
+    // \iref{spanbuf.assign}, assign and swap
     basic_spanbuf& operator=(const basic_spanbuf&) = delete;
     basic_spanbuf& operator=(basic_spanbuf&& rhs);
     void swap(basic_spanbuf& rhs);
 
-    // \iref{spanbuf.members}, get and set:
+    // \iref{spanbuf.members}, get and set
     std::span<charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;
 
   protected:
-    // \iref{spanbuf.virtuals}, overridden virtual functions:
+    // \iref{spanbuf.virtuals}, overridden virtual functions
     basic_streambuf<charT, traits>* setbuf(charT*, streamsize) override;
 
     pos_type seekoff(off_type off, ios_base::seekdir way,
@@ -360,8 +369,7 @@ The class
 is derived from
 \tcode{basic_streambuf}
 to associate possibly the input sequence and possibly
-the output sequence with a sequence of arbitrary
-\term{characters}.
+the output sequence with a sequence of arbitrary characters.
 The sequence is provided by an object of class
 \tcode{span<charT>}.
 % literally take from basic_stringbuf.
@@ -388,7 +396,7 @@ is the view to the underlying character sequence.
 \indexlibrary{\idxcode{basic_spanbuf}!constructor}%
 \begin{itemdecl}
 explicit basic_spanbuf(
-  basic_span<charT> s,
+  std::span<charT> s,
   ios_base::openmode which = ios_base::in | ios_base::out);
 \end{itemdecl}
 
@@ -396,7 +404,7 @@ explicit basic_spanbuf(
 \pnum
 \effects
 Initializes the base class with
-\tcode{basic_streambuf()}~(\iref{streambuf.cons}),
+\tcode{basic_streambuf()}~(\iref{streambuf.cons}), and
 \tcode{mode}
 with \tcode{which}. 
 Initializes the internal pointers as if calling \tcode{span(s)}.
@@ -422,7 +430,7 @@ The sequence pointers in
 the values which \tcode{rhs} had.
 %% the following gives the same leeway as other streambufs
 It is 
-\impldef{wether \tcode{rhs.buf.empty()} returns true after the move}
+\impldef{whether \tcode{rhs.buf.empty()} returns true after the move}
 wether \tcode{rhs.buf.empty()} returns true after the move.
 
 %It
@@ -482,8 +490,8 @@ void swap(basic_spanbuf& rhs);
 \effects Equivalent to:
 \begin{codeblock} 
     basic_streambuf<charT, traits>::swap(rhs);
-    swap(mode, rhs.mode);
-    swap(buf, rhs.buf);
+    std::swap(mode, rhs.mode);
+    std::swap(buf, rhs.buf);
 \end{codeblock}
 % swap is std::swap, because mode and buf's types are from std.
 \end{itemdescr}
@@ -517,7 +525,8 @@ returns \tcode{std::span<charT>(pbase(), pptr())},
 otherwise returns \tcode{buf}. 
 
 \begin{note}
-In constrast to \tcode{basic_stringbuf} the underlying sequence can never grow and will not be owned. An owning copy can be obtained by converting the result to \tcode{basic_string<charT>}.
+In contrast to \tcode{basic_stringbuf}, the underlying sequence never grows and is not owned. 
+An owning copy can be obtained by converting the result to \tcode{basic_string<charT>}.
 \end{note}
 
 
@@ -531,7 +540,7 @@ void span(std::span<charT> s);
 \begin{itemdescr}
 \pnum
 \effects 
-\tcode{buf = s;} Initializes the input and output sequences according to \tcode{mode}.
+\tcode{buf = s}. Initializes the input and output sequences according to \tcode{mode}.
 % expect feedback
 
 
@@ -544,9 +553,6 @@ void span(std::span<charT> s);
 \item in addition, 
 if \tcode{ios_base::ate} is set in \tcode{mode},
 \tcode{pptr() == pbase() + s.size()} is \tcode{true}, 
-\begin{note}
-Using append mode does not make sense for \tcode{span}-based streams.
-\end{note}
 \item otherwise \tcode{pptr() == pbase()} is \tcode{true}. 
 \end{itemize}
 \item If \tcode{ios_base::in} is set in \tcode{mode}, 
@@ -561,7 +567,7 @@ Using append mode does not make sense for \tcode{span}-based streams.
 %\rSec3[spanbuf.virtuals]{Overridden virtual functions}
 \pnum
 \begin{note}
-Since the underlying buffer is of fixed size, neither \tcode{overflow}, \tcode{underflow} or \tcode{pbackfail} can provide useful behavior.
+Because the underlying buffer is of fixed size, neither \tcode{overflow}, \tcode{underflow}, nor \tcode{pbackfail} can provide useful behavior.
 \end{note}
 
 %\indexlibrarymember{seekoff}{basic_spanbuf}%
@@ -574,26 +580,39 @@ pos_type seekoff(off_type off, ios_base::seekdir way,
 \begin{itemdescr}
 \pnum
 \effects
-Alters the stream position within one of the
-controlled sequences, if possible, as indicated in Table~\ref{tab:spanbuf.seekoff.positioning}1\iref{tab:spanbuf.seekoff.positioning}.
+Alters the stream position within one or both of the
+controlled sequences, if possible, as follows:
+\begin{itemize}
+\item if \tcode{ios_base::in} is set in \tcode{which}, positions the input sequence; \tcode{xnext} is \tcode{gptr()}, \tcode{xbeg} is \tcode{eback()}.
+\item if \tcode{ios_base::out} is set in \tcode{which}, positions the output sequence; \tcode{xnext} is \tcode{pptr()}, \tcode{xbeg} is \tcode{pbase()}.
+\end{itemize}
 
-\begin{libtab2}{\tcode{seekoff} positioning}{tab:spanbuf.seekoff.positioning}
-{p{2.5in}l}{Conditions}{Result}
-\tcode{(which \& ios_base::in)}\br\tcode{ == ios_base::in}  &
- positions the input sequence; \tcode{xnext} is \tcode{gptr()}, \tcode{xbeg} is \tcode{eback()} \\ \rowsep
-\tcode{(which \& ios_base::out)}\br\tcode{ == ios_base::out}  &
- positions the output sequence; \tcode{xnext} is \tcode{pptr()}, \tcode{xbeg} is \tcode{pbase()} \\ \rowsep
-\tcode{(which \& (ios_base::in |}\br
-\tcode{ios_base::out)) ==}\br
-\tcode{(ios_base::in |}\br
-\tcode{ios_base::out)}\br
-and \tcode{way ==} either\br
-\tcode{ios_base::beg} or\br
-\tcode{ios_base::end}     &
- positions both the input and the output sequences  \\ \rowsep
-Otherwise &
- the positioning operation fails. \\
-\end{libtab2}
+\pnum
+If both \tcode{ios_base::in} and \tcode{ios_base::out} are set in \tcode{which} and \tcode{way} is 
+%neither \tcode{ios_base::beg}, nor \tcode{ios_base::end} 
+\tcode{ios_base::cur}
+the positioning operation fails.
+
+
+%indicated in Table~\ref{tab:spanbuf.seekoff.positioning}1\iref{tab:spanbuf.seekoff.positioning}.
+
+%\begin{libtab2}{\tcode{seekoff} positioning}{tab:spanbuf.seekoff.positioning}
+%{p{2.5in}l}{Conditions}{Result}
+%\tcode{(which \& ios_base::in)}\br\tcode{ == ios_base::in}  &
+% positions the input sequence; \tcode{xnext} is \tcode{gptr()}, \tcode{xbeg} is \tcode{eback()} \\ \rowsep
+%\tcode{(which \& ios_base::out)}\br\tcode{ == ios_base::out}  &
+% positions the output sequence; \tcode{xnext} is \tcode{pptr()}, \tcode{xbeg} is \tcode{pbase()} \\ \rowsep
+%\tcode{(which \& (ios_base::in |}\br
+%\tcode{ios_base::out)) ==}\br
+%\tcode{(ios_base::in |}\br
+%\tcode{ios_base::out)}\br
+%and \tcode{way ==} either\br
+%\tcode{ios_base::beg} or\br
+%\tcode{ios_base::end}     &
+% positions both the input and the output sequences  \\ \rowsep
+%Otherwise &
+% the positioning operation fails. \\
+%\end{libtab2}
 
 \pnum
 For a sequence to be positioned, if its next pointer \tcode{xnext}
@@ -602,26 +621,44 @@ For a sequence to be positioned, if its next pointer \tcode{xnext}
 or
 \tcode{pptr()})
 is a null pointer and the new offset \tcode{newoff} as computed below is nonzero, the positioning
-operation fails. Otherwise, the function determines \tcode{baseoff} as a value of type \tcode{off_type} as indicated in
-Table~\ref{tab:spanbuf.baseoff.values}2\iref{tab:spanbuf.baseoff.values}.
+operation fails. Otherwise, the function determines \tcode{baseoff} as a value of type \tcode{off_type} as follows:
+\begin{itemize}
+\item \tcode{0} when \tcode{way} is \tcode{ios_base::beg};
+\item \tcode{(pptr() - pbase())} for the output sequence, or \newline
+      \tcode{(gptr() - eback())} for the input sequence when \tcode{way} is \tcode{ios_base::cur};
+\item when \tcode{way} is \tcode{ios_base::end} :  
+\begin{itemize}
+\item \tcode{(pptr() - pbase())} if \tcode{mode} is \tcode{ios_base::out}, 
+\item \tcode{buf.size()} otherwise.
+\end{itemize}
+\end{itemize}
 
-\begin{libtab2}{\tcode{baseoff} values}{tab:spanbuf.baseoff.values}
-{lp{2.0in}}{Condition}{\tcode{baseoff} Value}
-\tcode{way == ios_base::beg}  &
- 0  \\ \rowsep
-\tcode{way == ios_base::cur}  &
- \tcode{pptr() - pbase()} or \tcode{gptr() - eback()}. \\ \rowsep
-\tcode{way == ios_base::end}  &
-  \tcode{(mode == ios_base::out)?} \tcode{pptr() - pbase() : }\tcode{buf.size()}   \\
-\end{libtab2}
+
+
+
+%indicated in
+%Table~\ref{tab:spanbuf.baseoff.values}2\iref{tab:spanbuf.baseoff.values}.
+%
+%\begin{libtab2}{\tcode{baseoff} values}{tab:spanbuf.baseoff.values}
+%{lp{2.0in}}{Condition}{\tcode{baseoff} Value}
+%\tcode{way == ios_base::beg}  &
+% 0  \\ \rowsep
+%\tcode{way == ios_base::cur}  &
+% \tcode{pptr() - pbase()} or \tcode{gptr() - eback()}. \\ \rowsep
+%\tcode{way == ios_base::end}  &
+%  \tcode{(mode == ios_base::out)?} \tcode{pptr() - pbase() : }\tcode{buf.size()}   \\
+%\end{libtab2}
 
 \pnum
-If
-\tcode{(baseoff + off) < 0},
-or if \tcode{size_t(baseoff) + size_t(off)}  \tcode{ >= buf.size()},
-or if \tcode{baseoff + off} would overflow, 
+If \tcode{baseoff} + \tcode{off} would overflow, or 
+if \tcode{baseoff} + \tcode{off} is less than zero, or 
+if \tcode{baseoff} + \tcode{off} is greater than \tcode{buf.size()},
 the positioning operation fails.
-Otherwise, the function computes the value \tcode{newoff} of type \tcode{off_type} as \tcode{baseoff + off} and assigns
+Otherwise, the function computes 
+\begin{codeblock}
+off_type newoff = baseoff + off;
+\end{codeblock}
+and assigns
 \tcode{xbeg + newoff}
 to the next pointer \tcode{xnext}.
 
@@ -641,7 +678,10 @@ pos_type seekpos(pos_type sp,
 \begin{itemdescr}
 \pnum
 \effects
-Equivalent to: \tcode{return seekoff(off_type(sp), ios_base::beg, which);}
+Equivalent to: 
+\begin{codeblock}
+return seekoff(off_type(sp), ios_base::beg, which);
+\end{codeblock}
 \end{itemdescr}
 
 %\indexlibrarymember{setbuf}{basic_streambuf}%
@@ -653,8 +693,6 @@ basic_streambuf<charT, traits>* setbuf(charT* s, streamsize n);
 \pnum
 \effects
 \tcode{this->span(std::span<charT>(s, n));}
-
-\emph{Review question: can we construct \tcode{span(nullptr, 0)} ?}
 
 \pnum
 \returns
@@ -677,19 +715,19 @@ namespace std {
     using off_type       = typename traits::off_type;
     using traits_type    = traits;
 
-    // \iref{ispanstream.cons}, constructors:
+    // \iref{ispanstream.cons}, constructors
     explicit basic_ispanstream(
       std::span<charT> s,
       ios_base::openmode which = ios_base::in);
     basic_ispanstream(const basic_ispanstream&) = delete;
     basic_ispanstream(basic_ispanstream&& rhs);
 
-    // \iref{ispanstream.assign}, assign and swap:
+    // \iref{ispanstream.assign}, assign and swap
     basic_ispanstream& operator=(const basic_ispanstream&) = delete;
     basic_ispanstream& operator=(basic_ispanstream&& rhs);
     void swap(basic_ispanstream& rhs);
 
-    // \iref{ispanstream.members}, members:
+    // \iref{ispanstream.members}, members
     basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 
     std::span<charT> span() const noexcept;
@@ -725,7 +763,7 @@ namespace std {
 %\indexlibrary{\idxcode{basic_ispanstream}!constructor}%
 \begin{itemdecl}
 explicit basic_ispanstream(
-  span<charT> s,
+  std::span<charT> s,
   ios_base::openmode which = ios_base::in);
 \end{itemdecl}
 
@@ -733,7 +771,7 @@ explicit basic_ispanstream(
 \pnum
 \effects
 Initializes the base class with
-\tcode{basic_istream<charT, traits>(\&sb)}
+\tcode{basic_istream<charT, traits>(addressof(sb))}
 and \tcode{sb} with
 \tcode{basic_spanbuf<charT, traits>(s, which | ios_base::in)}~(\iref{spanbuf.cons}).
 \end{itemdescr}
@@ -746,10 +784,10 @@ basic_ispanstream(basic_ispanstream&& rhs);
 \begin{itemdescr}
 \pnum
 \effects 
-Initializes the base class from \tcode{std::move(rhs)} 
-and initializing \tcode{sb} from \tcode{std::move(rhs.sb)}.
+Initializes the base class with \tcode{std::move(rhs)} 
+and \tcode{sb} with \tcode{std::move(rhs.sb)}.
 % LWG: base class does not touch sb member on move, only the pointer is moved and needs to be readjusted
-Next \tcode{basic_istream<charT, traits>::set_rdbuf(\&sb)} is called to
+Next, \tcode{basic_istream<charT, traits>::set_rdbuf(addressof(sb))} is called to
 install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
@@ -757,20 +795,20 @@ install the contained \tcode{basic_spanbuf}.
 \subsection{29.x.3.2 Assign and swap [ispanstream.assign]}
 \label{ispanstream.assign}
 
-%\indexlibrarymember{operator=}{basic_ispanstream}%
-\begin{itemdecl}
-basic_ispanstream& operator=(basic_ispanstream&& rhs);
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\effects Equivalent to:
-\begin{codeblock}
-   basic_istream<charT, traits>::swap(rhs);
-   sb = std::move(rhs.sb);
-   return *this;
-\end{codeblock}
-\end{itemdescr}
+%%\indexlibrarymember{operator=}{basic_ispanstream}%
+%\begin{itemdecl}
+%basic_ispanstream& operator=(basic_ispanstream&& rhs);
+%\end{itemdecl}
+%
+%\begin{itemdescr}
+%\pnum
+%\effects Equivalent to:
+%\begin{codeblock}
+%   basic_istream<charT, traits>::swap(rhs);
+%   sb = std::move(rhs.sb);
+%   return *this;
+%\end{codeblock}
+%\end{itemdescr}
 
 %\indexlibrarymember{swap}{basic_ispanstream}%
 \begin{itemdecl}
@@ -811,13 +849,13 @@ template <class charT, class traits>
 
 %\indexlibrarymember{rdbuf}{basic_ispanstream}%
 \begin{itemdecl}
-basic_spanbuf<charT>* rdbuf() const noexcept;
+basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \effects Equivalent to:\\
-\tcode{return const_cast<basic_spanbuf<charT>*>(\&sb);}
+\tcode{return const_cast<basic_spanbuf<charT, traits>*>(addressof(sb));}
 \end{itemdescr}
 
 %\indexlibrarymember{str}{basic_ispanstream}%
@@ -833,7 +871,7 @@ std::span<charT> span() const noexcept;
 
 %\indexlibrarymember{str}{basic_ispanstream}%
 \begin{itemdecl}
-void span(span<charT> s) noexcept;
+void span(std::span<charT> s) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -859,23 +897,23 @@ namespace std {
     using off_type       = typename traits::off_type;
     using traits_type    = traits;
 
-    // \iref{ospanstream.cons}, constructors:
+    // \iref{ospanstream.cons}, constructors
     explicit basic_ospanstream(
-      span<charT> s,
+      std::span<charT> s,
       ios_base::openmode which = ios_base::out);
     basic_ospanstream(const basic_ospanstream&) = delete;
     basic_ospanstream(basic_ospanstream&& rhs);
 
-    // \iref{ospanstream.assign}, assign and swap:
+    // \iref{ospanstream.assign}, assign and swap
     basic_ospanstream& operator=(const basic_ospanstream&) = delete;
     basic_ospanstream& operator=(basic_ospanstream&& rhs);
     void swap(basic_ospanstream& rhs);
 
-    // \iref{ospanstream.members}, members:
+    // \iref{ospanstream.members}, members
     basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 
-    span<charT> span() const noexcept;
-    void span(span<charT> s) noexcept;
+    std::span<charT> span() const noexcept;
+    void span(std::span<charT> s) noexcept;
   private:
     basic_spanbuf<charT, traits> sb; // \expos
   };
@@ -915,7 +953,7 @@ explicit basic_ospanstream(
 \pnum
 \effects
 Initializes the base class with
-\tcode{basic_ostream<charT, traits>(\&sb)}
+\tcode{basic_ostream<charT, traits>(addressof(sb))}
 and \tcode{sb} with
 \tcode{basic_spanbuf<charT, traits>(span, which | ios_base::out)}~(\iref{spanbuf.cons}).
 \end{itemdescr}
@@ -928,10 +966,10 @@ basic_ospanstream(basic_ospanstream&& rhs) noexcept;
 \begin{itemdescr}
 \pnum
 \effects 
-Initializes the base class from \tcode{std::move(rhs)} 
-and \tcode{sb} from \tcode{std::move(rhs.sb)}.
+Initializes the base class with \tcode{std::move(rhs)} 
+and \tcode{sb} with \tcode{std::move(rhs.sb)}.
 %move constructing the base class, and the contained \tcode{basic_spanbuf}.
-Next \tcode{basic_ostream<charT, traits>::set_rdbuf(\&sb)} is called to
+Next, \tcode{basic_ostream<charT, traits>::set_rdbuf(addressof(sb))} is called to
 install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
@@ -939,20 +977,20 @@ install the contained \tcode{basic_spanbuf}.
 \subsection{29.x.4.2 Assign and swap [ospanstream.assign]}
 \label{ospanstream.assign}
 
-%\indexlibrarymember{operator=}{basic_ospanstream}%
-\begin{itemdecl}
-basic_ospanstream& operator=(basic_ospanstream&& rhs);
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\effects Equivalent to: 
-\begin{codeblock}
-    basic_ostream<charT, traits>::swap(rhs);
-    sb = std::move(rhs.sb);
-    return *this;
-\end{codeblock}
-\end{itemdescr}
+%%\indexlibrarymember{operator=}{basic_ospanstream}%
+%\begin{itemdecl}
+%basic_ospanstream& operator=(basic_ospanstream&& rhs);
+%\end{itemdecl}
+%
+%\begin{itemdescr}
+%\pnum
+%\effects Equivalent to: 
+%\begin{codeblock}
+%    basic_ostream<charT, traits>::swap(rhs);
+%    sb = std::move(rhs.sb);
+%    return *this;
+%\end{codeblock}
+%\end{itemdescr}
 
 %\indexlibrarymember{swap}{basic_ospanstream}%
 \begin{itemdecl}
@@ -987,13 +1025,13 @@ template <class charT, class traits>
 
 %\indexlibrarymember{rdbuf}{basic_ospanstream}%
 \begin{itemdecl}
-basic_spanbuf<charT>* rdbuf() const noexcept;
+basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \effects Equivalent to: \\
-\tcode{return const_cast<basic_spanbuf<charT>*>(\&sb);}
+\tcode{return const_cast<basic_spanbuf<charT, traits>*>(addressof(sb));}
 \end{itemdescr}
 
 %\indexlibrarymember{str}{basic_ospanstream}%
@@ -1035,22 +1073,22 @@ namespace std {
     using off_type       = typename traits::off_type;
     using traits_type    = traits;
 
-    // \iref{spanstream.cons}, constructors:
+    // \iref{spanstream.cons}, constructors
     explicit basic_spanstream(
-      span<charT> span,
-      ios_base::openmode which = ios_base::out);
+      std::span<charT> s,
+      ios_base::openmode which = ios_base::out | ios_base::in);
     basic_spanstream(const basic_spanstream&) = delete;
     basic_spanstream(basic_spanstream&& rhs);
 
-    // \iref{spanstream.assign}, assign and swap:
+    // \iref{spanstream.assign}, assign and swap
     basic_spanstream& operator=(const basic_spanstream&) = delete;
     basic_spanstream& operator=(basic_spanstream&& rhs);
     void swap(basic_spanstream& rhs);
 
-    // \iref{spanstream.members}, members:
+    // \iref{spanstream.members}, members
     basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 
-    span<charT> span() const noexcept;
+    std::span<charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;
   private:
     basic_spanbuf<charT, traits> sb; // \expos
@@ -1083,19 +1121,17 @@ namespace std {
 %\indexlibrary{\idxcode{basic_spanstream}!constructor}%
 \begin{itemdecl}
 explicit basic_spanstream(
-  std::span<charT> span,
+  std::span<charT> s,
   ios_base::openmode which = ios_base::out | ios_bas::in);
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \effects
-Constructs an object of class
-\tcode{basic_spanstream<charT, traits>},
-initializing the base class with
-\tcode{basic_iostream<charT, traits>(\&sb)}
-and initializing \tcode{sb} with
-\tcode{basic_spanbuf<charT, traits>(span, which)}~(\iref{spanbuf.cons}).
+Initializes the base class with
+\tcode{basic_ostream<charT, traits>(addressof(sb))}
+and \tcode{sb} with
+\tcode{basic_spanbuf<charT, traits>(s, which)}~(\iref{spanbuf.cons}).
 \end{itemdescr}
 
 %\indexlibrary{\idxcode{basic_spanstream}!constructor}%
@@ -1105,11 +1141,11 @@ basic_spanstream(basic_spanstream&& rhs);
 
 \begin{itemdescr}
 \pnum
-\effects Initializes the base class from \tcode{std::move(rhs)} 
-and \tcode{sb} from \tcode{std::move(rhs.sb)}.
+\effects Initializes the base class with \tcode{std::move(rhs)} 
+and \tcode{sb} with \tcode{std::move(rhs.sb)}.
 %move constructing the base class, and the contained
 %\tcode{basic_spanbuf}.
-Next \tcode{basic_iostream<charT, traits>::set_rdbuf(\&sb)} is called to
+Next, \tcode{basic_iostream<charT, traits>::set_rdbuf(addressof(sb))} is called to
 install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
@@ -1117,20 +1153,20 @@ install the contained \tcode{basic_spanbuf}.
 \subsection{29.x.5.2 Assign and swap [spanstream.assign]}
 \label{spanstream.assign}
 
-%\indexlibrarymember{operator=}{basic_spanstream}%
-\begin{itemdecl}
-basic_spanstream& operator=(basic_spanstream&& rhs);
-\end{itemdecl}
-
-\begin{itemdescr}
-\pnum
-\effects Equivalent to:
-\begin{codeblock}
-    basic_iostream<charT, traits>::swap(rhs);
-    sb = std::move(rhs.sb);
-    return *this;
-\end{codeblock}
-\end{itemdescr}
+%%\indexlibrarymember{operator=}{basic_spanstream}%
+%\begin{itemdecl}
+%basic_spanstream& operator=(basic_spanstream&& rhs);
+%\end{itemdecl}
+%
+%\begin{itemdescr}
+%\pnum
+%\effects Equivalent to:
+%\begin{codeblock}
+%    basic_iostream<charT, traits>::swap(rhs);
+%    sb = std::move(rhs.sb);
+%    return *this;
+%\end{codeblock}
+%\end{itemdescr}
 
 %\indexlibrarymember{swap}{basic_spanstream}%
 \begin{itemdecl}
@@ -1165,13 +1201,13 @@ template <class charT, class traits>
 
 %\indexlibrarymember{rdbuf}{basic_spanstream}%
 \begin{itemdecl}
-basic_spanbuf<charT>* rdbuf() const noexcept;
+basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \effects Equivalent to: \\
-\tcode{return const_cast<basic_spanbuf<charT>*>(\&sb);}
+\tcode{return const_cast<basic_spanbuf<charT, traits>*>(addressof(sb));}
 \end{itemdescr}
 
 %\indexlibrarymember{str}{basic_spanstream}%
