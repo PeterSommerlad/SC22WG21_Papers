@@ -59,7 +59,7 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{d0448r3}
-\newcommand{\paperdate}{2020-12-04}
+\newcommand{\paperdate}{2020-12-07}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -91,9 +91,10 @@ Based on the review of p0408 in Cologne 2019, some adjustments were made here ac
 \item update editorial advise to include header and feature test macro, as well as the section number to 29.
 \item made wording adjustments like suggested for p0408 in Cologne 2019 by LWG in the hope to make reviewing it faster.
 \item removed mentioning a template parameter Extent in all uses of span.
-\item tried to fix the adopted wording (from \tcode{basic_stringbuf}) wrt seekoff.
+\item tried to fix the adopted wording (from \tcode{basic_stringbuf}) wrt seekoff by removing tables in favor of words.
 \item removed impossible to achieve \tcode{noexcept} from move and swap operations.
-\item some more initial review feedback from LWG.
+\item some more email and review feedback from LWG telecon (spelling, spacing, etc).
+\item rephrased constructor wording to read more modern (Initializes vs constructs).
 \end{itemize}
 
 
@@ -168,6 +169,7 @@ This paper proposes a class template \tcode{basic_spanbuf} and the corresponding
 \item Thanks go to Jonathan Wakely who pointed the problem of \tcode{strstream} out to me and to Neil Macintosh to provide the span library type specification.
 \item Thanks to Felix Morgner for proofreading.
 \item Thanks to Kona LEWG small group discussion suggesting some clarifications and Thomas K\"oppe for allowing me to use using type aliases instead of \tcode{typedef}.
+\item Thanks to remote LWG meeting December 2020 and surrounding email feedback by Jeff Garland, Tim Song, Jens Maurer, Volle Voutilainen
 \end{itemize}
 
 \chapter{Motivation}
@@ -231,9 +233,12 @@ As with all existing stream classes, using a stream object or a streambuf object
 
 \emph{Introduce a new header \tcode{\textless{}spanstream\textgreater} in subclause ([headers]): Table 19 ([tab:headers.cpp]).}
 
-\emph{Add the feature test macro \tcode{__cpp_lib_spanstream} 
+\emph{In section [version.syn] add the feature test macro \tcode{__cpp_lib_spanstream} 
 %to Table 19 ([tab:cpp.predefined.ft]) 
-with the corresponding value for the header \tcode{\textless{}spanstream\textgreater}.}
+with the corresponding value for the header \tcode{\textless{}spanstream\textgreater}:}
+\begin{codeblock}
+#define __cpp_lib_spanstream  @\emph{TBD}@ // also in <spanstream>
+\end{codeblock}
 
 \emph{Insert a new section 29.x in chapter 29 [input.output] after section 29.8 [string.streams] and adjust table [tab:iostreams.summary] accordingly.}
 
@@ -364,7 +369,7 @@ namespace std {
 \end{codeblock}
 
 \pnum
-The class
+The class template
 \tcode{basic_spanbuf}
 is derived from
 \tcode{basic_streambuf}
@@ -420,8 +425,8 @@ basic_spanbuf(basic_spanbuf&& rhs);
 \pnum
 \effects 
 %Copy/
-Copy constructs the base class 
-and initializes \tcode{mode} from \tcode{rhs.mode} and \tcode{buf} from \tcode{rhs.buf}.
+Initializes the base class with \tcode{std::move(rhs)}
+and \tcode{mode} with \tcode{std::move(rhs.mode)} and \tcode{buf} with \tcode{std::move(rhs.buf)}.
 %Both \tcode{basic_spanbuf} objects share the same underlying \tcode{span}.
 The sequence pointers in 
 \tcode{*this}
@@ -431,7 +436,7 @@ the values which \tcode{rhs} had.
 %% the following gives the same leeway as other streambufs
 It is 
 \impldef{whether \tcode{rhs.buf.empty()} returns true after the move}
-wether \tcode{rhs.buf.empty()} returns true after the move.
+whether \tcode{rhs.buf.empty()} returns true after the move.
 
 %It
 %is
