@@ -1,4 +1,4 @@
-#include "span.h"
+
 #include "spanstream.h"
 
 #include "cute.h"
@@ -7,9 +7,11 @@
 #include "cute_runner.h"
 
 using namespace std::experimental;
+using std::span;
+
 void thisIsATest() {
-	char input[] = "10 20 30";
-	ispanstream is{span<char>{input}};
+	char const input[] = "10 20 30";
+	ispanstream is{span{input}};
 	int i;
 	is >> i;
 	ASSERT_EQUAL(10,i);

@@ -15,7 +15,7 @@
 
 //#pragma GCC system_header
 
-#include <string>
+#include <string_view>
 
 // should go into iosfwd
 namespace std {
@@ -59,7 +59,7 @@ using wspanstream = basic_spanstream<wchar_t>;
 }
 }
 
-#include "span.h"
+#include <span>
 
 #include <istream>
 #include <ostream>
@@ -96,9 +96,7 @@ public:
 	typedef typename traits_type::off_type off_type;
 
 	typedef basic_streambuf<char_type, traits_type> __streambuf_type;
-	typedef std::experimental::span<char_type> __span_type;
-	template<ptrdiff_t Extent = std::experimental::dynamic_extent>
-	using __span=std::experimental::span<char_type,Extent>;
+	typedef std::/*experimental::*/span<char_type> __span_type;
 	typedef typename __span_type::size_type __size_type;
 
 protected:
@@ -106,7 +104,7 @@ protected:
 	ios_base::openmode _M_mode;
 
 	// Data Members:
-	__span_type _M_string; // always fixed Extent
+	__span_type _M_string; // always dynamic Extent
 
 public:
 	// Constructors:
@@ -118,8 +116,7 @@ public:
 	 *  This constructor initializes the parent class using its
 	 *  own default ctor.
 	 */
-	template<ptrdiff_t Extent>
-	explicit basic_spanbuf(__span <Extent> __str, ios_base::openmode __mode = ios_base::in | ios_base::out) :
+	explicit basic_spanbuf(__span_type __str, ios_base::openmode __mode = ios_base::in | ios_base::out) :
 			__streambuf_type { }, _M_mode { }, _M_string { __str.data(), __str.size() } // TODO: could use templated copy-ctor
 	{
 		_M_spanbuf_init(__mode);
@@ -181,8 +178,7 @@ public:
 	 *  copies @a s to
 	 *  use as a new one.
 	 */
-	template<ptrdiff_t Extent>
-	void span(__span <Extent> __s) {
+	void span(__span_type __s) {
 		_M_string = __span_type{ __s.data(), __s.size() };
 		_M_spanbuf_init(_M_mode);
 	}
@@ -205,6 +201,7 @@ protected:
 		return __ret;
 	}
 
+#if 0 // defaults should be ok
 	virtual int_type underflow() {
 		int_type __ret = traits_type::eof();
 //		bool const __testin = this->_M_mode & ios_base::in;
@@ -262,7 +259,7 @@ protected:
 		this->pbump(1);
 		return __c;
 	}
-
+#endif
 	/**
 	 *  @brief  Manipulates the buffer.
 	 *  @param  __s  Pointer to a buffer area.
@@ -489,9 +486,8 @@ public:
 	// Non-standard types:
 	typedef basic_spanbuf<_CharT, _Traits> __spanbuf_type;
 	typedef basic_istream<char_type, traits_type> __istream_type;
-	typedef std::experimental::span<char_type> __span_type;
-	template<ptrdiff_t Extent = std::experimental::dynamic_extent>
-	using __span=std::experimental::span<char_type,Extent>;
+	typedef std::/*experimental::*/span<char_type> __span_type;
+	using   __cspan=std::/*experimental::*/span<_CharT const>;
 	typedef typename __span_type::size_type __size_type;
 
 private:
@@ -512,11 +508,12 @@ public:
 	 *  That's a lie.  We initialize the base class with NULL, because the
 	 *  span class does its own memory management.
 	 */
-	template<ptrdiff_t Extent>
-	explicit basic_ispanstream(__span <Extent> __str, ios_base::openmode __mode = ios_base::in) :
+	explicit basic_ispanstream(__span_type  __str, ios_base::openmode __mode = ios_base::in) :
 			__istream_type { }, _M_stringbuf { __str, __mode | ios_base::in } {
 		this->init(&_M_stringbuf);
 	}
+    explicit basic_ispanstream(__cspan  __str) :
+    		basic_ispanstream(__span_type{const_cast<char_type *>(__str.data()),__str.size()}){}
 
 	/**
 	 *  @brief  The destructor does nothing.
@@ -566,20 +563,24 @@ public:
 	 *  @brief  Access the underlying buffer.
 	 *  @return  @c rdbuf()->span()
 	 */
-	__span_type
+	__cspan
 	span() const
-	{	return _M_stringbuf.span();}
+	{	return  _M_stringbuf.span(); }
 	/**
 	 *  @brief  Setting a new buffer.
 	 *  @param  __s  The span to use as a new sequence.
 	 *
 	 *  Calls @c rdbuf()->span(s).
 	 */
-	template<ptrdiff_t Extent>
 	void
-	span(__span<Extent> __s)
+	span(__span_type __s)
 	{
 		_M_stringbuf.span(__s);
+	}
+	void
+	span(__cspan __s)
+	{
+		_M_stringbuf.span(__span_type{const_cast<char_type *>(__s.data()),__s.size()});
 	}
 };
 
@@ -610,9 +611,7 @@ public:
 	// Non-standard types:
 	typedef basic_spanbuf<_CharT, _Traits> __spanbuf_type;
 	typedef basic_ostream<char_type, traits_type> __ostream_type;
-	typedef std::experimental::span<char_type> __span_type;
-	template<ptrdiff_t Extent = std::experimental::dynamic_extent>
-	using __span=std::experimental::span<char_type,Extent>;
+	typedef std::/*experimental::*/span<char_type> __span_type;
 	typedef typename __span_type::size_type __size_type;
 
 private:
@@ -633,8 +632,7 @@ public:
 	 *  That's a lie.  We initialize the base class with NULL, because the
 	 *  span class does its own memory management.
 	 */
-	template<ptrdiff_t Extent>
-	explicit basic_ospanstream(__span <Extent> __str, ios_base::openmode __mode = ios_base::out) :
+	explicit basic_ospanstream(__span_type __str, ios_base::openmode __mode = ios_base::out) :
 			__ostream_type { }, _M_stringbuf { __str, __mode | ios_base::out } {
 		this->init(&_M_stringbuf);
 	}
@@ -694,9 +692,8 @@ public:
 	 *
 	 *  Calls @c rdbuf()->span(s).
 	 */
-	template<ptrdiff_t Extent>
 	void
-	span(__span<Extent> __s)
+	span(__span_type __s)
 	{
 		_M_stringbuf.span(__s);
 	}
@@ -732,9 +729,7 @@ public:
 	// Non-standard Types:
 	typedef basic_spanbuf<_CharT, _Traits> __stringbuf_type;
 	typedef basic_iostream<char_type, traits_type> __iostream_type;
-	typedef std::experimental::span<char_type> __span_type;
-	template<ptrdiff_t Extent = std::experimental::dynamic_extent>
-	using __span=std::experimental::span<char_type,Extent>;
+	typedef std::/*experimental::*/span<char_type> __span_type;
 	typedef typename __span_type::size_type __size_type;
 
 private:
@@ -752,8 +747,7 @@ public:
 	 *  to the base class initializer.
 	 *
 	 */
-	template<ptrdiff_t Extent>
-	explicit basic_spanstream(__span <Extent> __str, ios_base::openmode __m = ios_base::out | ios_base::in) :
+	explicit basic_spanstream(__span_type __str, ios_base::openmode __m = ios_base::out | ios_base::in) :
 			__iostream_type { }, _M_stringbuf { __str, __m } {
 		this->init(&_M_stringbuf);
 	}
@@ -814,9 +808,8 @@ public:
 	 *
 	 *  Calls @c rdbuf()->span(s).
 	 */
-	template<ptrdiff_t Extent>
 	void
-	span(__span<Extent> __s)
+	span(__span_type __s)
 	{
 		_M_stringbuf.span(__s);
 	}
