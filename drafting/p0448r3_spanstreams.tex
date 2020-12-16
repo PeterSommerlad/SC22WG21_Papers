@@ -1,32 +1,30 @@
+%\documentclass[a4paper,10pt,oneside,openany,final]{memoir}
 \documentclass[ebook,11pt,article]{memoir}
-\usepackage{geometry}  % See geometry.pdf to learn the layout options. There are lots.
-\geometry{a4paper}  % ... or a4paper or a5paper or ... 
-%\geometry{landscape}  % Activate for for rotated page geometry
-%%% from std.tex
-%\usepackage[american]
-%           {babel}        % needed for iso dates
-%\usepackage[iso,american]
-%           {isodate}      % use iso format for dates
+\usepackage[american]
+           {babel}        % needed for iso dates
+\usepackage[iso,american]
+           {isodate}      % use iso format for dates
 \usepackage[final]
            {listings}     % code listings
 \usepackage{longtable}    % auto-breaking tables
 \usepackage{ltcaption}    % fix captions for long tables
 \usepackage{relsize}      % provide relative font size changes
-%\usepackage{textcomp}     % provide \text{l,r}angle
+\usepackage{textcomp}     % provide \text{l,r}angle
 \usepackage{underscore}   % remove special status of '_' in ordinary text
-%\usepackage{parskip}      % handle non-indented paragraphs "properly"
-%\usepackage{array}        % new column definitions for tables
+\usepackage{parskip}      % handle non-indented paragraphs "properly"
+\usepackage{array}        % new column definitions for tables
 \usepackage[normalem]{ulem}
 \usepackage{enumitem}
 \usepackage{color}        % define colors for strikeouts and underlines
-%\usepackage{amsmath}      % additional math symbols
-%\usepackage{mathrsfs}     % mathscr font
+\usepackage{amsmath}      % additional math symbols
+\usepackage{mathrsfs}     % mathscr font
 \usepackage[final]{microtype}
-%\usepackage{multicol}
-\usepackage{xspace}
-%\usepackage{lmodern}
+\usepackage[splitindex,original]{imakeidx}
+\usepackage{multicol}
+%\usepackage{xspace}
+\usepackage{lmodern}
 \usepackage[T1]{fontenc} % makes tilde work! and is better for umlauts etc.
-%\usepackage[pdftex, final]{graphicx}
+\usepackage[pdftex, final]{graphicx}
 \usepackage[pdftex,
 %            pdftitle={C++ International Standard},
 %            pdfsubject={C++ International Standard},
@@ -41,9 +39,16 @@
             linkcolor=blue,
             plainpages=false
            ]{hyperref}
-%\usepackage{memhfixc}     % fix interactions between hyperref and memoir
-%\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnftab,simplebnf,bnf,bnfkeywordtab}]{extract} % Grammar extraction
-%
+\usepackage{memhfixc}     % fix interactions between hyperref and memoir
+\usepackage[active,header=false,handles=false,copydocumentclass=false,generate=std-gram.ext,extract-cmdline={gramSec},extract-env={bnf,simplebnf}]{extract} % Grammar extraction
+\usepackage{expl3}
+\usepackage{xparse}
+
+\pdfminorversion=5
+\pdfcompresslevel=9
+\pdfobjcompresslevel=2
+
+
 \renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
 
 
@@ -59,12 +64,13 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{d0448r3}
-\newcommand{\paperdate}{2020-12-07}
+\newcommand{\paperdate}{2020-12-16}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
 \title{\papernumber{} - A strstream replacement using span\textless{}charT\textgreater{} as buffer}
-\author{Peter Sommerlad}
+\author{Peter Sommerlad 
+( peter.cpp@sommerlad.ch )}
 \date{\paperdate}                % Activate to display a given date or no date
 \setsecnumdepth{subsection}
 
@@ -91,10 +97,13 @@ Based on the review of p0408 in Cologne 2019, some adjustments were made here ac
 \item update editorial advise to include header and feature test macro, as well as the section number to 29.
 \item made wording adjustments like suggested for p0408 in Cologne 2019 by LWG in the hope to make reviewing it faster.
 \item removed mentioning a template parameter Extent in all uses of span.
-\item tried to fix the adopted wording (from \tcode{basic_stringbuf}) wrt seekoff by removing tables in favor of words.
+\item fix the adopted wording (from \tcode{basic_stringbuf}) wrt seekoff by removing tables in favor of words.
 \item removed impossible to achieve \tcode{noexcept} from move and swap operations.
 \item some more email and review feedback from LWG telecon (spelling, spacing, etc).
 \item rephrased constructor wording to read more modern (Initializes vs constructs).
+\item added author email.
+\item fixed uses of correct macros to guarantee "Preconditions" and "Postconditions" wording vs. requires/ensures.
+\item added potential future change (not in the wording part) to provide \tcode{ispanstream} for \tcode{charT const*} arguments (this should be put in, before the next release, it is a kind of design bug fix.).
 \end{itemize}
 
 
@@ -110,8 +119,7 @@ The synopsis shows these classes in std::experimental, while the class descripti
 \item  
 The synopsis should probably \#include <span> and <string>, since that's where span and char_traits come from.
 \textit{yes to <span> not to <string> since the base class basic_streambuf already has a dependency to char_traits, so no gain from mentioning <string>, but including <streambuf> might be shown. Fixed. However, I found no precedence to such include directives for stream classes in n4791 (may be a more modern style of specification introduced with C++11. I guess mentioning a required identifier encourages implementors to make its definition available. }
-\item 
-Why a separate <spanstream> header? why not just put it in one of the existing ones? 
+\item Why a separate \tcode{<spanstream>} header? why not just put it in one of the existing ones? 
        (we're adding headers at a surprising - to me - rate)
 \textit{First, because strstreams are also in their separate header. Second, LEWG blessed/asked for it.
 Third, the base class already has the dependency to char_traits.}
@@ -169,7 +177,7 @@ This paper proposes a class template \tcode{basic_spanbuf} and the corresponding
 \item Thanks go to Jonathan Wakely who pointed the problem of \tcode{strstream} out to me and to Neil Macintosh to provide the span library type specification.
 \item Thanks to Felix Morgner for proofreading.
 \item Thanks to Kona LEWG small group discussion suggesting some clarifications and Thomas K\"oppe for allowing me to use using type aliases instead of \tcode{typedef}.
-\item Thanks to remote LWG meeting December 2020 and surrounding email feedback by Jeff Garland, Tim Song, Jens Maurer, Volle Voutilainen
+\item Thanks to remote LWG meeting December 2020 and surrounding email feedback by Jeff Garland, Tim Song, Jens Maurer, Volle Voutilainen. Special thanks to Tim for pointing out the \tcode{const charT*} potential for \tcode{basic_ispanstream}.
 \end{itemize}
 
 \chapter{Motivation}
@@ -228,7 +236,100 @@ As with all existing stream classes, using a stream object or a streambuf object
 \item \added{LEWG(Kona2019): Forward to LWG for C++20!}
 \end{itemize}
 
+\section{Future Directions (after p0448 is accepted for the WP: support \tcode{span<const charT>}}
 
+During the finalizing review sessions Tim Song recognized a missing feature that \tcode{istrstream} supports, namely the use of the stream with a read-only input sequence (\tcode{char const*} in the case of \tcode{istrstream}). Some thinking it turned out that with a few additions an one change to class template \tcode{basic_ispanstream} this could be achieved, because an input only \tcode{basic_spanbuf} will never attempt to modify its underlying character sequence, because \tcode{pbackfail()} is not overridden.
+
+The following changes will be proposed by a follow-up paper:
+
+\emph{Change the synopsis of [ispanstream] as follows:}
+\begin{codeblock}
+namespace std {
+  template <class charT, class traits = char_traits<charT>>
+  class basic_ispanstream
+    : public basic_istream<charT, traits> {
+  public:
+    using char_type      = charT;
+    using int_type       = typename traits::int_type;
+    using pos_type       = typename traits::pos_type;
+    using off_type       = typename traits::off_type;
+    using traits_type    = traits;
+
+    // \iref{ispanstream.cons}, constructors
+    explicit basic_ispanstream(
+      std::span<charT> s,
+      ios_base::openmode which = ios_base::in);\end{codeblock}\begin{addedblock}\begin{codeblock}  
+    explicit basic_ispanstream(std::span<const charT> s)}
+      :basic_ispanstream(
+         std::span<charT>(const_cast<charT*>s.data(),s.size()){}\end{codeblock}\end{addedblock}\begin{codeblock}         
+    basic_ispanstream(const basic_ispanstream&) = delete;
+    basic_ispanstream(basic_ispanstream&& rhs);
+
+    // \iref{ispanstream.swap}, assign and swap
+    basic_ispanstream& operator=(const basic_ispanstream&) = delete;
+    basic_ispanstream& operator=(basic_ispanstream&& rhs);
+    void swap(basic_ispanstream& rhs);
+
+    // \iref{ispanstream.members}, members
+    basic_spanbuf<charT, traits>* rdbuf() const noexcept;
+
+    std::span<@\added{const }@charT> span() const noexcept;
+    void span(std::span<charT> s) noexcept;\end{codeblock}\begin{addedblock}\begin{codeblock}
+    void span(std::span<const charT> s) noexcept { 
+       this->span(std::span<charT>(const_cast<charT*>s.data(),s.size())); 
+    }\end{codeblock}\end{addedblock}\begin{codeblock}
+  private:
+    basic_spanbuf<charT, traits> sb; // \expos
+  };
+
+  template <class charT, class traits>
+    void swap(basic_ispanstream<charT, traits>& x,
+              basic_ispanstream<charT, traits>& y);
+}
+\end{codeblock}
+
+\emph{Change [ispanstream.members] as follows}
+%\rSec3[ispanstream.members]{Member functions}
+\subsection{29.x.3.3 Member functions [ispanstream.members]}
+\label{ispanstream.members}
+
+%\indexlibrarymember{rdbuf}{basic_ispanstream}%
+\begin{itemdecl}
+basic_spanbuf<charT, traits>* rdbuf() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Equivalent to:\\
+\tcode{return const_cast<basic_spanbuf<charT, traits>*>(addressof(sb));}
+\end{itemdescr}
+
+%\indexlibrarymember{str}{basic_ispanstream}%
+\begin{itemdecl}
+std::span<@\added{const }@charT> span() const noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects Equivalent to:\\
+\tcode{return rdbuf()->span();}
+\end{itemdescr}
+
+%\indexlibrarymember{str}{basic_ispanstream}%
+\begin{itemdecl}
+void span(std::span<charT> s) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\effects
+Equivalent to:
+\tcode{rdbuf()->span(s)}.
+\end{itemdescr}
+
+
+\textbf{\emph{It is to be discussed in LEWG if such a change should also incorporate creating an \tcode{basic_ispanstream} from a \tcode{basic_string_view}.}
+}
 \chapter{Technical Specifications}
 
 \emph{Introduce a new header \tcode{\textless{}spanstream\textgreater} in subclause ([headers]): Table 19 ([tab:headers.cpp]).}
@@ -277,10 +378,12 @@ namespace std {
 \pnum
 This section introduces a stream interface for user-provided fixed-size buffers. 
 \subsection{29.x.1 Overview [span.streams.overview]}
-The header \tcode{<spanstream>} defines class templates and types that associate stream buffers with objects of class template \tcode{span} as described in [views.span]. 
+
+\pnum
+The header \tcode{<spanstream>} defines class templates and types that associate stream buffers with objects whose types are specializations of \tcode{span} as described in [views.span]. 
 
 \begin{note}
-A user of theses classes is responsible that the character sequence represented by the given \tcode{span} outlives the use of the sequence by objects of the classes in this chapter. Using multiple \tcode{basic_spanbuf} objects referring to overlapping underlying sequences from different threads, where at least one \tcode{basic_spanbuf} object is used for writing to the sequence, results in a data race.
+A user of theses classes is responsible for ensuring that the character sequence represented by the given \tcode{span} outlives the use of the sequence by objects of the classes in this subclause. Using multiple \tcode{basic_spanbuf} objects referring to overlapping underlying sequences from different threads, where at least one \tcode{basic_spanbuf} object is used for writing to the sequence, results in a data race.
 \end{note}
 
 \subsection{Header \tcode{<spanstream>} synopsis [span.streams.syn]}
@@ -633,7 +736,7 @@ operation fails. Otherwise, the function determines \tcode{baseoff} as a value o
       \tcode{(gptr() - eback())} for the input sequence when \tcode{way} is \tcode{ios_base::cur};
 \item when \tcode{way} is \tcode{ios_base::end} :  
 \begin{itemize}
-\item \tcode{(pptr() - pbase())} if \tcode{mode} is \tcode{ios_base::out}, 
+\item \tcode{(pptr() - pbase())} if \tcode{ios_base::out} is set in \tcode{mode} and \tcode{ios_base::in} is not set in \tcode{mode}, 
 \item \tcode{buf.size()} otherwise.
 \end{itemize}
 \end{itemize}
@@ -697,7 +800,8 @@ basic_streambuf<charT, traits>* setbuf(charT* s, streamsize n);
 \begin{itemdescr}
 \pnum
 \effects
-\tcode{this->span(std::span<charT>(s, n));}
+Equivalent to:
+\tcode{this->span(std::span<charT>(s, n))}.
 
 \pnum
 \returns
@@ -727,7 +831,7 @@ namespace std {
     basic_ispanstream(const basic_ispanstream&) = delete;
     basic_ispanstream(basic_ispanstream&& rhs);
 
-    // \iref{ispanstream.assign}, assign and swap
+    // \iref{ispanstream.swap}, assign and swap
     basic_ispanstream& operator=(const basic_ispanstream&) = delete;
     basic_ispanstream& operator=(basic_ispanstream&& rhs);
     void swap(basic_ispanstream& rhs);
@@ -797,7 +901,7 @@ install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
 %\rSec3[ispanstream.assign]{Assign and swap}
-\subsection{29.x.3.2 Assign and swap [ispanstream.assign]}
+\subsection{29.x.3.2 Swap [ispanstream.swap]}
 \label{ispanstream.assign}
 
 %%\indexlibrarymember{operator=}{basic_ispanstream}%
@@ -909,7 +1013,7 @@ namespace std {
     basic_ospanstream(const basic_ospanstream&) = delete;
     basic_ospanstream(basic_ospanstream&& rhs);
 
-    // \iref{ospanstream.assign}, assign and swap
+    // \iref{ospanstream.swap}, assign and swap
     basic_ospanstream& operator=(const basic_ospanstream&) = delete;
     basic_ospanstream& operator=(basic_ospanstream&& rhs);
     void swap(basic_ospanstream& rhs);
@@ -979,8 +1083,8 @@ install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
 %\rSec3[ospanstream.assign]{Assign and swap}
-\subsection{29.x.4.2 Assign and swap [ospanstream.assign]}
-\label{ospanstream.assign}
+\subsection{29.x.4.2 Swap [ospanstream.swap]}
+\label{ospanstream.swap}
 
 %%\indexlibrarymember{operator=}{basic_ospanstream}%
 %\begin{itemdecl}
@@ -1085,7 +1189,7 @@ namespace std {
     basic_spanstream(const basic_spanstream&) = delete;
     basic_spanstream(basic_spanstream&& rhs);
 
-    // \iref{spanstream.assign}, assign and swap
+    // \iref{spanstream.swap}, assign and swap
     basic_spanstream& operator=(const basic_spanstream&) = delete;
     basic_spanstream& operator=(basic_spanstream&& rhs);
     void swap(basic_spanstream& rhs);
@@ -1155,8 +1259,8 @@ install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
 
 %\rSec3[spanstream.assign]{Assign and swap}
-\subsection{29.x.5.2 Assign and swap [spanstream.assign]}
-\label{spanstream.assign}
+\subsection{29.x.5.2 Swap [spanstream.swap]}
+\label{spanstream.swap}
 
 %%\indexlibrarymember{operator=}{basic_spanstream}%
 %\begin{itemdecl}

@@ -210,8 +210,8 @@
 \newcommand{\CppXI}{\Cpp{} 2011}
 \newcommand{\CppXIV}{\Cpp{} 2014}
 \newcommand{\CppXVII}{\Cpp{} 2017}
-\newcommand{\opt}[1]{#1\ensuremath{_\mathit{opt}}}
-\newcommand{\dcr}{-{-}}
+\newcommand{\CppXX}{\Cpp{} 2020}
+\newcommand{\opt}[1]{#1\ensuremath{_\mathit{\color{black}opt}}}
 \newcommand{\bigoh}[1]{\ensuremath{\mathscr{O}(#1)}}
 
 % Make all tildes a little larger to avoid visual similarity with hyphens.
@@ -237,14 +237,14 @@
 
 %% Library function descriptions
 \newcommand{\Fundescx}[1]{\textit{#1}}
-\newcommand{\Fundesc}[1]{\Fundescx{#1:}\space}
+\newcommand{\Fundesc}[1]{\Fundescx{#1}:\space}
+\newcommand{\recommended}{\Fundesc{Recommended practice}}
 \newcommand{\required}{\Fundesc{Required behavior}}
-\newcommand{\requires}{\Fundesc{Requires}}
 \newcommand{\constraints}{\Fundesc{Constraints}}
 \newcommand{\mandates}{\Fundesc{Mandates}}
-\newcommand{\expects}{\Fundesc{Expects}}
+\newcommand{\expects}{\Fundesc{Preconditions}}
 \newcommand{\effects}{\Fundesc{Effects}}
-\newcommand{\ensures}{\Fundesc{Ensures}}
+\newcommand{\ensures}{\Fundesc{Postconditions}}
 \newcommand{\postconditions}{\ensures}
 \newcommand{\returns}{\Fundesc{Returns}}
 \newcommand{\throws}{\Fundesc{Throws}}
@@ -323,10 +323,25 @@
 \newcommand{\commentellip}{\tcode{/* ...\ */}}
 
 %% Concepts
-\newcommand{\oldconcept}[1]{\textit{Cpp17#1}}
-\newcommand{\oldconceptdefn}[1]{\defn{Cpp17#1}}
-\newcommand{\idxoldconcept}[1]{Cpp17#1@\textit{Cpp17#1}}
-\newcommand{\libconcept}[1]{\tcode{#1}}
+\newcommand{\oldconceptname}[1]{Cpp17#1}
+\newcommand{\oldconcept}[1]{\textit{\oldconceptname{#1}}}
+\newcommand{\defnoldconcept}[1]{\indexdefn{\idxoldconcept{#1}}\oldconcept{#1}}
+\newcommand{\idxoldconcept}[1]{\oldconceptname{#1}@\oldconcept{#1}}
+% FIXME: A "new" oldconcept (added after C++17),
+% which doesn't get a Cpp17 prefix.
+\newcommand{\newoldconcept}[1]{\textit{#1}}
+\newcommand{\defnnewoldconcept}[1]{\indexdefn{\idxnewoldconcept{#1}}\newoldconcept{#1}}
+\newcommand{\idxnewoldconcept}[1]{#1@\newoldconcept{#1}}
+
+\newcommand{\cname}[1]{\tcode{#1}}
+\newcommand{\ecname}[1]{\tcode{\placeholder{#1}}}
+\newcommand{\libconceptx}[2]{\cname{#1}\indexconcept{\idxconcept{#2}}}
+\newcommand{\libconcept}[1]{\libconceptx{#1}{#1}}
+\newcommand{\deflibconcept}[1]{\cname{#1}\indexlibrary{\idxconcept{#1}}\indexconcept{\idxconcept{#1}|idxbfpage}}
+\newcommand{\exposconcept}[1]{\ecname{#1}\indexconcept{\idxexposconcept{#1}}}
+\newcommand{\exposconceptx}[2]{\ecname{#1}\indexconcept{\idxexposconcept{#2}}}
+\newcommand{\exposconceptnc}[1]{\indexconcept{\idxexposconcept{#1}}\ecname{#1\nocorr}}
+\newcommand{\defexposconcept}[1]{\ecname{#1}\indexconcept{\idxexposconcept{#1}|idxbfpage}}
 
 %% Ranges
 \newcommand{\Range}[4]{\tcode{#1#3,\penalty2000{} #4#2}}
@@ -422,7 +437,8 @@
  aboveskip=2ex,
  belowskip=0ex	% leave this alone: it keeps these things out of the
 				% footnote area
- }
+ }%
+ \renewcommand{\tcode}[1]{\textup{\CodeStylex{##1}}}
 }
 {
 }
