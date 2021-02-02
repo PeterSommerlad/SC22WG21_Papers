@@ -122,7 +122,13 @@ public:
 		_M_spanbuf_init(__mode);
 	}
 
-	basic_spanbuf(basic_spanbuf const &) =delete;
+	basic_spanbuf(basic_spanbuf const &__rhs)
+	:__streambuf_type{}
+	, _M_mode{__rhs._M_mode}
+	,_M_string{__rhs._M_string}{
+		_M_spanbuf_init(_M_mode);
+	}
+
 
 	// TODO: could move-enable the spanbuf but it is dangerous, because of the 
 	// non-managed memory area.
@@ -273,7 +279,7 @@ protected:
 	{
 		if (__s && __n >= 0)
 		{
-			this->span( __span_type{__s,__n});
+			this->span( __span_type{__s,static_cast<__span_type::size_type>(__n)});
 		}
 		return this;
 	}
@@ -512,8 +518,15 @@ public:
 			__istream_type { }, _M_stringbuf { __str, __mode | ios_base::in } {
 		this->init(&_M_stringbuf);
 	}
-    explicit basic_ispanstream(__cspan  __str) :
-    		basic_ispanstream(__span_type{const_cast<char_type *>(__str.data()),__str.size()}){}
+			template<std::ranges::borrowed_range R>
+			requires (not std::convertible_to<R, std::span<_CharT>>) &&
+			std::convertible_to<R, __cspan>
+			explicit basic_ispanstream(R&& __rr):
+			basic_ispanstream(__span_type{const_cast<char_type *>(std::data(__rr)),std::size(__rr)}){}
+//			basic_ispanstream(__span_type{const_cast<char_type *>(__rr.data()),__rr.size()}){}
+
+//    explicit basic_ispanstream(__cspan  __str) :
+//    		basic_ispanstream(__span_type{const_cast<char_type *>(__str.data()),__str.size()}){}
 
 	/**
 	 *  @brief  The destructor does nothing.
@@ -577,10 +590,12 @@ public:
 	{
 		_M_stringbuf.span(__s);
 	}
+	template<std::ranges::borrowed_range ROS>
+	requires (not std::convertible_to<ROS, std::span<_CharT>>) &&	std::convertible_to<ROS, __cspan>
 	void
-	span(__cspan __s)
+	span(ROS&& __s)
 	{
-		_M_stringbuf.span(__span_type{const_cast<char_type *>(__s.data()),__s.size()});
+		_M_stringbuf.span(__span_type{const_cast<char_type *>(ranges::data(__s)),ranges::size(__s)});
 	}
 };
 

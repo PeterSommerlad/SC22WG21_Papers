@@ -48,7 +48,7 @@
 \pdfcompresslevel=9
 \pdfobjcompresslevel=2
 
-
+ 
 \renewcommand\RSsmallest{5.5pt}  % smallest font size for relsize
 
 
@@ -240,7 +240,11 @@ As with all existing stream classes, using a stream object or a streambuf object
 
 During the finalizing review sessions Tim Song recognized a missing feature that \tcode{istrstream} supports, namely the use of the stream with a read-only input sequence (\tcode{char const*} in the case of \tcode{istrstream}). Some thinking it turned out that with a few additions an one change to class template \tcode{basic_ispanstream} this could be achieved, because an input only \tcode{basic_spanbuf} will never attempt to modify its underlying character sequence, because \tcode{pbackfail()} is not overridden.
 
-The following changes will be proposed by a follow-up paper:
+With Tim Song's help the following extra constructor from a read-only \tcode{span<charT const>} was provided.
+
+\emph{LWG question: should the requirement go as code or as text?}
+
+The following changes will be proposed either by a follow-up paper of if LEWG gives immediate blessing:
 
 \emph{Change the synopsis of [ispanstream] as follows:}
 \begin{codeblock}
@@ -258,10 +262,13 @@ namespace std {
     // \iref{ispanstream.cons}, constructors
     explicit basic_ispanstream(
       std::span<charT> s,
-      ios_base::openmode which = ios_base::in);\end{codeblock}\begin{addedblock}\begin{codeblock}  
-    explicit basic_ispanstream(std::span<const charT> s)}
+      ios_base::openmode which = ios_base::in);\end{codeblock}\begin{addedblock}\begin{codeblock} 
+    template <ranges::borrowed_range ROS>
+    requires (not convertible_to<ROS, std::span<charT>>) &&
+             convertible_to<ROS, std::span<charT const>>   
+    explicit basic_ispanstream(ROS&& s)}
       :basic_ispanstream(
-         std::span<charT>(const_cast<charT*>s.data(),s.size()){}\end{codeblock}\end{addedblock}\begin{codeblock}         
+         std::span<charT>(const_cast<charT*>(data(s)),size(s)){}\end{codeblock}\end{addedblock}\begin{codeblock}         
     basic_ispanstream(const basic_ispanstream&) = delete;
     basic_ispanstream(basic_ispanstream&& rhs);
 
@@ -275,8 +282,11 @@ namespace std {
 
     std::span<@\added{const }@charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;\end{codeblock}\begin{addedblock}\begin{codeblock}
-    void span(std::span<const charT> s) noexcept { 
-       this->span(std::span<charT>(const_cast<charT*>s.data(),s.size())); 
+    template <ranges::borrowed_range ROS>
+    requires (not convertible_to<ROS, std::span<charT>>) &&
+             convertible_to<ROS, std::span<charT const>>   
+    void span(ROS&& s) noexcept { 
+       this->span(std::span<charT>(const_cast<charT*>(data(s)),size(s))); 
     }\end{codeblock}\end{addedblock}\begin{codeblock}
   private:
     basic_spanbuf<charT, traits> sb; // \expos
@@ -328,8 +338,6 @@ Equivalent to:
 \end{itemdescr}
 
 
-\textbf{\emph{It is to be discussed in LEWG if such a change should also incorporate creating an \tcode{basic_ispanstream} from a \tcode{basic_string_view}.}
-}
 \chapter{Technical Specifications}
 
 \emph{Introduce a new header \tcode{\textless{}spanstream\textgreater} in subclause ([headers]): Table 19 ([tab:headers.cpp]).}

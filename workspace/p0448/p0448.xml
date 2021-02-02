@@ -1,7 +1,13 @@
 <testsuites>
-	<testsuite name="AllTests" tests="3">
+	<testsuite name="AllTests" tests="9">
 		<testcase classname="AllTests" name="thisIsATest"/>
 		<testcase classname="AllTests" name="testOspanstreamOutputToCharArray"/>
 		<testcase classname="AllTests" name="testOspanstreamWithShortOutput"/>
+		<testcase classname="AllTests" name="testIspanstreamFromStringview"/>
+		<testcase classname="AllTests" name="testIspanStreamFromVector"/>
+		<testcase classname="AllTests" name="testIspanStreamFromConstString"/>
+		<testcase classname="AllTests" name="testSpanstreambufCopy"/>
+		<testcase classname="AllTests" name="testISpanStreamFromTemporaries"/>
+		<testcase classname="AllTests" name="testIspanStreamSpanRebind"/>
 	</testsuite>
 </testsuites>
