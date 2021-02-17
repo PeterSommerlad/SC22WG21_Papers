@@ -63,8 +63,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{d0448r3}
-\newcommand{\paperdate}{2020-12-16}
+\newcommand{\papernumber}{p0448r3}
+\newcommand{\paperdate}{2021-02-16}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -242,9 +242,12 @@ During the finalizing review sessions Tim Song recognized a missing feature that
 
 With Tim Song's help the following extra constructor from a read-only \tcode{span<charT const>} was provided.
 
-\emph{LWG question: should the requirement go as code or as text?}
 
-The following changes will be proposed either by a follow-up paper of if LEWG gives immediate blessing:
+\removed{The following changes will be proposed either by a follow-up paper of if LEWG gives immediate blessing }
+\emph{At the LEWG zoom 20210216 the change was supported unanimously. The changes marked below are applied to section 7 of this paper revision. The change delta is kept here for LWG's convenience to see what needs to be re-reviewed.}:
+
+\emph{LWG question: should the requirement go as code or as text?} Mailing list reply was to put it as text, so the changes to section 7 reflect that and the changes marked below show it.
+
 
 \emph{Change the synopsis of [ispanstream] as follows:}
 \begin{codeblock}
@@ -264,11 +267,8 @@ namespace std {
       std::span<charT> s,
       ios_base::openmode which = ios_base::in);\end{codeblock}\begin{addedblock}\begin{codeblock} 
     template <ranges::borrowed_range ROS>
-    requires (not convertible_to<ROS, std::span<charT>>) &&
-             convertible_to<ROS, std::span<charT const>>   
-    explicit basic_ispanstream(ROS&& s)}
-      :basic_ispanstream(
-         std::span<charT>(const_cast<charT*>(data(s)),size(s)){}\end{codeblock}\end{addedblock}\begin{codeblock}         
+    explicit basic_ispanstream(ROS&& s);
+\end{codeblock}\end{addedblock}\begin{codeblock}         
     basic_ispanstream(const basic_ispanstream&) = delete;
     basic_ispanstream(basic_ispanstream&& rhs);
 
@@ -283,11 +283,8 @@ namespace std {
     std::span<@\added{const }@charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;\end{codeblock}\begin{addedblock}\begin{codeblock}
     template <ranges::borrowed_range ROS>
-    requires (not convertible_to<ROS, std::span<charT>>) &&
-             convertible_to<ROS, std::span<charT const>>   
-    void span(ROS&& s) noexcept { 
-       this->span(std::span<charT>(const_cast<charT*>(data(s)),size(s))); 
-    }\end{codeblock}\end{addedblock}\begin{codeblock}
+    void span(ROS&& s) noexcept ;
+    \end{codeblock}\end{addedblock}\begin{codeblock}
   private:
     basic_spanbuf<charT, traits> sb; // \expos
   };
@@ -297,6 +294,33 @@ namespace std {
               basic_ispanstream<charT, traits>& y);
 }
 \end{codeblock}
+\begin{addedblock}
+\begin{note}
+Constructing an \tcode{ispanstream} from a \fakegrammarterm{string-literal} will include the termination character \tcode{'\textbackslash{}0'} in the underlying \tcode{spanbuf}.
+\end{note}
+\end{addedblock}
+
+\emph{Add to [ispanstream.cons] the following}
+
+\begin{addedblock}
+\begin{itemdecl}
+template <ranges::borrowed_range ROS>
+explicit basic_ispanstream(ROS&& s)
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\constraints
+\tcode{(not convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
+
+\pnum
+\effects
+Equivalent to:\\
+\tcode{basic_ispanstream(std::span(const_cast<charT*>(data(s)),size(s))}.
+\end{itemdescr}
+\end{addedblock}
+
+
 
 \emph{Change [ispanstream.members] as follows}
 %\rSec3[ispanstream.members]{Member functions}
@@ -337,6 +361,24 @@ Equivalent to:
 \tcode{rdbuf()->span(s)}.
 \end{itemdescr}
 
+\begin{addedblock}
+\begin{itemdecl}
+template <ranges::borrowed_range ROS>
+void span(ROS&& s) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\constraints
+\tcode{(not convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
+ 
+\pnum
+\effects
+Equivalent to: \\
+\tcode{this->span(std::span(const_cast<charT*>(data(s)),size(s)))}.
+\end{itemdescr}
+
+\end{addedblock}
 
 \chapter{Technical Specifications}
 
@@ -838,6 +880,8 @@ namespace std {
       ios_base::openmode which = ios_base::in);
     basic_ispanstream(const basic_ispanstream&) = delete;
     basic_ispanstream(basic_ispanstream&& rhs);
+    template <ranges::borrowed_range ROS>
+    explicit basic_ispanstream(ROS&& s);
 
     // \iref{ispanstream.swap}, assign and swap
     basic_ispanstream& operator=(const basic_ispanstream&) = delete;
@@ -847,8 +891,11 @@ namespace std {
     // \iref{ispanstream.members}, members
     basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 
-    std::span<charT> span() const noexcept;
+    std::span<const charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;
+    template <ranges::borrowed_range ROS>
+    void span(ROS&& s) noexcept;
+    
   private:
     basic_spanbuf<charT, traits> sb; // \expos
   };
@@ -858,6 +905,29 @@ namespace std {
               basic_ispanstream<charT, traits>& y);
 }
 \end{codeblock}
+
+%%% LWG wants non textual spec
+
+%    template <ranges::borrowed_range ROS>
+%    requires (not convertible_to<ROS, std::span<charT>>) &&
+%             convertible_to<ROS, std::span<charT const>>   
+%    explicit basic_ispanstream(ROS&& s)
+%      :basic_ispanstream(
+%         std::span<charT>(const_cast<charT*>(data(s)),size(s)){}         
+%    template <ranges::borrowed_range ROS>
+%    requires (not convertible_to<ROS, std::span<charT>>) &&
+%             convertible_to<ROS, std::span<charT const>>   
+%    void span(ROS&& s) noexcept { 
+%       this->span(std::span<charT>(const_cast<charT*>(data(s)),size(s))); 
+%    }
+
+
+
+
+\pnum
+\begin{note}
+Constructing an \tcode{ispanstream} from a \fakegrammarterm{string-literal} will include the termination character \tcode{'\textbackslash{}0'} in the underlying \tcode{spanbuf}.
+\end{note}
 
 %\pnum
 %The class
@@ -907,6 +977,25 @@ and \tcode{sb} with \tcode{std::move(rhs.sb)}.
 Next, \tcode{basic_istream<charT, traits>::set_rdbuf(addressof(sb))} is called to
 install the contained \tcode{basic_spanbuf}.
 \end{itemdescr}
+
+%%%% LWG wants textual spec:
+
+\begin{itemdecl}
+template <ranges::borrowed_range ROS>
+explicit basic_ispanstream(ROS&& s)
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\constraints
+\tcode{(not convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
+
+\pnum
+\effects
+Equivalent to:\\
+\tcode{basic_ispanstream(std::span(const_cast<charT*>(data(s)),size(s))}.
+\end{itemdescr}
+
 
 %\rSec3[ispanstream.assign]{Assign and swap}
 \subsection{29.x.3.2 Swap [ispanstream.swap]}
@@ -977,7 +1066,7 @@ basic_spanbuf<charT, traits>* rdbuf() const noexcept;
 
 %\indexlibrarymember{str}{basic_ispanstream}%
 \begin{itemdecl}
-std::span<charT> span() const noexcept;
+std::span<const charT> span() const noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -997,6 +1086,28 @@ void span(std::span<charT> s) noexcept;
 Equivalent to:
 \tcode{rdbuf()->span(s)}.
 \end{itemdescr}
+
+
+%%%% LWG wants textual spec:
+
+
+\begin{itemdecl}
+template <ranges::borrowed_range ROS>
+void span(ROS&& s) noexcept;
+\end{itemdecl}
+
+\begin{itemdescr}
+\pnum
+\constraints
+\tcode{(not convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
+ 
+\pnum
+\effects
+Equivalent to: \\
+\tcode{this->span(std::span(const_cast<charT*>(data(s)),size(s)))}.
+\end{itemdescr}
+
+
 
 %\rSec2[ospanstream]{Class template \tcode{basic_ospanstream}}
 \section{29.x.4 Class template \tcode{basic_ospanstream} [ospanstream] }
