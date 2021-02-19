@@ -63,8 +63,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{p0448r3}
-\newcommand{\paperdate}{2021-02-16}
+\newcommand{\papernumber}{p0448r4}
+\newcommand{\paperdate}{2021-02-19}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -90,6 +90,18 @@ Streams have been the oldest part of the C++ standard library and especially str
 A combination of external-fixed and internal-growing buffer allocation that strstreambuf provides is IMHO a doomed approach and very hard to use right.
 
 There had been a proposal for the pre-allocated external memory buffer streams in N2065 but that went nowhere. Today, with \tcode{span<T>} we actually have a library type representing such buffers views we can use for specifying (and implementing) such streams. They can be used in areas where dynamic (re-)allocation of stringstreams is not acceptable but the burden of caring for a pre-existing buffer during the lifetime of the stream is manageable. 
+
+\section{Changes from p0448r3}
+
+Incorporated changes as of LWG zoom 2021-02-19. 
+
+Changed the changes proposed in section 6.4 and forwarded by LEWG according to LWG feedback:
+\begin{itemize}
+\item Put all constraints on \tcode{ROS} in \constraints especially \tcode{ROS} models \tcode{ranges::borrowed_range}
+\item explicitly convert to \tcode{std::span<const charT>} of ROS parameter.
+\item use \tcode{span::data} \tcode{span::size} member functions.
+\item removed : after Equivalent to where only an expression follows.
+\end{itemize}
 
 \section{Changes from p0448r2}
 Based on the review of p0408 in Cologne 2019, some adjustments were made here accordingly to the feedback given there.
@@ -266,7 +278,7 @@ namespace std {
     explicit basic_ispanstream(
       std::span<charT> s,
       ios_base::openmode which = ios_base::in);\end{codeblock}\begin{addedblock}\begin{codeblock} 
-    template <ranges::borrowed_range ROS>
+    template <class ROS>
     explicit basic_ispanstream(ROS&& s);
 \end{codeblock}\end{addedblock}\begin{codeblock}         
     basic_ispanstream(const basic_ispanstream&) = delete;
@@ -282,7 +294,7 @@ namespace std {
 
     std::span<@\added{const }@charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;\end{codeblock}\begin{addedblock}\begin{codeblock}
-    template <ranges::borrowed_range ROS>
+    template <class ROS>
     void span(ROS&& s) noexcept ;
     \end{codeblock}\end{addedblock}\begin{codeblock}
   private:
@@ -304,19 +316,21 @@ Constructing an \tcode{ispanstream} from a \fakegrammarterm{string-literal} will
 
 \begin{addedblock}
 \begin{itemdecl}
-template <ranges::borrowed_range ROS>
+template <class ROS>
 explicit basic_ispanstream(ROS&& s)
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \constraints
-\tcode{(not convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
+\tcode{ROS} models \tcode{ranges::borrowed_range}.\\
+\tcode{(!convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<const charT>{}>} is \tcode{true}.
 
 \pnum
 \effects
-Equivalent to:\\
-\tcode{basic_ispanstream(std::span(const_cast<charT*>(data(s)),size(s))}.
+Let \tcode{sp} be \tcode{std::span<const charT>(std::forward<ROS>(s))}. 
+Equivalent to\\
+\tcode{basic_ispanstream(std::span<charT>(const_cast<charT*>(sp.data()),sp.size()))}.
 \end{itemdescr}
 \end{addedblock}
 
@@ -357,25 +371,27 @@ void span(std::span<charT> s) noexcept;
 \begin{itemdescr}
 \pnum
 \effects
-Equivalent to:
+Equivalent to
 \tcode{rdbuf()->span(s)}.
 \end{itemdescr}
 
 \begin{addedblock}
 \begin{itemdecl}
-template <ranges::borrowed_range ROS>
+template <class ROS>
 void span(ROS&& s) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \constraints
-\tcode{(not convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
+\tcode{ROS} models \tcode{ranges::borrowed_range}.\\
+\tcode{(!convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<const charT>{}>} is \tcode{true}.
  
 \pnum
 \effects
-Equivalent to: \\
-\tcode{this->span(std::span(const_cast<charT*>(data(s)),size(s)))}.
+Let \tcode{sp} be \tcode{std::span<const charT>(std::forward<ROS>(s)}). 
+Equivalent to \\
+\tcode{this->span(std::span<const charT>(const_cast<charT*>(sp.data()),sp.size()))}.
 \end{itemdescr}
 
 \end{addedblock}
@@ -663,7 +679,7 @@ template <class charT, class traits>
 
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{x.swap(y)}.
+\effects Equivalent to \tcode{x.swap(y)}.
 \end{itemdescr}
 
 
@@ -850,7 +866,7 @@ basic_streambuf<charT, traits>* setbuf(charT* s, streamsize n);
 \begin{itemdescr}
 \pnum
 \effects
-Equivalent to:
+Equivalent to
 \tcode{this->span(std::span<charT>(s, n))}.
 
 \pnum
@@ -880,7 +896,7 @@ namespace std {
       ios_base::openmode which = ios_base::in);
     basic_ispanstream(const basic_ispanstream&) = delete;
     basic_ispanstream(basic_ispanstream&& rhs);
-    template <ranges::borrowed_range ROS>
+    template <class ROS>
     explicit basic_ispanstream(ROS&& s);
 
     // \iref{ispanstream.swap}, assign and swap
@@ -893,7 +909,7 @@ namespace std {
 
     std::span<const charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;
-    template <ranges::borrowed_range ROS>
+    template <class ROS>
     void span(ROS&& s) noexcept;
     
   private:
@@ -981,19 +997,21 @@ install the contained \tcode{basic_spanbuf}.
 %%%% LWG wants textual spec:
 
 \begin{itemdecl}
-template <ranges::borrowed_range ROS>
+template <class ROS>
 explicit basic_ispanstream(ROS&& s)
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \constraints
-\tcode{(not convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
+\tcode{ROS} models \tcode{ranges::borrowed_range}.\\
+\tcode{(!convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
 
 \pnum
 \effects
-Equivalent to:\\
-\tcode{basic_ispanstream(std::span(const_cast<charT*>(data(s)),size(s))}.
+Let \tcode{sp} be \tcode{std::span<const charT>(std::forward<ROS>(s)}). 
+Equivalent to \\
+\tcode{basic_ispanstream(std::span<charT>(const_cast<charT*>(sp.data()),sp.size()))}.
 \end{itemdescr}
 
 
@@ -1045,7 +1063,7 @@ template <class charT, class traits>
 
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: 
+\effects Equivalent to 
 \tcode{x.swap(y)}.
 \end{itemdescr}
 
@@ -1083,7 +1101,7 @@ void span(std::span<charT> s) noexcept;
 \begin{itemdescr}
 \pnum
 \effects
-Equivalent to:
+Equivalent to
 \tcode{rdbuf()->span(s)}.
 \end{itemdescr}
 
@@ -1092,19 +1110,21 @@ Equivalent to:
 
 
 \begin{itemdecl}
-template <ranges::borrowed_range ROS>
+template <class ROS>
 void span(ROS&& s) noexcept;
 \end{itemdecl}
 
 \begin{itemdescr}
 \pnum
 \constraints
-\tcode{(not convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
+\tcode{ROS} models \tcode{ranges::borrowed_range}.\\
+\tcode{(!convertible_to<ROS, std::span<charT>{}>) \&\&}\\ \tcode{convertible_to<ROS, std::span<charT const>{}>} is \tcode{true}.
  
 \pnum
 \effects
-Equivalent to: \\
-\tcode{this->span(std::span(const_cast<charT*>(data(s)),size(s)))}.
+Let \tcode{sp} be \tcode{std::span<const charT>(std::forward<ROS>(s)}). 
+Equivalent to \\
+\tcode{this->span(std::span<charT>(const_cast<charT*>(sp.data()),sp.size()))}.
 \end{itemdescr}
 
 
@@ -1244,7 +1264,7 @@ template <class charT, class traits>
 
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{x.swap(y)}.
+\effects Equivalent to \tcode{x.swap(y)}.
 \end{itemdescr}
 
 %\rSec3[ospanstream.members]{Member functions}
@@ -1281,7 +1301,7 @@ void span(std::span<charT> s) noexcept;
 \begin{itemdescr}
 \pnum
 \effects
-Equivalent to:
+Equivalent to
 \tcode{rdbuf()->span(s)}.
 \end{itemdescr}
 
@@ -1420,7 +1440,7 @@ template <class charT, class traits>
 
 \begin{itemdescr}
 \pnum
-\effects Equivalent to: \tcode{x.swap(y)}.
+\effects Equivalent to \tcode{x.swap(y)}.
 \end{itemdescr}
 
 %\rSec3[spanstream.members]{Member functions}
@@ -1457,7 +1477,7 @@ void span(std::span<charT> s) noexcept;
 \begin{itemdescr}
 \pnum
 \effects
-Equivalent to:
+Equivalent to
 \tcode{rdbuf()->span(s)}.
 \end{itemdescr}
 
