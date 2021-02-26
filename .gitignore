@@ -26,6 +26,7 @@
 *.maf
 *.mtc
 *.mtc0
+*.xtr
 
 .DS_Store
 
