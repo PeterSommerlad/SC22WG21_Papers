@@ -64,7 +64,7 @@
 \pagestyle{myheadings}
 
 \newcommand{\papernumber}{p0448r4}
-\newcommand{\paperdate}{2021-02-19}
+\newcommand{\paperdate}{2021-02-26}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -264,7 +264,7 @@ With Tim Song's help the following extra constructor from a read-only \tcode{spa
 \emph{Change the synopsis of [ispanstream] as follows:}
 \begin{codeblock}
 namespace std {
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
   class basic_ispanstream
     : public basic_istream<charT, traits> {
   public:
@@ -278,7 +278,7 @@ namespace std {
     explicit basic_ispanstream(
       std::span<charT> s,
       ios_base::openmode which = ios_base::in);\end{codeblock}\begin{addedblock}\begin{codeblock} 
-    template <class ROS>
+    template<class ROS>
     explicit basic_ispanstream(ROS&& s);
 \end{codeblock}\end{addedblock}\begin{codeblock}         
     basic_ispanstream(const basic_ispanstream&) = delete;
@@ -294,14 +294,14 @@ namespace std {
 
     std::span<@\added{const }@charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;\end{codeblock}\begin{addedblock}\begin{codeblock}
-    template <class ROS>
+    template<class ROS>
     void span(ROS&& s) noexcept ;
     \end{codeblock}\end{addedblock}\begin{codeblock}
   private:
     basic_spanbuf<charT, traits> sb; // \expos
   };
 
-  template <class charT, class traits>
+  template<class charT, class traits>
     void swap(basic_ispanstream<charT, traits>& x,
               basic_ispanstream<charT, traits>& y);
 }
@@ -316,7 +316,7 @@ Constructing an \tcode{ispanstream} from a \fakegrammarterm{string-literal} will
 
 \begin{addedblock}
 \begin{itemdecl}
-template <class ROS>
+template<class ROS>
 explicit basic_ispanstream(ROS&& s)
 \end{itemdecl}
 
@@ -377,7 +377,7 @@ Equivalent to
 
 \begin{addedblock}
 \begin{itemdecl}
-template <class ROS>
+template<class ROS>
 void span(ROS&& s) noexcept;
 \end{itemdecl}
 
@@ -416,13 +416,13 @@ with the corresponding value for the header \tcode{\textless{}spanstream\textgre
 
 \begin{codeblock}
 namespace std {
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
     class basic_spanbuf;
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
     class basic_ispanstream;
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
     class basic_ospanstream;
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
     class basic_spanstream;
 
   using spanbuf     = basic_spanbuf<char>;
@@ -456,25 +456,25 @@ A user of theses classes is responsible for ensuring that the character sequence
 
 \begin{codeblock}
 namespace std {
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
     class basic_spanbuf;
     
   using spanbuf = basic_spanbuf<char>;
   using wspanbuf = basic_spanbuf<wchar_t>;
 
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
     class basic_ispanstream;
 
   using ispanstream = basic_ispanstream<char>;
   using wispanstream = basic_ispanstream<wchar_t>;
 
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
     class basic_ospanstream;
 
   using ospanstream = basic_ospanstream<char>;
   using wospanstream = basic_ospanstream<wchar_t>;
 
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
     class basic_spanstream;
 
   using spanstream = basic_spanstream<char>;
@@ -486,7 +486,7 @@ namespace std {
 %\indexlibrary{\idxcode{basic_spanbuf}}%
 \begin{codeblock}
 namespace std {
-  template <class charT, class traits = char_traits<charT> >
+  template<class charT, class traits = char_traits<charT> >
   class basic_spanbuf
     : public basic_streambuf<charT, traits> {
   public:
@@ -531,7 +531,7 @@ namespace std {
     std::span<charT> buf; // \expos
   };
 
-  template <class charT, class traits>
+  template<class charT, class traits>
     void swap(basic_spanbuf<charT, traits>& x,
               basic_spanbuf<charT, traits>& y);
 }
@@ -672,7 +672,7 @@ void swap(basic_spanbuf& rhs);
 
 %\indexlibrarymember{swap}{basic_spanbuf}%
 \begin{itemdecl}
-template <class charT, class traits>
+template<class charT, class traits>
   void swap(basic_spanbuf<charT, traits>& x,
             basic_spanbuf<charT, traits>& y);
 \end{itemdecl}
@@ -880,7 +880,7 @@ Equivalent to
 %\indexlibrary{\idxcode{basic_ispanstream}}%
 \begin{codeblock}
 namespace std {
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
   class basic_ispanstream
     : public basic_istream<charT, traits> {
   public:
@@ -896,7 +896,7 @@ namespace std {
       ios_base::openmode which = ios_base::in);
     basic_ispanstream(const basic_ispanstream&) = delete;
     basic_ispanstream(basic_ispanstream&& rhs);
-    template <class ROS>
+    template<class ROS>
     explicit basic_ispanstream(ROS&& s);
 
     // \iref{ispanstream.swap}, assign and swap
@@ -909,14 +909,14 @@ namespace std {
 
     std::span<const charT> span() const noexcept;
     void span(std::span<charT> s) noexcept;
-    template <class ROS>
+    template<class ROS>
     void span(ROS&& s) noexcept;
     
   private:
     basic_spanbuf<charT, traits> sb; // \expos
   };
 
-  template <class charT, class traits>
+  template<class charT, class traits>
     void swap(basic_ispanstream<charT, traits>& x,
               basic_ispanstream<charT, traits>& y);
 }
@@ -924,13 +924,13 @@ namespace std {
 
 %%% LWG wants non textual spec
 
-%    template <ranges::borrowed_range ROS>
+%    template<ranges::borrowed_range ROS>
 %    requires (not convertible_to<ROS, std::span<charT>>) &&
 %             convertible_to<ROS, std::span<charT const>>   
 %    explicit basic_ispanstream(ROS&& s)
 %      :basic_ispanstream(
 %         std::span<charT>(const_cast<charT*>(data(s)),size(s)){}         
-%    template <ranges::borrowed_range ROS>
+%    template<ranges::borrowed_range ROS>
 %    requires (not convertible_to<ROS, std::span<charT>>) &&
 %             convertible_to<ROS, std::span<charT const>>   
 %    void span(ROS&& s) noexcept { 
@@ -997,7 +997,7 @@ install the contained \tcode{basic_spanbuf}.
 %%%% LWG wants textual spec:
 
 \begin{itemdecl}
-template <class ROS>
+template<class ROS>
 explicit basic_ispanstream(ROS&& s)
 \end{itemdecl}
 
@@ -1009,9 +1009,9 @@ explicit basic_ispanstream(ROS&& s)
 
 \pnum
 \effects
-Let \tcode{sp} be \tcode{std::span<const charT>(std::forward<ROS>(s)}). 
+Let \tcode{sp} be \tcode{std::span<const charT>(std::forward<ROS>(s))}. 
 Equivalent to \\
-\tcode{basic_ispanstream(std::span<charT>(const_cast<charT*>(sp.data()),sp.size()))}.
+\tcode{basic_ispanstream(std::span<charT>(const_cast<charT*>(sp.data()), sp.size()))}.
 \end{itemdescr}
 
 
@@ -1056,7 +1056,7 @@ void swap(basic_ispanstream& rhs);
 
 %\indexlibrarymember{swap}{basic_ispanstream}%
 \begin{itemdecl}
-template <class charT, class traits>
+template<class charT, class traits>
   void swap(basic_ispanstream<charT, traits>& x,
             basic_ispanstream<charT, traits>& y);
 \end{itemdecl}
@@ -1110,7 +1110,7 @@ Equivalent to
 
 
 \begin{itemdecl}
-template <class ROS>
+template<class ROS>
 void span(ROS&& s) noexcept;
 \end{itemdecl}
 
@@ -1122,9 +1122,9 @@ void span(ROS&& s) noexcept;
  
 \pnum
 \effects
-Let \tcode{sp} be \tcode{std::span<const charT>(std::forward<ROS>(s)}). 
+Let \tcode{sp} be \tcode{std::span<const charT>(std::forward<ROS>(s))}. 
 Equivalent to \\
-\tcode{this->span(std::span<charT>(const_cast<charT*>(sp.data()),sp.size()))}.
+\tcode{this->span(std::span<charT>(const_cast<charT*>(sp.data()), sp.size()))}.
 \end{itemdescr}
 
 
@@ -1135,7 +1135,7 @@ Equivalent to \\
 %\indexlibrary{\idxcode{basic_ospanstream}}%
 \begin{codeblock}
 namespace std {
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
   class basic_ospanstream
     : public basic_ostream<charT, traits> {
   public:
@@ -1166,7 +1166,7 @@ namespace std {
     basic_spanbuf<charT, traits> sb; // \expos
   };
 
-  template <class charT, class traits>
+  template<class charT, class traits>
     void swap(basic_ospanstream<charT, traits>& x,
               basic_ospanstream<charT, traits>& y);
 }
@@ -1257,7 +1257,7 @@ void swap(basic_ospanstream& rhs);
 
 %\indexlibrarymember{swap}{basic_ospanstream}%
 \begin{itemdecl}
-template <class charT, class traits>
+template<class charT, class traits>
   void swap(basic_ospanstream<charT, traits>& x,
             basic_ospanstream<charT, traits>& y);
 \end{itemdecl}
@@ -1311,7 +1311,7 @@ Equivalent to
 %\indexlibrary{\idxcode{basic_spanstream}}%
 \begin{codeblock}
 namespace std {
-  template <class charT, class traits = char_traits<charT>>
+  template<class charT, class traits = char_traits<charT>>
   class basic_spanstream
     : public basic_iostream<charT, traits> {
   public:
@@ -1342,7 +1342,7 @@ namespace std {
     basic_spanbuf<charT, traits> sb; // \expos
   };
 
-  template <class charT, class traits>
+  template<class charT, class traits>
     void swap(basic_spanstream<charT, traits>& x,
               basic_spanstream<charT, traits>& y);
 }
@@ -1433,7 +1433,7 @@ void swap(basic_spanstream& rhs);
 
 %\indexlibrarymember{swap}{basic_spanstream}%
 \begin{itemdecl}
-template <class charT, class traits>
+template<class charT, class traits>
   void swap(basic_spanstream<charT, traits>& x,
             basic_spanstream<charT, traits>& y);
 \end{itemdecl}
