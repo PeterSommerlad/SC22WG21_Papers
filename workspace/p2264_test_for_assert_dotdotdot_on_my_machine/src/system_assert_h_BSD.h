@@ -64,21 +64,23 @@
 #ifndef CHECK_SINGLE_ASSERT_ARGUMENT_PASSED_TO_ASSERT_DEFINED
 #define CHECK_SINGLE_ASSERT_ARGUMENT_PASSED_TO_ASSERT_DEFINED
 #ifdef __cplusplus
-#if __cplusplus >= 201103L
- constexpr
-#elif __cplusplus >= 202002L
- consteval
-#endif
-  inline bool __check_single_argument_passed_to_assert(bool b) { return b; }
 #else
-inline int __check_single_argument_passed_to_assert(int b) { return b; }
-// need to have one extern declaration of inline function introduced
+// should better use (_Bool){__VA_ARGS__}
+//inline int __check_single_argument_passed_to_assert(int b) { return b; }
+/* need to have one extern declaration of inline function introduced
 // to prevent linker errors. did not patch my libc for that.
-
-extern int __check_single_argument_passed_to_assert(int b);
+*/
+//extern int __check_single_argument_passed_to_assert(int b);
 
 #endif
 #endif /* CHECK_SINGLE_ASSERT_ARGUMENT_PASSED_TO_ASSERT_DEFINED */
+
+#ifdef __cplusplus
+#else
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wexcess-initializers"
+#endif
+
 
 #ifndef __GNUC__
 
@@ -89,8 +91,17 @@ void abort(void) __dead2;
 int  printf(const char * __restrict, ...);
 __END_DECLS
 
+#ifdef __cplusplus
 #define assert(...)  \
-    ((void) (__check_single_argument_passed_to_assert(__VA_ARGS__) ? ((void)0) : __assert (#_VA_ARGS__, __FILE__, __LINE__)))
+    ((void) (bool( __VA_ARGS__) ? ((void)0) : __assert (#__VA_ARGS__, __FILE__, __LINE__)))
+#else
+#define assert(...)  \
+		_Pragma("GCC diagnostic push")\
+		_Pragma("GCC diagnostic error \"-Wexcess-initializers\"")\
+    ((void) ((_Bool){ __VA_ARGS__} ? ((void)0) : __assert (#__VA_ARGS__, __FILE__, __LINE__)))\
+        _Pragma("GCC diagnostic pop")
+#endif
+
 #define __assert(e, file, line) \
     ((void)printf ("%s:%u: failed assertion `%s'\n", file, line, e), abort())
 
@@ -113,14 +124,37 @@ __END_DECLS
 #endif
 
 #if __DARWIN_UNIX03
+#ifdef __cplusplus
 #define	assert(...) \
-    (__builtin_expect(!__check_single_argument_passed_to_assert(__VA_ARGS__), 0) ? __assert_rtn(__func__, __FILE__, __LINE__, #__VA_ARGS__) : (void)0)
+    (__builtin_expect(!bool( __VA_ARGS__), 0) ? __assert_rtn(__func__, __FILE__, __LINE__, #__VA_ARGS__) : (void)0)
+#else
+#define	assert(...) \
+	_Pragma("GCC diagnostic push")\
+	_Pragma("GCC diagnostic error \"-Wexcess-initializers\"")\
+    ((void)(__builtin_expect(!(_Bool){ __VA_ARGS__}, 0) ? __assert_rtn(__func__, __FILE__, __LINE__, #__VA_ARGS__) : (void)0))\
+	_Pragma("GCC diagnostic pop")
+#endif
 #else /* !__DARWIN_UNIX03 */
+#ifdef __cplusplus
 #define assert(...)  \
-    (__builtin_expect(!__check_single_argument_passed_to_assert(__VA_ARGS__), 0) ? __assert (#__VA_ARGS__, __FILE__, __LINE__) : (void)0)
+    (__builtin_expect(!bool(__VA_ARGS__), 0) ? __assert (#__VA_ARGS__, __FILE__, __LINE__) : (void)0)
+#else
+#define assert(...)  \
+		_Pragma("GCC diagnostic push")\
+		_Pragma("GCC diagnostic error \"-Wexcess-initializers\"")\
+    ((void)(__builtin_expect(!(_Bool){__VA_ARGS__}, 0) ? __assert (#__VA_ARGS__, __FILE__, __LINE__) : (void)0))\
+    _Pragma("GCC diagnostic pop")
+#endif
 #endif /* __DARWIN_UNIX03 */
 
 #endif /* __GNUC__ */
+#ifdef __cplusplus
+#else
+// not sure if that works wrt macro expansions....
+// It doesn't, because we cannot enable the #pragma locally for a macro expansion.
+//#pragma GCC diagnostic pop
+#endif
+
 #endif /* NDEBUG */
 
 #ifndef _ASSERT_H_

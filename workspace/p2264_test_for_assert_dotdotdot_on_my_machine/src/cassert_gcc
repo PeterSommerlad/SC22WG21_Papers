@@ -39,8 +39,9 @@
 // No include guards on this header...
 
 #pragma GCC system_header
-
+#ifdef __clang
 #include <bits/c++config.h>
+#endif
 //#include <assert.h>
 #include "system_assert_h_BSD.h"
 //#include "system_assert_original.h"
