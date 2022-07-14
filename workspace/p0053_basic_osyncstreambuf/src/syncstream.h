@@ -347,14 +347,14 @@ public:
 	explicit basic_osyncstream(basic_ostream<charT,traits> &os, 
 														 Allocator const &a=Allocator())
 		: mybuf_t{os.rdbuf(),a}
-	    , base{} {
+	    , base{this->rdbuf()} {
 			base::init(static_cast<mybuf_t*>(this));
 		}
 
 	explicit basic_osyncstream(streambuf_type *outbuf=nullptr,
 														 Allocator const &a=Allocator())
 		: mybuf_t{outbuf,a}
-		, base{}{
+		, base{this->rdbuf()}{
 			base::init(static_cast<mybuf_t*>(this));
 		}
 
