@@ -75,17 +75,18 @@ void DemonstrateTransactionFilecopy(){
 
 
 
-std::string access_returned_from_string(size_t& len){
-	std::string s{"a string"};
+auto access_returned_from_string(size_t& len){
+	char const s_in[]{"a very long string to prevent small string optimization so that move is actually move, this test will fail with COW strings"};
+	std::vector<char> s{std::begin(s_in),std::end(s_in)};
 	scope_exit guard{[&]{ len = s.size();}};
-	return (s); // pessimize copy elision to demonstrate effect
+	return std::move(s); // pessimize copy elision to demonstrate effect
 }
 void DemonstrateSurprisingReturnedFromBehavior(){
 	size_t len{0xffffffff};
 	auto s = access_returned_from_string(len);
-	// exected:	ASSERT_EQUAL(s.size(),len);
-	// what really happens
-	ASSERT_EQUAL(0,len);
+	// naïvely exected:	ASSERT_EQUAL(s.size(),len);
+	// what really happens due to destructive move
+	ASSERT_EQUAL(0,len); // fails with COW std::string
 }
 
 

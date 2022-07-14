@@ -1,5 +1,5 @@
 <testsuites>
-	<testsuite name="AllTests" tests="36">
+	<testsuite name="AllTests" tests="37">
 		<testcase classname="AllTests" name="InsaneBool"/>
 		<testcase classname="AllTests" name="testscopeExitWithNonAssignableResourceAndReset"/>
 		<testcase classname="AllTests" name="testCompilabilityGuardForPointerTypes"/>
@@ -36,5 +36,6 @@
 		<testcase classname="AllTests" name="DemoFstream"/>
 		<testcase classname="AllTests" name="DemonstrateTransactionFilecopy"/>
 		<testcase classname="AllTests" name="DemonstrateSurprisingReturnedFromBehavior"/>
+		<testcase classname="AllTests" name="testThatExplicitReferenceParameterCompiles"/>
 	</testsuite>
 </testsuites>

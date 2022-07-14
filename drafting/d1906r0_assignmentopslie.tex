@@ -57,8 +57,8 @@
 
 \pagestyle{myheadings}
 
-\newcommand{\papernumber}{P1906R0}
-\newcommand{\paperdate}{2019-10-07}
+\newcommand{\papernumber}{P1906R1}
+\newcommand{\paperdate}{2020-06-01}
 
 \markboth{\papernumber{} \paperdate{}}{\papernumber{} \paperdate{}}
 
@@ -83,10 +83,14 @@ Audience: & EWGI/EWG/CWG and SG12/WG23\\\hline
 
 \chapter{Introduction}
 
-When preparing my CPPCon 2019 talk I tried to explain that the only typical problem inherited from C is "dangling".
-During his CPPCon 2019 keynote Sean Parent introduced the terms "relationship type" and "relationship object", meaning an object that relates to another object. Changes to or the end of the lifetime of that referred object can sever the relationship and thus invalidate the state of the relationship object.
-This is what commonly is called "dangling" or "use after free". In my own CPPCon talk I referred to such "relationship types" as "designating types", which I now consider a worse name.
-Typical examples of relationship types are references, pointers, views, span, and iterators.
+Unfortunately, the compiler provided and canonical user-defined assignment operators return an lvalue reference to \tcode{*this}, because being unqualified member functions they can be called on glvalue objects. This breaks the type system leading to the danger of immediate dangling when they are applied to a temporary xvalue on the left-hand-side. This paper attempts to fix the compiler-provided assignment operators, potentially retroactive and provides two options for such a fix.
+\begin{itemize}
+	\item{Option 1: provide assignment operators by the compilers to be ref-qualified. This might break code relying on the assignability of temporaries.}
+	\item{Option 2: change the return type of compiler-provided assignment operators implicitly, when called on a temporary.}
+\end{itemize}
+
+Dangling of references or other relationship-type\footnote{During his CPPCon 2019 keynote Sean Parent introduced the terms "relationship type" and "relationship object", meaning an object that relates to another object. Changes to or the end of the lifetime of that referred object can sever the relationship and thus invalidate the state of the relationship object.} objects (pointers, iterators, views, span, wrappers/substitutes of those) is one of the problems that are not solvable completely in the C++ type system. Use of relationship types requires However, it is possible to limit the leaking of relationships to temporary objects, that will immediately dangle. Unfortunately, the mechanism introduced in C++11 ref-qualified member functions, is under-utilised.
+
 
 \section{The Problem: Immediate Dangling}
 
@@ -96,9 +100,28 @@ Small changes might lead to binding the local reference to a returned reference 
 Even worse are non-reference relationship types that are often Regular types that immediate dangle when returned from member function on a temporary object, such as \tcode{vector::data()}.
 
 C++11 introduced reference qualifiers for member functions that can prohibit calling member functions on temporaries (rvalues), especially those that return a relationship object referring to \tcode{*this}, a non-static data member of \tcode{*this}, or data managed by \tcode{*this}, such as elements in a vector.
-Non-member versions of corresponding functionality, such as \tcode{std::begin()} do not have the same problem, because for them the special rule for unqualified member functions [over.maptch.funcs] p5.1 does not apply. Views from std::ranges also do never bind to temporaries, because the overloads taking an rvalue-reference are deleted.
+Non-member versions of corresponding functionality, such as \tcode{std::begin()} do not have the same problem, because for them the special rule for unqualified member functions [over.maptch.funcs] p5.1 does not apply. Views from \tcode{std::ranges} also do never bind to temporaries, because the overloads taking an rvalue-reference are deleted.
+However, even the range for statement suffers, because it employs lifetime extension for temporaries, but not, for references obtained from temporaries (see \url{https://cppinsights.io/s/e9a7dec5}, example courtesy of Nico Josuttis).
 
-The standard library suffers from that legacy that was never considered or cleaned after ref-qualifiers for member functions were introduced. But that is a topic of another future paper.
+\begin{codeblock}
+#include <string>
+#include <vector>
+#include <iostream>
+
+std::vector<std::string> makeListOfNames(){
+	using namespace std::string_literals;
+	return {"Peter"s,"Christian"s,"Sommerlad"s};
+}
+
+int main() {
+    // try to iterate over first name letters
+	for(char const &c : makeListOfNames().at(0)){ // immediate dangling
+		std::cout << std::toupper(c);
+	}
+}
+\end{codeblock}
+
+You see the standard library suffers from that legacy that was never considered or cleaned after ref-qualifiers for member functions were introduced. But that is a topic of another future paper.
 
 This paper is about core language wording. For class types, if nothing is specified the compiler provides copy and move assignment operators as unqualified member functions that return an lvalue reference to the assigned to object ([class.copy.assign] p.2 and p.5). As unqualified members they can be called on temporary objects and rvalues. This violates Scott Meyers' principle "do as the ints do" for operator overloading.
 

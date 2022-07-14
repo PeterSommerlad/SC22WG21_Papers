@@ -75,9 +75,7 @@ extern "C" void runCasserts();
 
 int main() {
 	runCasserts();
-	std::cout << "!!!Hello World!!!" << std::endl;
+	std::cout << "!!!Hello World!!!\n" ;
 	runCppasserts();
-	checkThatNoArgumentDoesntCompile(); // compiles for C++ but fails.
-	assert();
-
+	checkThatNoArgumentDoesntCompile(); // compiles for C++ but fails assertion
 }

@@ -522,7 +522,7 @@ public:
 			requires (not std::convertible_to<R, std::span<_CharT>>) &&
 			std::convertible_to<R, __cspan>
 			explicit basic_ispanstream(R&& __rr):
-			basic_ispanstream(__span_type{const_cast<char_type *>(std::data(__rr)),std::size(__rr)}){}
+			basic_ispanstream(std::span{const_cast<char_type *>(std::data(__rr)),std::size(__rr)}){}
 //			basic_ispanstream(__span_type{const_cast<char_type *>(__rr.data()),__rr.size()}){}
 
 //    explicit basic_ispanstream(__cspan  __str) :
@@ -595,7 +595,7 @@ public:
 	void
 	span(ROS&& __s)
 	{
-		_M_stringbuf.span(__span_type{const_cast<char_type *>(ranges::data(__s)),ranges::size(__s)});
+		_M_stringbuf.span(std::span{const_cast<char_type *>(ranges::data(__s)),ranges::size(__s)});
 	}
 };
 

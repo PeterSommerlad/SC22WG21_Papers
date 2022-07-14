@@ -20,6 +20,6 @@
 
 * `scoped_lock` whole class [thread.lock.scoped] -- ignore pathological case of empty pack.
 
-* `unique_loock` constructors taking mutex (except for defer lock ?)
+* `unique_lock` constructors taking mutex (except for defer lock ?)
 
 * `shared_lock` some constructors: blocking one, try (and adopt?) ones.

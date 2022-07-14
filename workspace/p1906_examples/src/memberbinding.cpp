@@ -1,5 +1,7 @@
 #include <array>
 #include <type_traits>
+#include <iostream>
+
 using one = char;
 static_assert(1==sizeof(one));
 using two = std::array<char,2>;
@@ -25,6 +27,9 @@ struct Y{
 
     one mfl() & { return {};}
     two mfl() const & { return {};}
+
+    one mflo() & { return {};}
+
 
     one mflc() const & { return {};}
 
@@ -78,6 +83,12 @@ static_assert(1 == sizeof(std::declval<Y&&>().mflc()));
 static_assert(1 == sizeof(std::declval<Y const &>().mflc()));
 static_assert(1 == sizeof(std::declval<Y const &&>().mflc()));
 
+//static_assert(1 == sizeof(std::declval<Y>().mflo())); // would bind to a value parameter, because that is a Y&
+//static_assert(1 == sizeof(std::declval<Y const>().mflo()));
+static_assert(1 == sizeof(std::declval<Y&>().mflo()));
+//static_assert(1 == sizeof(std::declval<Y&&>().mflo()));
+//static_assert(1 == sizeof(std::declval<Y const &>().mflo()));
+//static_assert(1 == sizeof(std::declval<Y const &&>().mflo()));
 
 static_assert(1 == sizeof(std::declval<Y>().mfx()));
 static_assert(2 == sizeof(std::declval<Y const>().mfx()));
@@ -92,3 +103,12 @@ static_assert(1 == sizeof(std::declval<Y>().mfxnc()));
 static_assert(1 == sizeof(std::declval<Y&&>().mfxnc()));
 //static_assert(1 == sizeof(std::declval<Y const &>().mfxnc()));
 //static_assert(1 == sizeof(std::declval<Y const &&>().mfxnc()));
+
+
+
+void foo(){
+    auto const & x = std::min(42,43);
+    auto p = std::array{1,2,3,4,5,6}.data();
+    std::cout << *p << x;
+
+}
