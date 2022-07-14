@@ -733,6 +733,21 @@ void test_sometimes_throwing_deleter_copy_ctor(){
 }
 
 
+namespace{
+std::string just_for_testing_side_effect{};
+}
+
+void functocall(){
+    just_for_testing_side_effect.append("functocall_called\n");
+}
+
+void testThatExplicitReferenceParameterCompiles(){
+    {
+        scope_exit<void(&)()> guard{functocall};
+        scope_exit guardfromptr{functocall};
+    }
+    ASSERT_EQUAL("functocall_called\nfunctocall_called\n",just_for_testing_side_effect);
+}
 
 
 void runAllTests(int argc, const char *argv[]) {
@@ -774,6 +789,7 @@ void runAllTests(int argc, const char *argv[]) {
 	s.push_back(CUTE(DemoFstream));
 	s.push_back(CUTE(DemonstrateTransactionFilecopy));
 	s.push_back(CUTE(DemonstrateSurprisingReturnedFromBehavior));
+	s.push_back(CUTE(testThatExplicitReferenceParameterCompiles));
 	cute::xml_file_opener xmlfile(argc,argv);
 	cute::xml_listener<cute::ide_listener<> >  lis(xmlfile.out);
 	cute::makeRunner(lis,argc,argv)(s, "AllTests");

@@ -26,6 +26,7 @@ SOFTWARE.
 #include "_scope_guard_common.h"
 #include <utility>
 #include <limits> // for maxint
+#include <exception> // for std::uncaught_exceptions
 // modeled slightly after Andrescu's talk and article(s)
 
 
@@ -90,7 +91,7 @@ class basic_scope_exit; // silence brain dead clang warning -Wmismatched-tags
 //using scope_exit = basic_scope_exit<EF, detail::on_exit_policy>;
 
 template<class EF>
-struct scope_exit : basic_scope_exit<EF, detail::on_exit_policy>{
+struct [[nodiscard]] scope_exit : basic_scope_exit<EF, detail::on_exit_policy>{
 	using basic_scope_exit<EF, detail::on_exit_policy>::basic_scope_exit;
 };
 
@@ -139,7 +140,7 @@ struct _empty_scope_exit
 // Requires: EF is Callable
 // Requires: EF is nothrow MoveConstructible OR CopyConstructible
 template<class EF, class Policy /*= on_exit_policy*/>
-class basic_scope_exit :  Policy
+class [[nodiscard]] basic_scope_exit :  Policy
 {
 	static_assert(std::is_invocable_v<EF>,"scope guard must be callable");
     detail::_box<EF> exit_function;
@@ -148,7 +149,11 @@ class basic_scope_exit :  Policy
     {
         return detail::_empty_scope_exit{};
     }
-    template<typename Fn>
+	static auto _make_failsafe(std::true_type, void( * ) ())
+    {
+        return detail::_empty_scope_exit{};
+    }
+	template<typename Fn>
     static auto _make_failsafe(std::false_type, Fn *fn)
     {
         return basic_scope_exit<Fn &, Policy>(*fn);
@@ -159,7 +164,7 @@ class basic_scope_exit :  Policy
     using _noexcept_ctor_from = std::bool_constant<noexcept(detail::_box<EF>(std::declval<EFP>(), detail::_empty_scope_exit{}))>;
 public:
     template<typename EFP, typename = std::enable_if_t<_ctor_from<EFP>::value>>
-    [[nodiscard]] explicit basic_scope_exit(EFP &&ef) noexcept(_noexcept_ctor_from<EFP>::value)
+    explicit basic_scope_exit(EFP &&ef) noexcept(_noexcept_ctor_from<EFP>::value)
       : exit_function(std::forward<EFP>( ef), _make_failsafe(_noexcept_ctor_from<EFP>{}, &ef))
     {}
     basic_scope_exit(basic_scope_exit &&that) noexcept(noexcept(detail::_box<EF>(that.exit_function.move(), that)))
