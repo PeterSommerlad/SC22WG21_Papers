@@ -144,4 +144,4 @@ The exposition-only class _`ignore_type`_ provides a ( constexpr constructor and
 # References
 
 * [LWG 2933](https://wg21.link/lwg2933)
-* The markdown of this document is available at my [github](https://github.com/PeterSommerlad)
+* The markdown of this document is available at my [github](https://raw.githubusercontent.com/PeterSommerlad/SC22WG21_Papers/master/drafting/P2968Rx_ignore.md)
