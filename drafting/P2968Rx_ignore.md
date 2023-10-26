@@ -22,7 +22,7 @@ All major open source C++ library implementations provide a suitably implemented
 # Introduction
 
 All major C++ open source standard libraries provide similar implementations for the type of `std::ignore`.
-However, the semantics of `std::ignore`, while useful beyond, are only specified in the context of `std::tie`
+However, the semantics of `std::ignore`, while useful beyond, are only specified in the context of `std::tie`.
 
 ## Non-tuple applications of `std::ignore`
 
@@ -87,7 +87,7 @@ Ville Voutilainen suggested a specification as code, such as:
 
 ```c++
 // 22.4.5, tuple creation functions
-struct @_ignore_type_@ { // @_expostion only_@
+struct @_ignore_type_@ { // @_exposition only_@
   decltype(auto) operator=(auto&&) const & { return *this; }
 };
 inline constexpr @_ignore_type_@ ignore;
@@ -97,7 +97,7 @@ or even more brief:
 
 ```c++
 inline constexpr 
-struct  { // expostion only
+struct  { // exposition only
   decltype(auto) operator=(auto&&) const & { return *this; }
 } ignore;
 ```
