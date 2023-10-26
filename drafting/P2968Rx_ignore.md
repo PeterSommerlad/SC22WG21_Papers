@@ -26,7 +26,7 @@ However, the semantics of `std::ignore`, while useful beyond, are only specified
 
 ## Non-tuple applications of `std::ignore`
 
-Programming guidelines for C++ safety critical systems consider all named functions with a non-void return type similar to having the attribute `[[nodiscard]]`.
+Programming guidelines for C++ safety-critical systems consider all named functions with a non-void return type similar to having the attribute `[[nodiscard]]`.
 
 As of today, the means to disable diagnostic is a static cast to void spelled with a C-style cast `(void) foo();`. 
 This provides a teachability issue, because, while C-style casts are banned, such a C-style cast need to be taught.
@@ -43,31 +43,11 @@ To summarize the proposed change:
 1. better self-documenting code telling the intent
 2. Improved teachability of C++ to would-be C++ programmers in safety critical environments
 
-## Comparison Table
-
-::: cmptable
-
-> Code that compiles today will be guaranteed to compile
-
-### Before
-```cpp
-std::ignore = std::printf("hello ignore\n");
-// compiles but is not sanctioned by the standard
-```
-
-### After
-```cpp
-std::ignore = std::printf("hello ignore\n");
-// well defined C++
-```
-
-:::
-
 # Mailing List discussions
 
-After some initial draft posted to lib-ext@lists.isocpp.org I got some further feedback on motivation and desire to move ignore to a separate header or utility:
+After some initial drafts posted to lib-ext@lists.isocpp.org I got some further feedback on motivation and desire to move `ignore` to a separate header or utility:
 
-Additional motivational usage by Arthur O'Dwyer:   
+Additional motivating usage by Arthur O'Dwyer:
 
 ```c++
   struct DevNullIterator {
@@ -81,7 +61,7 @@ Additional motivational usage by Arthur O'Dwyer:
   std::ranges::copy(a, a+100, DevNullIterator());
 ```
 
-Giuseppe D'Angelo: As an extra, could it be possible to move std::ignore out of `<tuple>` and into `<utility>` or possibly its own header `<ignore>`?
+Giuseppe D'Angelo: As an extra, could it be possible to move `std::ignore` out of `<tuple>` and into `<utility>` or possibly its own header `<ignore>`?
   
 Ville Voutilainen suggested a specification as code, such as:
 
@@ -115,29 +95,104 @@ struct  { // exposition only
 
 # Impact on existing code
 
-Since `std::ignore` is already implemented in a suitable way in all major C++ standard libraries, there is no impact on existing code.
+All three major standard library vendors (libstdc++, Microsoft, libc++) implement `std::ignore` in roughly the same
+way, but there are some minor differences that could be ironed out by this proposal.
 
-However, may be LEWG will decide on being more specific and less hand-wavy on the semantics of the type underlying `std::ignore` and even follow the suggestion to move its definition into another header (`<utility>` or `<ignore>`).
+```c++
+// libstdc++
+struct __ignore_t {
+  constexpr const __ignore_t&
+    operator=(const auto&) const
+      { return *this; }
+};
+inline constexpr __ignore_t ignore{};
 
-If LWG decides on using code for the specification, libraries might want to adjust their implementation accordingly (which I believe is not required).
+// Microsoft STL
+struct __ignore_t {
+  constexpr const __ignore_t&
+    operator=(const auto&) const noexcept
+      { return *this; }
+};
+inline constexpr __ignore_t ignore{};
+
+// libc++
+template<class T>
+struct __ignore_t {
+  constexpr const __ignore_t&
+    operator=(auto&&) const
+      { return *this; }
+};
+inline constexpr __ignore_t<unsigned char> ignore = __ignore_t<unsigned char>();
+```
+
+The programmer can detect whether `ignore`'s type is a template. We suggest either mandating that `ignore`'s type not be a template,
+or finding a way to leave it unspecified.
+
+The difference between `operator=(const auto&)` and `operator=(auto&&)` is that the former will bind to non-volatile
+bit-field glvalues, whereas the latter will not. We want to support non-volatile bit-fields, so we specify the signature of
+`ignore::operator=` to take `(const auto&)` instead of `(auto&&)`. (Neither signature binds to <em>volatile</em> bit-field glvalues;
+that is <a href="https://cplusplus.github.io/LWG/issue3978">[LWG3978]</a>. Our wording makes
+`std::ignore = vbf;` obviously ill-formed, which resolves LWG3978.)
+
+The difference between `noexcept` and not is negligible; we could mandate that `std::ignore::operator=` be noexcept,
+or we could leave it non-noexcept. The vendor is already permitted to strengthen the noexceptness of any standard library
+function; Microsoft takes advantage of this freedom already. We suggest that as long as we're touching this area anyway,
+we should go ahead and add the `noexcept`.
+
 
 # Wording
 
-In [tuple.syn] change the type of ignore from "unspecified" to an exposition-only type
-
+In <a href="https://eel.is/c++draft/tuple.syn">[tuple.syn]</a> change the type of `ignore` from "unspecified" to an exposition-only non-template type:
 
 ```diff
-// 22.4.5, tuple creation functions
-+struct @_ignore_type_@; // @_expostion only_@
++// [utility.ignore], ignore
++struct @_ignore_t_@ { // @_exposition only_@
++  constexpr const @_ignore_t_@&
++    operator=(const auto&) const noexcept
++      { return *this; }
++};
++inline constexpr @_ignore_t_@ ignore;
+
+ // [tuple.creation], tuple creation functions
 -inline constexpr @_unspecified_@ ignore;
-+inline constexpr @_ignore_type_@ ignore;
 ```
 
-Add at TBD the following:
+In <a href="https://eel.is/c++draft/tuple.creation">[tuple.creation]</a>, remove the normative text about `ignore`:
 
-::: add
+```diff
+ template<class... TTypes>
+   constexpr tuple<TTypes&...> tie(TTypes&... t) noexcept;
+ 5. Returns: tuple<TTypes&...>(t...).
+-When an argument in t is ignore, assigning any value to the corresponding tuple element has no effect.
+ 6. [Example 2: tie functions allow one to create tuples that unpack tuples into variables.
+ ignore can be used for elements that are not needed:
+     int i; std::string s;
+     tie(i, ignore, s) = make_tuple(42, 3.14, "C++");
+     // i == 42, s == "C++"
+ — end example]
+```
 
-The exposition-only class _`ignore_type`_ provides a ( constexpr constructor and ) constexpr const assignment operator template that allows assignment to `ignore` from any non-void type without having an effect.
+In <a href="https://eel.is/c++draft/utility.syn">[utility.syn]</a>, add `ignore` to the `<utility>` header also:
+
+```diff
+ template<class... T>
+   using index_sequence_for = make_index_sequence<sizeof...(T)>;
+
++// [utility.ignore], ignore
++struct @_ignore_t_@ { // @_exposition only_@
++  constexpr const @_ignore_t_@&
++    operator=(const auto&) const noexcept
++      { return *this; }
++};
++inline constexpr @_ignore_t_@ ignore;
+
+ // [pairs], class template pair
+ template<class T1, class T2>
+   struct pair;
+```
+
+We don't think a feature-test macro is required for this patch, as it's just barely visible to the programmer, and there
+is no situation where the programmer would want to do something different based on the absence of the feature.
 
 :::
 
