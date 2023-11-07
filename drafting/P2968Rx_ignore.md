@@ -111,6 +111,11 @@ Since there was the request to make `std::ignore`{.cpp} available without having
 * Should `std::ignore::operator=`{.cpp } support non-volatile bit-fields on the right hand side (`operator=(auto const&)`) or not (`operator=(auto&&)`) ?
 
 The latter question is not an issue with existing code, because tuple's tie() would never support bit-fields and there is actual implementation divergence between major vendors. I don't have a strong opinion, but suppressing also non-volatile bit-fields helps in situation where a bit-field containing class mixes volatile and non-volatile members.
+
+We have implementation divergence here (see below), which means we have implementation experience both ways:
+
+* libstdc++ and Microsoft both currently use `(const auto&)` (which supports non-volatile bit-fields (which are converted to rvalue implicitly) but not volatile bit-fields).
+* libc++ currently uses `(auto&&)` (which does not support bit-fields of any qualification). libc++ has never received a bug report about its more-restrictive `std::ignore`, which is currently proposed.
   
 # Questions to LWG
 
