@@ -93,7 +93,7 @@ __END_DECLS
 
 #ifdef __cplusplus
 #define assert(...)  \
-    ((void) (bool( __VA_ARGS__) ? ((void)0) : __assert (#__VA_ARGS__, __FILE__, __LINE__)))
+    ((void) (bool( __VA_ARGS__) ? ((void)sizeof(bool(__VA_ARGS__))) : __assert (#__VA_ARGS__, __FILE__, __LINE__)))
 #else
 #define assert(...)  \
 		_Pragma("GCC diagnostic push")\
@@ -126,7 +126,7 @@ __END_DECLS
 #if __DARWIN_UNIX03
 #ifdef __cplusplus
 #define	assert(...) \
-    (__builtin_expect(!bool( __VA_ARGS__), 0) ? __assert_rtn(__func__, __FILE__, __LINE__, #__VA_ARGS__) : (void)0)
+    (__builtin_expect(!bool( __VA_ARGS__), 0) ? __assert_rtn(__func__, __FILE__, __LINE__, #__VA_ARGS__) : (void)sizeof(bool(__VA_ARGS__)))
 #else
 #define	assert(...) \
 	_Pragma("GCC diagnostic push")\
@@ -137,7 +137,7 @@ __END_DECLS
 #else /* !__DARWIN_UNIX03 */
 #ifdef __cplusplus
 #define assert(...)  \
-    (__builtin_expect(!bool(__VA_ARGS__), 0) ? __assert (#__VA_ARGS__, __FILE__, __LINE__) : (void)0)
+    (__builtin_expect(!bool(__VA_ARGS__), 0) ? __assert (#__VA_ARGS__, __FILE__, __LINE__) : (void)sizeof(bool(__VA_ARGS__)))
 #else
 #define assert(...)  \
 		_Pragma("GCC diagnostic push")\

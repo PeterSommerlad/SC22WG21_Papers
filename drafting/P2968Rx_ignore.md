@@ -1,7 +1,7 @@
 ---
 title: "Make std::ignore a first-class object"
 document: P2968R1
-date: 2023-11-06
+date: 2023-11-07
 audience: WG21 - Library & Library Evolution 
 author:
   - name: Peter Sommerlad
@@ -57,7 +57,7 @@ This issue asks for a better specification of the type of `std::ignore`{.cpp} by
 ## [LWG issue 3978](https://wg21.link/lwg3978)
 
 This issue claims that the "no further effect" is not implementable when the rhs is a volatile bit-field. 
-Providing a code-wise specification, we can eliminate the situation, because the rhs will not 
+Providing a code-wise specification, we can eliminate the situation, because the rhs will not allow bit-fields `(auto&&)`{.cpp} or will allow only non-volatile bit-fields `(auto const&)`{.cpp }.
 
 # Mailing List discussions
 
@@ -106,16 +106,18 @@ Note that using `auto&&` instead of `auto const &` prevents the use of a bit-fie
 
 Since there was the request to make `std::ignore`{.cpp} available without having to include `<tuple>`{.cpp} the following questions are for LEWG. Note, any yes will require a change/addition to the provided wording and would also put some burden on implementors. An advantage might be slightly reduced compile times for users of `std::ignore`{.cpp} who do not need anything else from header `<tuple>`{.cpp }.
 
-* Should `std::ignore`{.cpp} be made available via its own header `<ignore>` in addition to be available via `<tuple>`? Y/N
-* If no: Should `std::ignore`{.cpp} be made available via header `<utility>` in addition to being available via `<tuple>`? Y/N
-* Should `std::ignore::operator=`{.cpp } support (non-volatile) bit-fields on the right hand side `(auto const&)` or not `(auto&&)`?
+* Should `std::ignore`{.cpp} be made available via its own header `<ignore>` in addition to be available via `<tuple>`? Y/N (I would not suggest a new header.)
+* If no: Should `std::ignore`{.cpp} be made available via header `<utility>` in addition to being available via `<tuple>`? Y/N (This makes sense in my opinion,`tuple_size` is there as well, for example)
+* Should `std::ignore::operator=`{.cpp } support non-volatile bit-fields on the right hand side (`operator=(auto const&)`) or not (`operator=(auto&&)`) ?
+
+The latter question is not an issue with existing code, because tuple's tie() would never support bit-fields and there is actual implementation divergence between major vendors. I don't have a strong opinion, but suppressing also non-volatile bit-fields helps in situation where a bit-field containing class mixes volatile and non-volatile members.
   
 # Questions to LWG
 
 * Should the specification of the type of `std::ignore`{.cpp} use code or stick to a more generic text (see below)?
-  * Note: just using text, can create an issue with using volatile (bitfields) as RHS, where the actual read on the volatile will happen. using `auto&&` as assignment operator's argument will prevent using a volatile bitfield on the RHS (according to my experiments on https://godbolt.org/z/hznx7611M )
-* Do we need to mention "constepxr constructors" as asked for by LWG2933? (see parenthesized text in the Wording section)
-* How would we mention avaialability from header `<utility>` ?
+  * Note: just using text, can create an issue with using volatile (bitfields) as RHS, where the actual read on the volatile will happen. using `auto&&` as assignment operator's argument will prevent using a volatile bitfield on the RHS (according to [my experiments](https://godbolt.org/z/88PTG1GEs) ).
+* Do we need to mention "constepxr constructors" as asked for by LWG2933? (see parenthesized text in the Wording section) I don't think so.
+* How would we mention avaialability from header `<utility>` ? (I prepared accordingly, thanks to Arthur's help)
 
 
 # Impact on existing code
@@ -177,7 +179,7 @@ In [tuple.syn](https://eel.is/c++draft/tuple.syn) change the type of ignore from
 +// [utility.ignore], ignore
 +struct @_ignore_t_@ { // @_exposition only_@
 +  constexpr const @_ignore_t_@&
-+    operator=(auto&&) const noexcept
++    operator=(auto&&) const & noexcept
 +      { return *this; }
 +};
 +inline constexpr @_ignore_type_@ ignore;
@@ -210,7 +212,7 @@ In [utility.syn](https://eel.is/c++draft/utility.syn), add `ignore` to the `<uti
 +// [utility.ignore], ignore
 +struct @_ignore_t_@ { // @_exposition only_@
 +  constexpr const @_ignore_t_@&
-+    operator=(auto&&) const noexcept
++    operator=(auto&&) const & noexcept
 +      { return *this; }
 +};
 +inline constexpr @_ignore_t_@ ignore;

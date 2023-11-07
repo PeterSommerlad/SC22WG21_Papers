@@ -8,7 +8,7 @@
 
 void checkThatNoArgumentDoesntCompile(){
 
-	assert(); // compiles for C++...
+	//assert(); // no longer compiles for C++...
 }
 
 void checkThatMultipleArgsDontCompile(){
@@ -58,7 +58,16 @@ void checkThatPointerAssertWorks(){
 	a = *pi;
 }
 
+enum class ConfVals
+{
+    DefaultConfig = 1,
+    ExpertConfigCustomer1 = 2,
+    ExpertConfigCustomer2 = 4
+}; // from Ville
+void checkThatScopedEnumsDontWork(){
 
+	assert(ConfVals::DefaultConfig); // shouldn't compile
+}
 void runCppasserts(){
 	checkThatMultipleArgsDontCompileNDEBUG();
 	checkThatBracesConstructorWithCommasCompilesNDEBUG();
